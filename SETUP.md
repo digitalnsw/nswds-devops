@@ -84,9 +84,16 @@ Without this every consumer stub fails with "workflow was not found".
 
 ## 5. Per-repo cleanups to fold into each sync-PR review
 
-- Delete the superseded commit-types file (`commit-types.js` in most repos,
-  `commit-types.cjs` in nswds-tokens + nswds-email) — the synced
-  `commitlint.config.mjs` imports `commit-types.mjs`.
+- Delete the superseded commit-types file(s) — the synced
+  `commitlint.config.mjs` imports `commit-types.mjs`, so the old ones are dead
+  weight. Verified against remote main (2026-07-15):
+  - attestation, nswds-email: `commit-types.js` AND `commit-types.cjs`
+  - awards, engagement, reviewers, ictds-portal-flows, ictds-risk,
+    nswds-images, nswds-public-sans, nswds-design, nswds-email-builder,
+    nswds-ui: `commit-types.js`
+  - nswds-tokens: `commit-types.cjs`
+  - digitalnsw, nswds-email-starter, nswds-app, nswds-email-framework:
+    nothing to delete
 - Delete `opencommit.yml` in awards / engagement / reviewers / nswds-app if
   OpenCommit is no longer used.
 - ictds-portal-flows: the old full `semantic-release.yml` is replaced by the
