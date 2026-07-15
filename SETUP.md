@@ -28,9 +28,14 @@ These steps need org-admin access and can't be automated from a workstation.
    so keep nswds-devops `main` branch-protected, and switch the installation
    to "Only select repositories" if the org ever gains a repo a sync bot must
    never touch.
-4. On **this repo** (nswds-devops) → Settings → Secrets and variables → Actions:
-   - Variable `SYNC_APP_ID` = the App ID (App settings page)
-   - Secret `SYNC_APP_PRIVATE_KEY` = full contents of the `.pem`
+4. On **this repo** (nswds-devops) → Settings → Secrets and variables → Actions
+   — use the **Repository** level for both (not Organization: that would expose
+   the org-wide-write key to every repo's workflows; not Environment: the sync
+   job declares no `environment`, so it wouldn't resolve):
+   - *Variables* tab → **New repository variable** `SYNC_APP_ID` = the App ID
+     (App settings page)
+   - *Secrets* tab → **New repository secret** `SYNC_APP_PRIVATE_KEY` = full
+     contents of the `.pem`
 
 Fallback: a fine-grained PAT with the same three permissions on the same repos
 works too (pass it as `GH_PAT`), but it expires and breaks the sync silently.
