@@ -82,6 +82,15 @@ Without this every consumer stub fails with "workflow was not found".
      (its release.yml is a Power Platform prod pipeline — group 4 maps the
      release stub to semantic-release.yml; double-check the PR diff)
 
+## 4b. Repos with required-status-check rulesets
+
+Reusable workflows change check-context names: a job that used to report as
+`commitlint` now reports as `commitlint / commitlint` (caller job / reusable
+job). Any ruleset requiring the old name blocks PRs with "Expected — waiting
+for status to be reported". Rename the required contexts accordingly
+(nswds-design's "Protect main" was updated 2026-07-15; apply the same rename
+to any future ruleset).
+
 ## 5. Per-repo cleanups to fold into each sync-PR review
 
 - Delete the superseded commit-types file(s) — the synced
