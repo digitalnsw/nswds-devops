@@ -72,10 +72,13 @@ Because the App key equals org-wide write for anyone who can push to this
 repo's `main`: keep `main` here protected, and if the org ever gains a repo
 the sync must never touch, switch the App installation to selected repos.
 
-**Reusable workflow access**: this repo is private, so Settings → Actions →
-General → Access must stay on "Accessible from repositories owned by the
-organization". If someone resets it, every consumer check fails with
-"workflow was not found".
+**Reusable workflow access**: this repo is **public** (made so 2026-07-15 —
+GitHub forbids public repos from calling reusable workflows in a private
+one, and nswds-email-issues is public), which makes the reusables callable
+from anywhere with no access setting. If it's ever made private again, two
+things break: set Settings → Actions → General → Access to "Accessible from
+repositories owned by the organization" for the private repos, and
+nswds-email-issues' CI stops resolving entirely.
 
 **Pinned third-party actions** (deliberate, don't unpin):
 
