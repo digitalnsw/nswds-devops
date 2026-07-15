@@ -25,6 +25,10 @@ group:
       digitalnsw/nswds-email-starter
       digitalnsw/nswds-design
       digitalnsw/nswds-email-builder
+      digitalnsw/data
+      digitalnsw/nswds-community
+      digitalnsw/nswds-signature
+      digitalnsw/nswds-email-issues
     files:
       - source: scripts/
         dest: scripts/
