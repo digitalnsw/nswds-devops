@@ -1,0 +1,25 @@
+{
+  "name": "shared-build-scripts",
+  "version": "0.0.0",
+  "description": "Single source of truth for the digitalnsw shared build tooling: commit/branch/PR scripts, commitlint + release configs, and reusable GitHub workflows. Changes here are synced out to consumer repos as pull requests.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/digitalnsw/shared-build-scripts.git"
+  },
+  "license": "ISC",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0 <25.0.0",
+    "npm": ">=10.9.0 <12.0.0"
+  },
+  "scripts": {
+    "snyk:check": "bash -lc 'npm exec --yes --package snyk@latest -- snyk test --all-projects --exclude=fixtures,.next --json-file-output=snyk-analysis.json; code=$?; if [ $code -eq 0 ] || [ $code -eq 1 ]; then exit 0; fi; exit $code'",
+    "snyk:monitor": "npm exec --yes --package snyk@latest -- snyk monitor --all-projects --exclude=fixtures,.next",
+    "branch:create": "scripts/create-branch.sh",
+    "branch:suggest": "scripts/suggest-branch-name.sh",
+    "branch:suggest:create": "scripts/suggest-branch-name.sh --create",
+    "commit": "scripts/git-commit.sh",
+    "pr": "scripts/pull-request.sh"
+  }
+}

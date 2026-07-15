@@ -1,0 +1,908 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BASE_REQUIRED_CMDS=(git cat sed grep awk tr head wc paste cut sort uniq)
+for cmd in "${BASE_REQUIRED_CMDS[@]}"; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    printf "❌ Missing dependency: %s\n" "$cmd" >&2
+    exit 1
+  fi
+done
+
+usage() {
+  cat <<'EOF'
+Usage: ./suggest-branch-name.sh [--issue <id> | --ticket <id>] [--staged] [--create]
+
+Options:
+  --issue <id>   Require /issue/<id>/ in the suggested branch name.
+  --ticket <id>  Require /ticket/<id>/ in the suggested branch name.
+  --staged       Use staged changes only (default: all tracked changes vs HEAD + untracked files).
+  --create       Create and checkout the suggested branch after validation.
+  -h, --help     Show this help.
+EOF
+}
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+issue_kind=""
+issue_id=""
+staged_only="false"
+create_branch="false"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --issue)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        printf "❌ --issue requires a value.\n" >&2
+        exit 1
+      fi
+      issue_kind="issue"
+      issue_id="${2:-}"
+      shift 2
+      ;;
+    --ticket)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        printf "❌ --ticket requires a value.\n" >&2
+        exit 1
+      fi
+      issue_kind="ticket"
+      issue_id="${2:-}"
+      shift 2
+      ;;
+    --staged)
+      staged_only="true"
+      shift
+      ;;
+    --create)
+      create_branch="true"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      printf "❌ Unknown option: %s\n\n" "$1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+CONVENTIONAL_CONFIG_SCRIPT="${SCRIPT_DIR}/conventional-commit-config.sh"
+if [[ ! -f "$CONVENTIONAL_CONFIG_SCRIPT" ]]; then
+  printf "❌ Helper script not found: %s\n" "$CONVENTIONAL_CONFIG_SCRIPT" >&2
+  exit 1
+fi
+if [[ ! -x "$CONVENTIONAL_CONFIG_SCRIPT" ]]; then
+  printf "❌ Helper script is not executable: %s\n" "$CONVENTIONAL_CONFIG_SCRIPT" >&2
+  printf "   Try: chmod +x \"%s\"\n" "$CONVENTIONAL_CONFIG_SCRIPT" >&2
+  exit 1
+fi
+
+CONVENTIONAL_COMMIT_TYPES_CSV="$("$CONVENTIONAL_CONFIG_SCRIPT" csv)"
+
+BRANCH_CONFIG_SCRIPT="${SCRIPT_DIR}/branch-name-config.sh"
+if [[ ! -f "$BRANCH_CONFIG_SCRIPT" ]]; then
+  printf "❌ Branch config not found: %s\n" "$BRANCH_CONFIG_SCRIPT" >&2
+  exit 1
+fi
+
+# shellcheck source=./branch-name-config.sh
+source "$BRANCH_CONFIG_SCRIPT"
+
+USE_OPENAI_API="true"
+if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+  printf "ℹ️ OPENAI_API_KEY is not set; skipping AI suggestion and using fallback.\n" >&2
+  USE_OPENAI_API="false"
+fi
+
+# Shared OpenAI model default + family detection (single source of truth).
+OPENAI_REQUEST_SCRIPT="${SCRIPT_DIR}/openai-request.sh"
+if [[ ! -f "$OPENAI_REQUEST_SCRIPT" ]]; then
+  printf "❌ OpenAI request helper not found: %s\n" "$OPENAI_REQUEST_SCRIPT" >&2
+  exit 1
+fi
+# Branch names should be near-deterministic, so use a lower temperature than the
+# repo default before sourcing the helper (it honours OPENAI_TEMPERATURE).
+export OPENAI_TEMPERATURE="${OPENAI_TEMPERATURE:-0.2}"
+# shellcheck source=./openai-request.sh
+source "$OPENAI_REQUEST_SCRIPT"
+
+# Shared secret detection + redaction (single source of truth).
+SECRET_REDACTION_SCRIPT="${SCRIPT_DIR}/secret-redaction.sh"
+if [[ ! -f "$SECRET_REDACTION_SCRIPT" ]]; then
+  printf "❌ Secret redaction helper not found: %s\n" "$SECRET_REDACTION_SCRIPT" >&2
+  exit 1
+fi
+# shellcheck source=./secret-redaction.sh
+source "$SECRET_REDACTION_SCRIPT"
+
+# Reasoning models spend output tokens on hidden reasoning, so they need a far
+# larger budget than the gpt-4 family to actually emit a branch name.
+if [[ "$OPENAI_MODEL_FAMILY" == "reasoning" ]]; then
+  OPENAI_MAX_OUTPUT_TOKENS="${OPENAI_MAX_OUTPUT_TOKENS:-2000}"
+else
+  OPENAI_MAX_OUTPUT_TOKENS="${OPENAI_MAX_OUTPUT_TOKENS:-140}"
+fi
+if [[ "$USE_OPENAI_API" == "true" ]] && ! [[ "$OPENAI_MAX_OUTPUT_TOKENS" =~ ^[1-9][0-9]*$ ]]; then
+  printf "❌ OPENAI_MAX_OUTPUT_TOKENS must be a positive integer.\n" >&2
+  exit 1
+fi
+
+if [[ "$USE_OPENAI_API" == "true" ]]; then
+  OPENAI_REQUIRED_CMDS=(jq curl)
+  for cmd in "${OPENAI_REQUIRED_CMDS[@]}"; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      printf "❌ Missing dependency for OpenAI mode: %s\n" "$cmd" >&2
+      exit 1
+    fi
+  done
+fi
+
+MAX_DIFF_PREVIEW_LINES=1500
+MAX_DIFF_SCAN_LINES=5000
+
+if [[ -n "$issue_id" ]] && ! [[ "$issue_id" =~ ^[A-Za-z0-9_-]+$ ]]; then
+  printf "❌ Invalid issue/ticket id: %s (allowed characters: A-Z a-z 0-9 _ -)\n" "$issue_id" >&2
+  exit 1
+fi
+
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+  printf "❌ This script must be run inside a git repository.\n" >&2
+  exit 1
+}
+
+# Default to the repo-root .opencommitignore (where it actually lives), not the
+# script dir. An explicit OPENCOMMIT_IGNORE_FILE still wins.
+OPENCOMMIT_IGNORE_FILE="${OPENCOMMIT_IGNORE_FILE:-${repo_root}/.opencommitignore}"
+opencommit_ignore_enabled="false"
+if [[ -f "$OPENCOMMIT_IGNORE_FILE" ]]; then
+  opencommit_ignore_enabled="true"
+fi
+
+if git -C "$repo_root" rev-parse --verify HEAD >/dev/null 2>&1; then
+  base_ref="HEAD"
+else
+  base_ref="$(git -C "$repo_root" hash-object -t tree /dev/null)"
+fi
+
+if [[ "$staged_only" == "true" ]]; then
+  raw_changed_files="$(git -C "$repo_root" diff --name-only --cached || true)"
+  raw_untracked_files=""
+else
+  # Include staged-only paths explicitly so default mode always analyzes full change context.
+  raw_changed_files="$(
+    {
+      git -C "$repo_root" diff --name-only "$base_ref" || true
+      git -C "$repo_root" diff --name-only --cached || true
+    } | sed '/^$/d' | awk '!seen[$0]++'
+  )"
+  raw_untracked_files="$(git -C "$repo_root" ls-files --others --exclude-standard || true)"
+fi
+
+changed_files=""
+untracked_files=""
+ignored_paths=""
+if [[ "$opencommit_ignore_enabled" == "true" ]]; then
+  ignore_filter_description="Git ignore pattern matching, including ${OPENCOMMIT_IGNORE_FILE}"
+else
+  ignore_filter_description="Git ignore pattern matching"
+fi
+
+should_ignore_path() {
+  local path="$1"
+  if [[ "$opencommit_ignore_enabled" == "true" ]]; then
+    if git -C "$repo_root" -c core.excludesFile="$OPENCOMMIT_IGNORE_FILE" check-ignore --no-index -q -- "$path" 2>/dev/null; then
+      return 0
+    fi
+  elif git -C "$repo_root" check-ignore --no-index -q -- "$path" 2>/dev/null; then
+    return 0
+  fi
+  return 1
+}
+
+while IFS= read -r path; do
+  [[ -z "$path" ]] && continue
+  if should_ignore_path "$path"; then
+    if [[ -n "$ignored_paths" ]]; then
+      ignored_paths="${ignored_paths}"$'\n'
+    fi
+    ignored_paths="${ignored_paths}${path}"
+  else
+    if [[ -n "$changed_files" ]]; then
+      changed_files="${changed_files}"$'\n'
+    fi
+    changed_files="${changed_files}${path}"
+  fi
+done <<< "$raw_changed_files"
+
+while IFS= read -r path; do
+  [[ -z "$path" ]] && continue
+  if should_ignore_path "$path"; then
+    if [[ -n "$ignored_paths" ]]; then
+      ignored_paths="${ignored_paths}"$'\n'
+    fi
+    ignored_paths="${ignored_paths}${path}"
+  else
+    if [[ -n "$untracked_files" ]]; then
+      untracked_files="${untracked_files}"$'\n'
+    fi
+    untracked_files="${untracked_files}${path}"
+  fi
+done <<< "$raw_untracked_files"
+
+changed_files="$(printf '%s\n' "$changed_files" | sed '/^$/d')"
+untracked_files="$(printf '%s\n' "$untracked_files" | sed '/^$/d')"
+ignored_paths="$(printf '%s\n' "$ignored_paths" | sed '/^$/d')"
+if [[ -n "$ignored_paths" ]]; then
+  ignored_paths_count="$(printf '%s\n' "$ignored_paths" | wc -l | tr -d ' ')"
+else
+  ignored_paths_count=0
+fi
+
+declare -a changed_files_arr=()
+while IFS= read -r path; do
+  [[ -z "$path" ]] && continue
+  changed_files_arr+=("$path")
+done <<< "$changed_files"
+
+full_diff=""
+if (( ${#changed_files_arr[@]} > 0 )); then
+  if [[ "$staged_only" == "true" ]]; then
+    full_diff="$(git -C "$repo_root" diff --cached -- "${changed_files_arr[@]}" | sed -n "1,${MAX_DIFF_SCAN_LINES}p" || true)"
+  else
+    # Build full pending-change context from both index and working tree.
+    full_diff="$(
+      {
+        git -C "$repo_root" diff --cached -- "${changed_files_arr[@]}" || true
+        git -C "$repo_root" diff -- "${changed_files_arr[@]}" || true
+      } | sed -n "1,${MAX_DIFF_SCAN_LINES}p"
+    )"
+  fi
+fi
+
+# If there are only untracked files, synthesize a compact diff-like context.
+if [[ -z "$full_diff" && -z "$changed_files" && -n "$untracked_files" ]]; then
+  full_diff="# Synthetic diff for untracked files"
+  while IFS= read -r path; do
+    [[ -z "$path" ]] && continue
+    full_diff+=$'\n'"diff --git a/$path b/$path"
+    full_diff+=$'\n'"new file mode 100644"
+    full_diff+=$'\n'"--- /dev/null"
+    full_diff+=$'\n'"+++ b/$path"
+    full_diff+=$'\n'
+  done <<< "$untracked_files"
+fi
+
+if [[ -z "$changed_files" && -z "$untracked_files" ]]; then
+  if [[ "$ignored_paths_count" -gt 0 ]]; then
+    printf "❌ No code changes detected after filtering collected candidate paths with %s (%s path(s) filtered).\n" "$ignore_filter_description" "$ignored_paths_count" >&2
+  else
+    printf "❌ No code changes detected.\n" >&2
+  fi
+  exit 1
+fi
+if [[ "$ignored_paths_count" -gt 0 ]]; then
+  printf "ℹ️ Filtered %s collected candidate path(s) with %s.\n" "$ignored_paths_count" "$ignore_filter_description"
+fi
+
+# SENSITIVE_REGEX comes from secret-redaction.sh (sourced above).
+if [[ "$USE_OPENAI_API" == "true" ]] && printf '%s\n' "$full_diff" | grep -Eqi "$SENSITIVE_REGEX"; then
+  printf "⚠️ Potential secrets detected in the diff.\n"
+  printf "This script sends a diff preview to the OpenAI API.\n"
+  proceed=""
+  if ! read -r -p "Proceed anyway? (y/N) " proceed; then
+    proceed=""
+  fi
+  if [[ ! "${proceed:-}" =~ ^[Yy]$ ]]; then
+    printf "Aborted.\n"
+    exit 1
+  fi
+fi
+
+# redact_sensitive_diff comes from secret-redaction.sh (sourced above).
+full_diff_redacted="$(redact_sensitive_diff "$full_diff")"
+if [[ -n "$full_diff_redacted" ]]; then
+  total_lines="$(printf '%s\n' "$full_diff_redacted" | wc -l | tr -d ' ')"
+else
+  total_lines=0
+fi
+diff_redacted="$(printf '%s\n' "$full_diff_redacted" | sed -n "1,${MAX_DIFF_PREVIEW_LINES}p")"
+truncated="false"
+if [[ "$total_lines" -gt "$MAX_DIFF_PREVIEW_LINES" ]]; then
+  truncated="true"
+fi
+
+sanitize_branch_name() {
+  local raw="$1"
+  raw="$(printf '%s' "$raw" | sed -e 's/\r//g')"
+  raw="$(printf '%s\n' "$raw" | sed -n '/[^[:space:]]/{p;q;}')"
+  raw="$(printf '%s' "$raw" | sed -E \
+    -e 's/^[-*][[:space:]]*//' \
+    -e 's/^[Bb]ranch([[:space:]]+[Nn]ame)?[[:space:]]*:[[:space:]]*//' \
+    -e 's@^refs/heads/@@' \
+    -e 's@^origin/@@' \
+    -e 's/^['\''"`]+//' \
+    -e 's/['\''"`]+$//' \
+    -e 's/[[:space:]]+/-/g' \
+    -e 's@/+@/@g' \
+    -e 's/^-+//' \
+    -e 's/-+$//' \
+    -e 's@/$@@' \
+  )"
+  printf '%s' "$raw"
+}
+
+sanitize_slug() {
+  local value="$1"
+  local fallback="${2:-}"
+  # Preserve dots so version slugs (e.g. v1.2.0) survive; everything else that
+  # isn't [a-z0-9.] collapses to a hyphen. Any run of mixed/repeated separators
+  # is then collapsed to a single hyphen and leading/trailing separators are
+  # stripped, so output always matches the strict branch slug regex
+  # [a-z0-9]+([.-][a-z0-9]+)* in branch-name-config.sh.
+  value="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]' | sed -E \
+    -e 's/[^a-z0-9.]+/-/g' \
+    -e 's/[.-]{2,}/-/g' \
+    -e 's/^[.-]+//' \
+    -e 's/[.-]+$//' \
+  )"
+  value="$(printf '%s' "$value" | cut -c1-80 | sed -E 's/[.-]+$//')"
+  if [[ -z "$value" && -n "$fallback" ]]; then
+    value="$fallback"
+  fi
+  printf '%s' "$value"
+}
+
+sanitize_issue_segment() {
+  local value="$1"
+  value="$(printf '%s' "$value" | sed -E \
+    -e 's/[^A-Za-z0-9_-]+/-/g' \
+    -e 's/^-+//' \
+    -e 's/-+$//' \
+    -e 's/-{2,}/-/g' \
+  )"
+  value="$(printf '%s' "$value" | cut -c1-40 | sed -E 's/-+$//')"
+  printf '%s' "$value"
+}
+
+join_parts_from_index() {
+  local start="$1"
+  shift
+  local i=0
+  local out=""
+  local part=""
+
+  for part in "$@"; do
+    if (( i >= start )); then
+      part="$(printf '%s' "$part" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
+      if [[ -n "$part" ]]; then
+        if [[ -n "$out" ]]; then
+          out="${out}-"
+        fi
+        out="${out}${part}"
+      fi
+    fi
+    i=$((i + 1))
+  done
+
+  printf '%s' "$out"
+}
+
+map_branch_type() {
+  local token="$1"
+  token="$(printf '%s' "$token" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z]+/-/g; s/^-+//; s/-+$//')"
+
+  case "$token" in
+    feature|features|feat) printf "feat" ;;
+    hotfix|hot-fix) printf "hotfix" ;;
+    fix|bug|bugfix|bug-fix) printf "fix" ;;
+    release) printf "release" ;;
+    docs|doc|documentation) printf "docs" ;;
+    build|ci|deps|dependency|dependencies) printf "build" ;;
+    test|tests|testing) printf "test" ;;
+    refactor|refactoring|perf|performance|cleanup|clean-up) printf "refactor" ;;
+    style|format|formatting) printf "style" ;;
+    chore|ops|maintenance|maint|merge) printf "chore" ;;
+    revert) printf "hotfix" ;;
+    *)
+      # Pass through any token that is already a valid configured branch type
+      # (e.g. export, ai, copilot, cursor, claude, codex) so AI suggestions
+      # using those prefixes aren't silently remapped to the default type.
+      # BRANCH_TYPES_REGEX (from branch-name-config.sh) is the single source of truth.
+      if [[ "$token" =~ ^(${BRANCH_TYPES_REGEX})$ ]]; then
+        printf '%s' "$token"
+      else
+        printf ""
+      fi
+      ;;
+  esac
+}
+
+count_matching_files() {
+  local files="$1"
+  local pattern="$2"
+  local count
+  count="$(printf '%s\n' "$files" | sed '/^$/d' | grep -E -c -- "$pattern" || true)"
+  printf '%s' "$count"
+}
+
+summarize_changed_paths() {
+  local files="$1"
+  local total top_dirs top_subdir
+
+  total="$(printf '%s\n' "$files" | sed '/^$/d' | wc -l | tr -d ' ')"
+  if [[ "$total" -eq 0 ]]; then
+    printf "No changed files detected."
+    return
+  fi
+
+  top_dirs="$(printf '%s\n' "$files" | sed '/^$/d' | awk -F/ '{print $1}' | sort | uniq -c | sort -nr | head -n 4 | awk '{printf "%s:%s ", $2, $1}')"
+  top_subdir="$(printf '%s\n' "$files" | sed '/^$/d' | awk -F/ '
+    NF >= 2 { key=$1"/"$2; c[key]++ }
+    END {
+      best=""; bestc=0;
+      for (k in c) {
+        if (c[k] > bestc) {
+          best=k;
+          bestc=c[k];
+        }
+      }
+      if (best != "") {
+        printf "%s:%s", best, bestc;
+      }
+    }
+  ')"
+
+  printf "Total changed files: %s\nTop directories (count): %s\nTop subdirectory (count): %s" \
+    "$total" "${top_dirs:-n/a}" "${top_subdir:-n/a}"
+}
+
+normalize_candidate_branch() {
+  local raw_candidate="$1"
+  local default_type="$2"
+  local candidate type mapped_type slug_raw slug start_index maybe_kind maybe_id
+  local issue_kind_local="" issue_id_local=""
+  local -a parts=()
+
+  candidate="$(sanitize_branch_name "$raw_candidate")"
+  if [[ -z "$candidate" ]]; then
+    printf ''
+    return
+  fi
+
+  if [[ "$candidate" =~ $SNYK_REGEX ]]; then
+    printf '%s' "$candidate"
+    return
+  fi
+
+  IFS='/' read -r -a parts <<< "$candidate"
+
+  type="${parts[0]:-}"
+  type="$(printf '%s' "$type" | sed -E 's/:$//')"
+  mapped_type="$(map_branch_type "$type")"
+  if [[ -z "$mapped_type" ]]; then
+    mapped_type="$default_type"
+  fi
+  if [[ -z "$mapped_type" ]]; then
+    mapped_type="feat"
+  fi
+
+  start_index=1
+  if [[ -n "$issue_kind" ]]; then
+    maybe_kind="$(printf '%s' "${parts[1]:-}" | tr '[:upper:]' '[:lower:]')"
+    issue_kind_local="$issue_kind"
+    issue_id_local="$issue_id"
+    if [[ "$maybe_kind" == "issue" || "$maybe_kind" == "ticket" ]]; then
+      if [[ -n "${parts[2]:-}" ]]; then
+        start_index=3
+      else
+        start_index=2
+      fi
+    fi
+  else
+    maybe_kind="$(printf '%s' "${parts[1]:-}" | tr '[:upper:]' '[:lower:]')"
+    if [[ "$maybe_kind" == "issue" || "$maybe_kind" == "ticket" ]]; then
+      maybe_id="$(sanitize_issue_segment "${parts[2]:-}")"
+      if [[ -n "$maybe_id" ]]; then
+        issue_kind_local="$maybe_kind"
+        issue_id_local="$maybe_id"
+        start_index=3
+      else
+        start_index=2
+      fi
+    fi
+  fi
+
+  slug_raw="$(join_parts_from_index "$start_index" "${parts[@]}")"
+  if [[ -z "$slug_raw" ]]; then
+    slug_raw="$(printf '%s' "$candidate" | sed -E "s@^${mapped_type}/@@")"
+  fi
+  slug="$(sanitize_slug "$slug_raw" "update-code")"
+
+  if [[ -n "$issue_kind_local" && -n "$issue_id_local" ]]; then
+    printf '%s/%s/%s/%s' "$mapped_type" "$issue_kind_local" "$issue_id_local" "$slug"
+  else
+    printf '%s/%s' "$mapped_type" "$slug"
+  fi
+}
+
+validate_branch_name() {
+  local branch="$1"
+  if [[ "$branch" =~ $BRANCH_REGEX || "$branch" =~ $SNYK_REGEX ]]; then
+    if [[ -n "$issue_kind" ]] && [[ "$branch" != */"$issue_kind"/"$issue_id"/* ]]; then
+      return 1
+    fi
+    return 0
+  fi
+  return 1
+}
+
+branch_rejection_reason() {
+  local branch="$1"
+  if [[ ! "$branch" =~ $BRANCH_REGEX && ! "$branch" =~ $SNYK_REGEX ]]; then
+    printf "does not match validate-branch-name regex"
+    return
+  fi
+
+  if [[ -n "$issue_kind" ]] && [[ "$branch" != */"$issue_kind"/"$issue_id"/* ]]; then
+    printf "missing required /%s/%s/ segment" "$issue_kind" "$issue_id"
+    return
+  fi
+
+  printf "failed additional validation"
+}
+
+infer_fallback_branch_type() {
+  local files="$1"
+  local total test_count docs_count build_count template_count
+
+  total="$(printf '%s\n' "$files" | sed '/^$/d' | wc -l | tr -d ' ')"
+  if [[ "$total" -eq 0 ]]; then
+    printf "chore"
+    return
+  fi
+
+  test_count="$(count_matching_files "$files" '(^|/)(test|tests|__tests__)/|(\.test\.|\.spec\.)')"
+  docs_count="$(count_matching_files "$files" '^docs/|\.md$')"
+  build_count="$(count_matching_files "$files" '^\.github/workflows/|Dockerfile|docker-compose|(^|/)(Makefile|package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$')"
+  template_count="$(count_matching_files "$files" '^(blocks|docs|emails|templates)/')"
+
+  if (( docs_count == total )); then
+    printf "docs"
+    return
+  fi
+
+  if (( test_count * 100 >= total * 60 )); then
+    printf "test"
+    return
+  fi
+
+  if (( build_count * 100 >= total * 60 )); then
+    printf "build"
+    return
+  fi
+
+  if (( template_count * 100 >= total * 60 )); then
+    printf "feat"
+    return
+  fi
+
+  if (( build_count > 0 && total <= 12 )); then
+    printf "chore"
+    return
+  fi
+
+  printf "feat"
+}
+
+generate_fallback_branch_name() {
+  local files="$1"
+  local branch_type slug_parts slug branch
+  local total top1 top1_count top2 top2_count top_focus area_token size_token topic_token
+  local top_entry_dir top_entry_count
+  local -a slug_tokens=()
+
+  branch_type="$(infer_fallback_branch_type "$files")"
+  total="$(printf '%s\n' "$files" | sed '/^$/d' | wc -l | tr -d ' ')"
+
+  top1=""
+  top2=""
+  top1_count="0"
+  top2_count="0"
+  while IFS=$'\t' read -r top_entry_dir top_entry_count; do
+    if [[ -z "$top1" ]]; then
+      top1="$top_entry_dir"
+      top1_count="${top_entry_count:-0}"
+    else
+      top2="$top_entry_dir"
+      top2_count="${top_entry_count:-0}"
+      break
+    fi
+  done < <(
+    printf '%s\n' "$files" \
+      | sed '/^$/d' \
+      | awk -F/ '{print $1}' \
+      | sort \
+      | uniq -c \
+      | sort -nr \
+      | awk 'NR<=2 {print $2 "\t" $1}'
+  )
+  top1_count="${top1_count:-0}"
+  top2_count="${top2_count:-0}"
+  if ! [[ "$top1_count" =~ ^[0-9]+$ ]]; then
+    top1_count=0
+  fi
+  if ! [[ "$top2_count" =~ ^[0-9]+$ ]]; then
+    top2_count=0
+  fi
+
+  top_focus=""
+  if [[ -n "$top1" ]]; then
+    top_focus="$(printf '%s\n' "$files" | sed '/^$/d' | awk -F/ -v top="$top1" '$1==top && NF>1 {print $2}' | sort | uniq -c | sort -nr | awk 'NR==1 {print $2}')"
+  fi
+
+  if [[ "$total" -ge 150 ]]; then
+    size_token="bulk"
+  elif [[ "$total" -ge 50 ]]; then
+    size_token="large"
+  else
+    size_token="update"
+  fi
+
+  if [[ "$total" -ge 40 ]]; then
+    if (( top1_count > 0 && (top1_count * 100) < (total * 80) )); then
+      area_token="multi-area"
+    elif [[ -n "$top1" ]]; then
+      area_token="$(sanitize_slug "$top1")"
+    else
+      area_token="code"
+    fi
+  elif [[ -n "$top2" && ${top2_count:-0} -gt 0 && ${top1_count:-0} -gt 0 ]] && (( (${top2_count:-0} * 100) >= (${top1_count:-0} * 65) )); then
+    area_token="multi-area"
+  elif [[ -n "$top1" && -n "$top_focus" ]]; then
+    area_token="$(sanitize_slug "${top1}-${top_focus}")"
+  elif [[ -n "$top1" ]]; then
+    area_token="$(sanitize_slug "$top1")"
+  else
+    area_token="code"
+  fi
+
+  if [[ -z "$area_token" ]]; then
+    area_token="code"
+  fi
+
+  topic_token="$(printf '%s\n' "$files" | sed '/^$/d' | sed -E \
+    -e 's@.*/@@' \
+    -e 's/\.[A-Za-z0-9._-]+$//' \
+  | tr '[:upper:]' '[:lower:]' \
+  | sed -E \
+    -e 's/[^a-z0-9]+/-/g' \
+    -e 's/^-+//' \
+    -e 's/-+$//' \
+  | sed '/^$/d' | awk '$0 !~ /^(index|readme|main|app|test|tests)$/ {print}' | sort | uniq -c | sort -nr | awk 'NR==1 {print $2}')"
+
+  slug_tokens+=("$size_token")
+  slug_tokens+=("$area_token")
+  if [[ "$total" -le 25 && -n "$topic_token" ]]; then
+    slug_tokens+=("$topic_token")
+  fi
+  slug_tokens+=("updates")
+
+  slug_parts="$(printf '%s\n' "${slug_tokens[@]}" | sed '/^$/d' | paste -sd'-' -)"
+  slug="$(sanitize_slug "$slug_parts" "update-code")"
+
+  if [[ -n "$issue_kind" ]]; then
+    branch="${branch_type}/${issue_kind}/${issue_id}/${slug}"
+  else
+    branch="${branch_type}/${slug}"
+  fi
+
+  if validate_branch_name "$branch"; then
+    printf '%s' "$branch"
+  else
+    if [[ -n "$issue_kind" ]]; then
+      printf '%s' "chore/${issue_kind}/${issue_id}/update-code"
+    else
+      printf '%s' "chore/update-code"
+    fi
+  fi
+}
+
+files_context="$(printf '%s\n%s\n' "$changed_files" "$untracked_files" | sed '/^$/d')"
+changed_files_count="$(printf '%s\n' "$changed_files" | sed '/^$/d' | wc -l | tr -d ' ')"
+untracked_files_count="$(printf '%s\n' "$untracked_files" | sed '/^$/d' | wc -l | tr -d ' ')"
+change_scope_summary="$(summarize_changed_paths "$files_context")"
+preferred_branch_type="$(infer_fallback_branch_type "$files_context")"
+preferred_fallback_branch="$(generate_fallback_branch_name "$files_context")"
+ignored_paths_sample="$(printf '%s\n' "$ignored_paths" | sed '/^$/d' | sed -n '1,8p')"
+if [[ "$ignored_paths_count" -gt 0 ]]; then
+  ignore_filter_summary="Filtered ${ignored_paths_count} collected candidate path(s) with ${ignore_filter_description}.
+Ignored sample:
+${ignored_paths_sample}"
+else
+  ignore_filter_summary="No collected candidate paths were filtered with ${ignore_filter_description}."
+fi
+
+changed_files_for_prompt="$(printf '%s\n' "$changed_files" | sed '/^$/d' | sed -n '1,250p')"
+if [[ "$changed_files_count" -gt 250 ]]; then
+  changed_files_for_prompt="${changed_files_for_prompt}
+... (${changed_files_count} changed files total; truncated for prompt)"
+fi
+
+untracked_files_for_prompt="$(printf '%s\n' "$untracked_files" | sed '/^$/d' | sed -n '1,120p')"
+if [[ "$untracked_files_count" -gt 120 ]]; then
+  untracked_files_for_prompt="${untracked_files_for_prompt}
+... (${untracked_files_count} untracked files total; truncated for prompt)"
+fi
+
+issue_requirement=""
+if [[ -n "$issue_kind" ]]; then
+  issue_requirement="Required middle segment: /${issue_kind}/${issue_id}/"
+fi
+
+build_prompt() {
+  local validation_error="${1:-}"
+  cat <<EOF
+You suggest git branch names for code changes.
+
+Output requirements:
+- Return exactly ONE branch name and nothing else.
+- Must match this regex exactly:
+  ${BRANCH_REGEX}
+- Allowed branch types (prefix): ${BRANCH_TYPES_CSV}
+- Conventional Commit types configured in this repo: ${CONVENTIONAL_COMMIT_TYPES_CSV}
+- Use this mapping to align branch type to commit intent:
+  feat->feat, fix->fix, refactor->refactor, perf->refactor, style->style, test->test, build->build, ops->chore, docs->docs, chore->chore, merge->chore, revert->hotfix
+- CRITICAL: Branch names must be either <type>/<slug> or <type>/(issue|ticket)/<id>/<slug>. Do not include any additional "/" segments.
+- Keep the slug concise, lowercase, and hyphenated ([a-z0-9.-]; dots only for version numbers like v1.2.0; no leading, trailing, or consecutive dots/hyphens).
+- Describe what the change actually DOES, inferred from the diff: name the dominant action or theme (e.g. bump-dependency-locks, migrate-button-variants, fix-callout-spacing), not the folder layout.
+- Even when many files change, pick the most specific theme that covers them. Do NOT fall back to generic placeholders like "multi-area-updates", "update-code", or anything ending in "-updates"; those are reserved for the deterministic fallback only.
+- Avoid filler words: no "update", "updates", "changes", "misc", "various", or "multi-area" unless the diff genuinely has no identifiable theme.
+- Prefer a branch type aligned with this default hint: ${preferred_branch_type}
+${issue_requirement}
+${validation_error}
+
+Valid examples:
+- feat/revise-callout-defaults
+- docs/issue/ABC-123/revise-component-guides
+- chore/ticket/ENG-77/refresh-kitchen-sink-emails
+
+Invalid examples:
+- feat/subfolder/component/revise-callout-defaults
+- feat/revise callout defaults
+- Branch name: feat/revise-callout-defaults
+
+Change scope summary:
+${change_scope_summary}
+
+Ignore filtering summary:
+${ignore_filter_summary}
+
+Changed files:
+${changed_files_for_prompt}
+
+Untracked files:
+${untracked_files_for_prompt}
+
+Diff preview (redacted):
+${diff_redacted}
+
+Diff truncated: ${truncated}
+EOF
+}
+
+attempt=1
+max_attempts=3
+suggested_branch=""
+validation_error=""
+rejected_candidates=()
+
+if [[ "$USE_OPENAI_API" == "true" ]]; then
+  while [[ $attempt -le $max_attempts ]]; do
+    prompt_text="$(build_prompt "$validation_error")"
+
+    # Single shared helper shapes the payload, makes the request, and runs all
+    # the transport/non-JSON/.error guards; it returns 1 on any failure.
+    set +e
+    model_output="$(openai_responses_text \
+      "You are strict about output format and only output a valid branch name." \
+      "$prompt_text" \
+      "$OPENAI_MAX_OUTPUT_TOKENS")"
+    request_status=$?
+    set -e
+
+    if [[ $request_status -ne 0 ]]; then
+      exit 1
+    fi
+
+    raw_candidate="$(sanitize_branch_name "$model_output")"
+    candidate="$(normalize_candidate_branch "$raw_candidate" "$preferred_branch_type")"
+
+    if [[ -n "$raw_candidate" && "$candidate" != "$raw_candidate" ]]; then
+      printf "ℹ️ Normalized AI candidate: %s -> %s\n" "$raw_candidate" "$candidate"
+    fi
+
+    if validate_branch_name "$candidate"; then
+      suggested_branch="$candidate"
+      break
+    fi
+
+    reason="$(branch_rejection_reason "$candidate")"
+    display_candidate="$raw_candidate"
+    if [[ -z "$display_candidate" ]]; then
+      display_candidate="<empty>"
+    fi
+    if [[ -n "$candidate" && "$candidate" != "$display_candidate" ]]; then
+      display_candidate="${display_candidate} -> ${candidate}"
+    fi
+    rejected_candidates+=("${display_candidate} (${reason})")
+    printf "⚠️ Rejected AI candidate (%d/%d): %s (%s)\n" "$attempt" "$max_attempts" "$display_candidate" "$reason"
+
+    validation_error="Previous output was invalid (${reason}): ${display_candidate}. Return only a valid branch name."
+    attempt=$((attempt + 1))
+  done
+fi
+
+if [[ -z "$suggested_branch" ]]; then
+  suggested_branch="$(generate_fallback_branch_name "$files_context")"
+  if [[ "$USE_OPENAI_API" == "true" ]]; then
+    printf "⚠️ Using fallback branch name after invalid model output.\n"
+  else
+    printf "ℹ️ Using deterministic fallback branch name.\n"
+  fi
+fi
+
+if [[ ${#rejected_candidates[@]} -gt 0 ]]; then
+  printf "🧪 Rejected AI candidates:\n"
+  for rejected in "${rejected_candidates[@]}"; do
+    printf "  - %s\n" "$rejected"
+  done
+fi
+
+printf "✅ Suggested branch name:\n%s\n" "$suggested_branch"
+
+if [[ "$create_branch" == "true" ]]; then
+  CREATE_BRANCH_SCRIPT="${SCRIPT_DIR}/create-branch.sh"
+  if [[ ! -f "$CREATE_BRANCH_SCRIPT" ]]; then
+    printf "❌ Required script not found: %s\n" "$CREATE_BRANCH_SCRIPT" >&2
+    exit 1
+  fi
+
+  while true; do
+    create_confirm=""
+    if ! read -r -p "Use this suggestion to create a branch now? (y/n): " create_confirm; then
+      create_confirm="n"
+    fi
+    case "${create_confirm:-}" in
+      [Yy])
+        while true; do
+          push_confirm=""
+          if ! read -r -p "Push the branch to origin now? (y/n): " push_confirm; then
+            push_confirm="n"
+          fi
+          case "${push_confirm:-}" in
+            [Yy])
+              bash "$CREATE_BRANCH_SCRIPT" "$suggested_branch"
+              exit $?
+              ;;
+            [Nn])
+              bash "$CREATE_BRANCH_SCRIPT" "$suggested_branch" --no-push
+              exit $?
+              ;;
+            *)
+              printf "Please answer y or n.\n"
+              ;;
+          esac
+        done
+        ;;
+      [Nn])
+        printf "Skipped branch creation.\n"
+        exit 0
+        ;;
+      *)
+        printf "Please answer y or n.\n"
+        ;;
+    esac
+  done
+fi

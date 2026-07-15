@@ -1,0 +1,13 @@
+node_modules/
+.DS_Store
+.env
+.env.*
+.claude/
+snyk-analysis.json
+
+# Local scratch files — not part of the shared tooling
+m.txt
+readme.txt
+index.js
+.opencommit-commitlint
+.opencommitignore

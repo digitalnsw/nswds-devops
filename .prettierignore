@@ -1,0 +1,12 @@
+node_modules
+.next
+.husky
+coverage
+.prettierignore
+.stylelintignore
+.eslintignore
+*.log
+package-lock.json
+public
+out
+build
