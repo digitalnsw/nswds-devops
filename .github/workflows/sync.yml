@@ -30,7 +30,9 @@ jobs:
         id: app
         uses: actions/create-github-app-token@v2
         with:
-          app-id: ${{ vars.SYNC_APP_ID }}
+          # Both stored as repository secrets (the App ID isn't sensitive, but
+          # it was saved there; reading it as a secret is equally fine).
+          app-id: ${{ secrets.SYNC_APP_ID }}
           private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
           owner: digitalnsw
 

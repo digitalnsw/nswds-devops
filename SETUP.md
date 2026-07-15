@@ -32,7 +32,7 @@ These steps need org-admin access and can't be automated from a workstation.
    — use the **Repository** level for both (not Organization: that would expose
    the org-wide-write key to every repo's workflows; not Environment: the sync
    job declares no `environment`, so it wouldn't resolve):
-   - *Variables* tab → **New repository variable** `SYNC_APP_ID` = the App ID
+   - *Secrets* tab → **New repository secret** `SYNC_APP_ID` = the App ID
      (App settings page)
    - *Secrets* tab → **New repository secret** `SYNC_APP_PRIVATE_KEY` = full
      contents of the `.pem`
