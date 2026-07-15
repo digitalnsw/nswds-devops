@@ -1,4 +1,6 @@
+# shellcheck shell=bash
 # Source this file from other scripts to share branch naming rules.
+# shellcheck disable=SC2034  # variables are consumed by the sourcing scripts
 
 BRANCH_TYPES_REGEX='feat|fix|hotfix|release|docs|build|test|refactor|style|chore|export|ai|copilot|cursor|claude|codex'
 BRANCH_TYPES_CSV='feat, fix, hotfix, release, docs, build, test, refactor, style, chore, export, ai, copilot, cursor, claude, codex'

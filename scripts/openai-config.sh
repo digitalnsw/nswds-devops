@@ -1,3 +1,5 @@
+# shellcheck shell=bash
+# shellcheck disable=SC2034  # variables are consumed by the sourcing scripts
 # Shared OpenAI configuration. Source this file to get a single, consistent
 # default model across every script in this repo.
 #

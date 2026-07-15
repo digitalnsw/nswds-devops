@@ -714,7 +714,6 @@ changed_files_count="$(printf '%s\n' "$changed_files" | sed '/^$/d' | wc -l | tr
 untracked_files_count="$(printf '%s\n' "$untracked_files" | sed '/^$/d' | wc -l | tr -d ' ')"
 change_scope_summary="$(summarize_changed_paths "$files_context")"
 preferred_branch_type="$(infer_fallback_branch_type "$files_context")"
-preferred_fallback_branch="$(generate_fallback_branch_name "$files_context")"
 ignored_paths_sample="$(printf '%s\n' "$ignored_paths" | sed '/^$/d' | sed -n '1,8p')"
 if [[ "$ignored_paths_count" -gt 0 ]]; then
   ignore_filter_summary="Filtered ${ignored_paths_count} collected candidate path(s) with ${ignore_filter_description}.

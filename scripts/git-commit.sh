@@ -225,6 +225,7 @@ while [[ $attempt -le $max_attempts ]]; do
   COMMIT_MSG="$(printf "%s" "$COMMIT_MSG" | sed -e 's/\r//g')"
   COMMIT_MSG="$(printf "%s" "$COMMIT_MSG" | sed -e 's/^Title:[[:space:]]*//I')"
   COMMIT_MSG="$(printf "%s" "$COMMIT_MSG" | sed -E 's/^['\''\"`]+//; s/['\''\"`]+$//')"
+  # shellcheck disable=SC2016  # backticks are literal (markdown fence stripping)
   COMMIT_MSG="$(printf "%s" "$COMMIT_MSG" | sed -e 's/^```[a-zA-Z0-9_-]*//; s/```$//')"
   COMMIT_MSG="$(printf "%s" "$COMMIT_MSG" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
 

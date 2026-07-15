@@ -91,6 +91,7 @@ fi
 # "Title:", wrapping quotes/backticks/code fences, collapse whitespace, and trim.
 title="$(printf '%s' "$title" | sed -E 's/^Title:[[:space:]]*//I')"
 title="$(printf '%s' "$title" | sed -E 's/^["'\''`]+|["'\''`]+$//g')"
+# shellcheck disable=SC2016  # backticks are literal (markdown fence stripping)
 title="$(printf '%s' "$title" | sed -E 's/^```[a-zA-Z0-9_-]*//; s/```$//')"
 title="$(printf '%s' "$title" | sed -E 's/[[:space:]]+/ /g')"
 title="$(printf '%s' "$title" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"

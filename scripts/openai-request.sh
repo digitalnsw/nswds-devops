@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared OpenAI request helper. Source this file (instead of openai-config.sh
 # directly) to get the model defaults *and* a single openai_responses_text()
 # function that every script in this repo uses to talk to the API.
