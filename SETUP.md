@@ -51,7 +51,21 @@ Without this every consumer stub fails with "workflow was not found".
 - `OPENAI_API_KEY` — used by ai-pr-title / openai-pr-description / commit
   scripts. An org-level secret covers all repos at once.
 - `RELEASE_DEPLOY_KEY` — only in repos whose main branch is ruleset-protected
-  (currently nswds-design); the release workflow picks it up automatically.
+  (currently nswds-design, already set up); the release workflow picks it up
+  automatically when present and uses the plain GITHUB_TOKEN otherwise.
+
+  To add it to a newly protected repo (or run `/protect-branch`, which
+  automates this):
+
+  ```sh
+  ssh-keygen -t ed25519 -f release-deploy-key -N "" -C "release-bot@<repo>"
+  gh repo deploy-key add release-deploy-key.pub --repo digitalnsw/<repo> --title "release-bot" --allow-write
+  gh secret set RELEASE_DEPLOY_KEY --repo digitalnsw/<repo> < release-deploy-key
+  rm release-deploy-key release-deploy-key.pub
+  ```
+
+  Then add **Deploy keys** to the Bypass list of the repo's `main` ruleset so
+  the release commit can push through the protection.
 
 ## 4. Pilot → fan-out
 
