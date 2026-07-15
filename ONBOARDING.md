@@ -117,12 +117,14 @@ What to expect:
 - If an old standalone workflow was replaced by a stub (e.g. an existing
   `semantic-release.yml`), confirm the next release run succeeds.
 
-## Repos still outside the sync
+## Coverage
 
-As of the July 2026 rollout, four repos were left out because they had no
-scripts/CI at all and need step 2 done first: **data, nswds-community,
-nswds-signature, nswds-email-issues**.
+All 21 digitalnsw repos are on the sync as of 2026-07-15 (data,
+nswds-community, nswds-signature and nswds-email-issues were onboarded last,
+following exactly this doc — their prep PRs are worked examples: both
+community and signature needed the lockfile repair from pre-flight (a),
+email-issues needed its first lockfile and a real .gitignore, and community
+carried the package.json name fix).
 
-While you're in there, two long-standing copy-paste bugs worth fixing:
-`nswds-community/package.json` is named "nswds-signature", and
-`nswds-images/package.json` is named "ictds-portal-flows".
+One known leftover: `nswds-images/package.json` is still named
+"ictds-portal-flows" — fix it next time someone's in that repo.
