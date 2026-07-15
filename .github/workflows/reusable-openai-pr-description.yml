@@ -6,7 +6,7 @@ on:
   workflow_call:
     secrets:
       OPENAI_API_KEY:
-        description: Supplied automatically by the stubs' `secrets: inherit`.
+        description: "Supplied automatically by the stubs' `secrets: inherit`."
         required: false
 
 permissions:

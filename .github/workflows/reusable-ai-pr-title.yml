@@ -11,7 +11,7 @@ on:
         default: '24'
     secrets:
       OPENAI_API_KEY:
-        description: Supplied automatically by the stubs' `secrets: inherit`.
+        description: "Supplied automatically by the stubs' `secrets: inherit`."
         required: false
 
 jobs:

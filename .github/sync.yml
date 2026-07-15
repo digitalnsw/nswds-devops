@@ -1,0 +1,113 @@
+# File-sync map for BetaHuhn/repo-file-sync-action (driven by workflows/sync.yml).
+# Changes merged to main open a "chore(ci): …" PR in every repo listed below.
+#
+# PILOT PHASE: only `reviewers` (group 1) and `nswds-ui` (group 2) are active.
+# Uncomment the remaining repos after both pilot PRs have merged cleanly.
+#
+# NEVER add `deleteOrphaned: true` — repos mix their own scripts and workflows
+# into the same directories; the sync must only ever write the paths listed here.
+
+group:
+  # ── Group 1: full set ────────────────────────────────────────────────────
+  # Repos on the stock semantic-release config.
+  - repos: |
+      digitalnsw/reviewers
+    #  digitalnsw/digitalnsw
+    #  digitalnsw/attestation
+    #  digitalnsw/awards
+    #  digitalnsw/engagement
+    #  digitalnsw/ictds-risk
+    #  digitalnsw/images
+    #  digitalnsw/nswds-public-sans
+    #  digitalnsw/nswds-email-framework
+    #  digitalnsw/nswds-email-starter
+    #  digitalnsw/nswds-email
+    #  digitalnsw/nswds-design
+    #  digitalnsw/nswds-email-builder
+    files:
+      - source: scripts/
+        dest: scripts/
+      - source: commit-types.mjs
+        dest: commit-types.mjs
+      - source: commitlint.config.mjs
+        dest: commitlint.config.mjs
+      - source: git-conventional-commits.yaml
+        dest: git-conventional-commits.yaml
+      - source: release.config.mjs
+        dest: release.config.mjs
+      - source: workflow-stubs/
+        dest: .github/workflows/
+
+  # ── Group 2: bespoke release pipelines ───────────────────────────────────
+  # nswds-ui (monorepo publish + registry checks) and nswds-tokens (npm publish
+  # + release verification) keep their own release.yml AND release config
+  # (both publish with @semantic-release/npm enabled).
+  - repos: |
+      digitalnsw/nswds-ui
+    #  digitalnsw/nswds-tokens
+    files:
+      - source: scripts/
+        dest: scripts/
+      - source: commit-types.mjs
+        dest: commit-types.mjs
+      - source: commitlint.config.mjs
+        dest: commitlint.config.mjs
+      - source: git-conventional-commits.yaml
+        dest: git-conventional-commits.yaml
+      - source: workflow-stubs/commitlint.yml
+        dest: .github/workflows/commitlint.yml
+      - source: workflow-stubs/validate-branch-name.yml
+        dest: .github/workflows/validate-branch-name.yml
+      - source: workflow-stubs/commit-types-sync.yml
+        dest: .github/workflows/commit-types-sync.yml
+      - source: workflow-stubs/ai-pr-title.yml
+        dest: .github/workflows/ai-pr-title.yml
+      - source: workflow-stubs/openai-pr-description.yml
+        dest: .github/workflows/openai-pr-description.yml
+
+  # ── Group 3: nswds-app ───────────────────────────────────────────────────
+  # Publishes @nswds/app via @semantic-release/npm, so it keeps its own
+  # release.config.mjs — but the stock release workflow (stub) is fine.
+  # - repos: |
+  #     digitalnsw/nswds-app
+  #   files:
+  #     - source: scripts/
+  #       dest: scripts/
+  #     - source: commit-types.mjs
+  #       dest: commit-types.mjs
+  #     - source: commitlint.config.mjs
+  #       dest: commitlint.config.mjs
+  #     - source: git-conventional-commits.yaml
+  #       dest: git-conventional-commits.yaml
+  #     - source: workflow-stubs/
+  #       dest: .github/workflows/
+
+  # ── Group 4: ictds-portal-flows ──────────────────────────────────────────
+  # Its release.yml is a Power Platform PROD DEPLOY pipeline (name collision —
+  # never overwrite it). The shared release workflow lives in
+  # semantic-release.yml, so the release stub is mapped there.
+  # - repos: |
+  #     digitalnsw/ictds-portal-flows
+  #   files:
+  #     - source: scripts/
+  #       dest: scripts/
+  #     - source: commit-types.mjs
+  #       dest: commit-types.mjs
+  #     - source: commitlint.config.mjs
+  #       dest: commitlint.config.mjs
+  #     - source: git-conventional-commits.yaml
+  #       dest: git-conventional-commits.yaml
+  #     - source: release.config.mjs
+  #       dest: release.config.mjs
+  #     - source: workflow-stubs/commitlint.yml
+  #       dest: .github/workflows/commitlint.yml
+  #     - source: workflow-stubs/validate-branch-name.yml
+  #       dest: .github/workflows/validate-branch-name.yml
+  #     - source: workflow-stubs/commit-types-sync.yml
+  #       dest: .github/workflows/commit-types-sync.yml
+  #     - source: workflow-stubs/ai-pr-title.yml
+  #       dest: .github/workflows/ai-pr-title.yml
+  #     - source: workflow-stubs/openai-pr-description.yml
+  #       dest: .github/workflows/openai-pr-description.yml
+  #     - source: workflow-stubs/release.yml
+  #       dest: .github/workflows/semantic-release.yml

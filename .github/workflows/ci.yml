@@ -1,0 +1,40 @@
+# Gates for the shared tooling itself. Must be green before merging to main
+# (every merge fans out sync PRs) and before moving the v1 tag.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Shellcheck all shared scripts
+        run: |
+          set -euo pipefail
+          # -x follows `source` statements; SC1091 stays off because husky
+          # hooks source files that only exist in consumer repos.
+          shellcheck -x -e SC1091 scripts/*.sh
+          shellcheck -e SC1091 scripts/husky/commit-msg scripts/husky/prepare-commit-msg
+
+  workflow-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: actionlint (workflows + stubs)
+        # Pinned; also validates the workflow-stubs by copying them into a
+        # scratch .github/workflows tree, since actionlint only scans there.
+        run: |
+          set -euo pipefail
+          bash <(curl -sSf https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7 /tmp
+          /tmp/actionlint
+          scratch="$(mktemp -d)/stub-check"
+          mkdir -p "$scratch/.github/workflows"
+          cp workflow-stubs/*.yml "$scratch/.github/workflows/"
+          cd "$scratch" && /tmp/actionlint
