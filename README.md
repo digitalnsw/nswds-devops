@@ -1,52 +1,111 @@
 # nswds-devops
 
-Single source of truth for the digitalnsw shared build tooling. Everything that used to be copy-pasted between repos lives here once:
+This repo is the single source of truth for the build tooling shared across
+all digitalnsw repos: the commit/branch/PR shell scripts, commitlint and
+semantic-release configs, husky hook sources, and the CI workflows. Before
+July 2026 these files were copy-pasted into every repo and had drifted into
+three or four variants; now they live here once and propagate automatically.
 
-| What | Where | How it reaches consumer repos |
+If you're picking this up from me: read this file for the mental model, then
+[ONBOARDING.md](ONBOARDING.md) when you need to add a repo, and
+[MAINTENANCE.md](MAINTENANCE.md) for day-to-day operation and the
+troubleshooting notes. The troubleshooting section is written from real
+incidents, not hypotheticals — trust it.
+
+## How propagation works
+
+There are two channels, and knowing which one applies is most of the job:
+
+**1. File-sync PRs (file contents).** Anything merged to `main` here that's
+listed in [.github/sync.yml](.github/sync.yml) gets pushed out by the `sync`
+workflow as a `chore(ci): …` pull request in every consumer repo. Each repo
+reviews and merges its own PR. This covers `scripts/`, the root configs, and
+the workflow *stubs*. The sync only ever writes the exact paths listed — it
+never deletes anything, so repo-specific files sitting in the same
+directories are safe.
+
+**2. Reusable workflows (CI logic).** The actual CI implementations live in
+`.github/workflows/reusable-*.yml` here. Consumer repos only hold thin stubs
+that call them, pinned to the floating `v1` tag:
+
+```yaml
+jobs:
+  commitlint:
+    uses: digitalnsw/nswds-devops/.github/workflows/reusable-commitlint.yml@v1
+    secrets: inherit
+```
+
+Moving the `v1` tag changes CI for all 17 repos at once, instantly, with no
+PRs. That's the point — and also why the tag only moves deliberately, after
+CI here is green. See MAINTENANCE.md for the exact motion.
+
+I deliberately chose this split over publishing an npm package: the sync PRs
+give every repo a reviewable diff for content changes, while the tag gives
+one-step rollout (and one-step rollback) for CI logic.
+
+## Repo layout
+
+```
+├── scripts/                      # canonical shell tooling → synced to scripts/ in each repo
+│   └── husky/                    # hook sources (installed into .husky/ by setup-commitlint.sh)
+├── commit-types.mjs              # THE list of allowed commit types → synced to repo roots
+├── commitlint.config.mjs         # imports commit-types.mjs → synced
+├── git-conventional-commits.yaml # kept in lockstep with commit-types.mjs, CI-enforced → synced
+├── release.config.mjs            # stock semantic-release config → synced (with exclusions)
+├── workflow-stubs/               # the thin callers → synced to .github/workflows/ in each repo
+└── .github/
+    ├── sync.yml                  # WHO gets WHAT (the four groups — see below)
+    └── workflows/
+        ├── sync.yml              # the sync driver (push to main + manual dispatch)
+        ├── reusable-*.yml        # the six real CI implementations (never synced)
+        ├── ci.yml                # shellcheck + actionlint, gates every merge here
+        └── the rest              # this repo dogfooding its own stubs via local references
+```
+
+## The four sync groups
+
+Repos aren't uniform — a few have bespoke release pipelines that must never
+be overwritten. `.github/sync.yml` encodes this as four groups:
+
+| Group | Repos | What's different |
 |---|---|---|
-| Commit / branch / PR shell tooling | `scripts/` | File-sync PRs → `scripts/` in each repo |
-| Husky hook sources | `scripts/husky/` | File-sync PRs (installed into `.husky/` by `scripts/setup-commitlint.sh`) |
-| Commit-type source of truth | `commit-types.mjs` | File-sync PRs → repo root |
-| Commitlint config | `commitlint.config.mjs` | File-sync PRs → repo root |
-| git-conventional-commits config | `git-conventional-commits.yaml` | File-sync PRs → repo root |
-| semantic-release config | `release.config.mjs` | File-sync PRs → repo root (repos with bespoke release configs are excluded — see `.github/sync.yml`) |
-| CI workflow logic | `.github/workflows/reusable-*.yml` | Not synced — repos call them via `workflow_call` |
-| CI workflow stubs | `workflow-stubs/` | File-sync PRs → `.github/workflows/` in each repo |
+| 1 | everything not listed below | full set: scripts, all four configs, all six stubs |
+| 2 | nswds-ui, nswds-tokens | keep their own `release.yml` AND release config (both publish to npm with bespoke verification) |
+| 3 | nswds-app | keeps its own `release.config.mjs` (publishes `@nswds/app`); stock release stub is fine |
+| 4 | ictds-portal-flows | ⚠️ its `release.yml` is a **Power Platform production deploy** that happens to share the filename — never overwrite it. The release stub maps to `semantic-release.yml` instead |
 
-## How updates propagate
+## The six shared CI checks
 
-1. Change a file here and merge to `main`.
-2. The `sync` workflow ([.github/workflows/sync.yml](.github/workflows/sync.yml)) opens a `chore(ci): sync shared build tooling` PR in every repo listed in [.github/sync.yml](.github/sync.yml).
-3. Each repo reviews and merges its PR. Repo-specific files are never touched (the sync only writes the exact paths listed; `deleteOrphaned` is off).
+| Stub (in each repo) | What it does |
+|---|---|
+| `commitlint.yml` | lints PR commit messages against `commitlint.config.mjs` |
+| `validate-branch-name.yml` | enforces branch naming from `scripts/branch-name-config.sh` (read from the PR *base* so PRs can't alter their own policy) |
+| `commit-types-sync.yml` | fails if `commit-types.mjs` and `git-conventional-commits.yaml` disagree |
+| `ai-pr-title.yml` | generates/validates Conventional Commit PR titles via OpenAI |
+| `openai-pr-description.yml` | autofills empty PR descriptions |
+| `release.yml` | semantic-release on push to main (handles npm OIDC publish, deploy-key push to protected branches, HUSKY=0) |
 
-Reusable workflow changes propagate instantly to every repo once the `v1` tag is moved — no sync PR needed. Stubs reference `digitalnsw/nswds-devops/.github/workflows/reusable-*.yml@v1`.
+Note the check names: a reusable workflow reports as `commitlint / commitlint`
+(caller job / called job), not `commitlint`. Required-check rulesets must use
+the two-part names.
 
-## Rules
-
-- **Never edit these files in a consumer repo.** The next sync PR will overwrite the change. Edit here instead.
-- `commit-types.mjs` is the single source of truth for allowed commit types; `git-conventional-commits.yaml` must be kept in lockstep (CI enforces this via `scripts/check-commit-types-sync.sh`).
-- Scripts must pass shellcheck (CI runs it on every PR).
-- Moving the `v1` tag changes CI for every consumer repo at once — only move it after central CI is green.
-
-## Consumer repo usage
-
-The synced scripts are wired through each repo's `package.json`:
+## Developer usage (in any consumer repo)
 
 ```
-npm run branch:create           # scripts/create-branch.sh
-npm run branch:suggest          # scripts/suggest-branch-name.sh
-npm run branch:suggest:create   # scripts/suggest-branch-name.sh --create
-npm run commit                  # scripts/git-commit.sh
-npm run pr                      # scripts/pull-request.sh
+npm run branch:create           # interactive branch creation
+npm run branch:suggest          # AI-suggested branch name from your diff
+npm run branch:suggest:create   # suggest + create in one step
+npm run commit                  # AI-assisted Conventional Commit (with secret redaction)
+npm run pr                      # AI-assisted PR creation
 ```
 
-## Onboarding a new repo
+Rule number one for consumers: **never edit the synced files in a consumer
+repo.** The next sync PR will overwrite the change without comment. Edit
+here, merge, and let the sync deliver it everywhere.
 
-1. `npm install -D husky @commitlint/cli @commitlint/config-conventional semantic-release @semantic-release/git @semantic-release/changelog`
-2. Add the repo to the appropriate group in [.github/sync.yml](.github/sync.yml) (group 1 = full set; group 2 = repos with a bespoke `release.config`).
-3. Merge the first sync PR, then run `./scripts/setup-commitlint.sh` to install the husky hooks.
-4. Add the `package.json` script entries shown above, plus `OPENAI_API_KEY` (repo or org secret) for the AI-assisted workflows.
+## Versioning of this repo
 
-## Auth for the sync workflow
-
-The sync runs with a GitHub App token (`SYNC_APP_ID` variable + `SYNC_APP_PRIVATE_KEY` secret on this repo). The App needs **Contents: read/write, Pull requests: read/write, Workflows: read/write** on every target repo. See [SETUP.md](SETUP.md).
+semantic-release runs on every push to `main` and cuts a version from the
+commit types (`fix:` → patch, `feat:` → minor). That's automatic and mostly
+just gives us a changelog. The `v1` tag that consumers pin to is separate and
+manual — see MAINTENANCE.md.
