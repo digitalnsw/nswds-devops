@@ -16,5 +16,5 @@ permissions:
 
 jobs:
   release:
-    uses: digitalnsw/nswds-devops/.github/workflows/reusable-release.yml@main
+    uses: digitalnsw/nswds-devops/.github/workflows/reusable-release.yml@v1
     secrets: inherit
