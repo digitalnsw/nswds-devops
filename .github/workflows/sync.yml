@@ -26,6 +26,9 @@ jobs:
       group: repo-sync
       cancel-in-progress: false
     steps:
+      # The action reads CONFIG_PATH (and the source files) from the workspace.
+      - uses: actions/checkout@v6
+
       - name: Mint GitHub App token
         id: app
         uses: actions/create-github-app-token@v2
