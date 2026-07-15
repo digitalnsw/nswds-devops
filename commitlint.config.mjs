@@ -11,7 +11,17 @@ const config = {
   // issue/commit URLs legitimately exceed footer/body line limits. They're not
   // hand-written, so skip linting them entirely. (defaultIgnores stays on, so
   // merge/revert/etc. remain ignored too.)
-  ignores: [(message) => /^chore\(release\):/.test(message)],
+  ignores: [
+    (message) =>
+      /^chore\(release\):/.test(message) ||
+      // GitHub code-scanning / Copilot bots open PRs whose commit subjects
+      // aren't Conventional Commits ("Potential fix for…", "Initial plan").
+      // Commitlint CI lints the whole PR range, so without these exemptions
+      // every bot-authored PR fails the check.
+      /^Potential fix for code scanning alert no\. \d+: /u.test(message.trim()) ||
+      message.trim().startsWith('Potential fix for pull request finding') ||
+      message.trim() === 'Initial plan',
+  ],
   rules: {
     // Warn (not error) on body lines over 100 chars. AI commit tools like
     // OpenCommit emit unwrapped prose, so this keeps the readability nudge
