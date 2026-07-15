@@ -23,4 +23,4 @@ export default [
   'chore',
   'merge',
   'revert',
-];
+]
