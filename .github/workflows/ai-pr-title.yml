@@ -71,6 +71,9 @@ jobs:
         id: get-pr-title
         uses: actions/github-script@v8
         with:
+          # Retry transient GitHub API errors (5xx / network). The API occasionally
+          # returns a 502 with an HTML error page; without retries that aborts the run.
+          retries: 3
           script: |
             const { data: pr } = await github.rest.pulls.get({
               owner: context.repo.owner,
@@ -169,6 +172,7 @@ jobs:
         env:
           CONVENTIONAL_COMMIT_REGEX: ${{ steps.conventional-config.outputs.regex || env.CONVENTIONAL_COMMIT_REGEX_DEFAULT }}
         with:
+          retries: 3
           script: |
             const { owner, repo } = context.repo;
             const pull_number = context.payload.pull_request.number;
@@ -344,6 +348,7 @@ jobs:
           CONVENTIONAL_COMMIT_REGEX: ${{ steps.conventional-config.outputs.regex || env.CONVENTIONAL_COMMIT_REGEX_DEFAULT }}
           REFRESH_AUTO: ${{ steps.validate-title.outputs.refresh_auto }}
         with:
+          retries: 3
           script: |
             const suggestedTitle = ${{ toJson(steps.ai.outputs.title) }};
             const originalTitle = ${{ toJson(steps.validate-title.outputs.original_title) }};
@@ -407,6 +412,7 @@ jobs:
         id: final-title
         uses: actions/github-script@v8
         with:
+          retries: 3
           script: |
             const { data: pr } = await github.rest.pulls.get({
               owner: context.repo.owner,
