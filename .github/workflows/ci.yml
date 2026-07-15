@@ -33,8 +33,10 @@ jobs:
         run: |
           set -euo pipefail
           bash <(curl -sSf https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7 /tmp
-          /tmp/actionlint
+          # SC2016 is informational; the workflows deliberately single-quote
+          # jq programs and sed expressions containing $ and backticks.
+          /tmp/actionlint -ignore 'SC2016'
           scratch="$(mktemp -d)/stub-check"
           mkdir -p "$scratch/.github/workflows"
           cp workflow-stubs/*.yml "$scratch/.github/workflows/"
-          cd "$scratch" && /tmp/actionlint
+          cd "$scratch" && /tmp/actionlint -ignore 'SC2016'
