@@ -1,0 +1,16 @@
+# Synced from digitalnsw/shared-build-scripts — DO NOT EDIT in this repo.
+# The implementation lives in that repo's reusable-ai-pr-title.yml.
+name: AI PR Title Generator
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  generate-title:
+    uses: digitalnsw/shared-build-scripts/.github/workflows/reusable-ai-pr-title.yml@main
+    secrets: inherit

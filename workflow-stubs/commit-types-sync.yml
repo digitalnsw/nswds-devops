@@ -1,5 +1,6 @@
-# This repo dogfoods its own reusable workflow via a local reference.
-# Consumer repos get the equivalent stub from workflow-stubs/.
+# Synced from digitalnsw/shared-build-scripts — DO NOT EDIT in this repo.
+# The implementation lives in that repo's reusable-commit-types-sync.yml.
+# The path filters live HERE because workflow_call has none.
 name: Commit type sync
 
 on:
@@ -9,7 +10,6 @@ on:
       - git-conventional-commits.yaml
       - scripts/conventional-commit-config.sh
       - scripts/check-commit-types-sync.sh
-      - .github/workflows/reusable-commit-types-sync.yml
   push:
     branches: [main]
     paths:
@@ -17,12 +17,11 @@ on:
       - git-conventional-commits.yaml
       - scripts/conventional-commit-config.sh
       - scripts/check-commit-types-sync.sh
-      - .github/workflows/reusable-commit-types-sync.yml
 
 permissions:
   contents: read
 
 jobs:
   check:
-    uses: ./.github/workflows/reusable-commit-types-sync.yml
+    uses: digitalnsw/shared-build-scripts/.github/workflows/reusable-commit-types-sync.yml@main
     secrets: inherit

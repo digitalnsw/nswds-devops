@@ -1,0 +1,28 @@
+# Reusable implementation — repos call this via the synced
+# openai-pr-description.yml stub. Edit here; never in a consumer repo.
+name: Autofill PR description (reusable)
+
+on:
+  workflow_call:
+    secrets:
+      OPENAI_API_KEY:
+        description: Supplied automatically by the stubs' `secrets: inherit`.
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  openai-pr-description:
+    runs-on: ubuntu-22.04
+    # Skip for fork PRs — secrets are not available there
+    if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
+
+    steps:
+      # Pinned to a commit SHA — @master would let upstream changes run
+      # unreviewed with access to OPENAI_API_KEY across every repo.
+      - uses: platisd/openai-pr-description@5ba2cf03f9f6c0ba68356a9bda44a380f55cccdb # master 2025-08-07
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}

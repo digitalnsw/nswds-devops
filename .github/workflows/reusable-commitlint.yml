@@ -1,0 +1,41 @@
+# Reusable implementation — repos call this via the synced commitlint.yml stub.
+# Edit here; never in a consumer repo.
+name: Commitlint (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node version used when the caller repo has no .nvmrc
+        type: string
+        default: '24'
+
+permissions:
+  contents: read
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      # Reusable workflows run in the caller's context: this checks out the
+      # consumer repo, and its own devDependencies provide commitlint.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js (.nvmrc)
+        if: ${{ hashFiles('.nvmrc') != '' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+      - name: Setup Node.js (fallback)
+        if: ${{ hashFiles('.nvmrc') == '' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+      - run: npm clean-install
+      - name: Validate PR commit messages
+        run: >-
+          npx commitlint
+          --from ${{ github.event.pull_request.base.sha }}
+          --to ${{ github.event.pull_request.head.sha }}
+          --verbose

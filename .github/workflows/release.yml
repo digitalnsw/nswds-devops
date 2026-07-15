@@ -1,40 +1,18 @@
+# This repo dogfoods its own reusable workflow via a local reference.
+# Consumer repos get the equivalent stub from workflow-stubs/.
 name: Release
+
 on:
   push:
     branches: [main]
 
 permissions:
+  contents: write
+  issues: write
+  pull-requests: write
   id-token: write
-  contents: read
 
 jobs:
   release:
-    name: Release
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
-      id-token: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - name: Setup Node.js
-        # Single source of truth: .nvmrc drives local dev and every CI workflow.
-        # Pin via the file instead of lts/* so a release can't regenerate a lockfile
-        # on a newer Node/npm than the rest of the repo uses.
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: '.nvmrc'
-          registry-url: 'https://registry.npmjs.org'
-          package-manager-cache: false
-      - name: Install dependencies
-        run: npm clean-install
-      - name: Verify the integrity of provenance attestations and registry signatures for installed dependencies
-        run: npm audit signatures
-      - name: Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release
+    uses: ./.github/workflows/reusable-release.yml
+    secrets: inherit

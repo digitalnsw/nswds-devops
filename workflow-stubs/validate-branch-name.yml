@@ -1,0 +1,15 @@
+# Synced from digitalnsw/shared-build-scripts — DO NOT EDIT in this repo.
+# The implementation lives in that repo's reusable-validate-branch-name.yml.
+name: Validate Branch Name
+
+on:
+  pull_request:
+    types: [opened, edited, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  check-branch-name:
+    uses: digitalnsw/shared-build-scripts/.github/workflows/reusable-validate-branch-name.yml@main
+    secrets: inherit

@@ -1,0 +1,14 @@
+# Synced from digitalnsw/shared-build-scripts — DO NOT EDIT in this repo.
+# The implementation lives in that repo's reusable-commitlint.yml.
+name: Commitlint
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  commitlint:
+    uses: digitalnsw/shared-build-scripts/.github/workflows/reusable-commitlint.yml@main
+    secrets: inherit

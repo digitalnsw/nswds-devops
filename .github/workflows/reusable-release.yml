@@ -1,0 +1,82 @@
+# Reusable implementation — repos call this via the synced release.yml stub
+# (ictds-portal-flows calls it from semantic-release.yml; its release.yml is a
+# Power Platform deploy pipeline). The stub must grant the elevated permissions
+# below — a reusable workflow cannot exceed the caller's grant.
+# Edit here; never in a consumer repo.
+name: Release (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node version used when the caller repo has no .nvmrc
+        type: string
+        default: '24'
+    secrets:
+      RELEASE_DEPLOY_KEY:
+        description: >-
+          Optional SSH deploy key (ruleset bypass actor) used to push release
+          commits to a protected default branch. Supplied automatically by the
+          stubs' `secrets: inherit` where the repo defines it.
+        required: false
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    # One release at a time, never cancelled mid-publish (a cancelled
+    # semantic-release can tag without publishing).
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+    env:
+      # Repos whose default branch is ruleset-protected push release commits
+      # over SSH as a deploy key that is a bypass actor on the ruleset (the
+      # default GITHUB_TOKEN can't push once required status checks are
+      # enforced). Repos without the secret use the plain checkout.
+      HAS_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY != '' }}
+    steps:
+      - name: Checkout (deploy key)
+        if: ${{ env.HAS_DEPLOY_KEY == 'true' }}
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
+      - name: Checkout
+        if: ${{ env.HAS_DEPLOY_KEY != 'true' }}
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js (.nvmrc)
+        # Pin via the file instead of lts/* so a release can't regenerate a
+        # lockfile on a newer Node/npm than the rest of the repo uses.
+        if: ${{ hashFiles('.nvmrc') != '' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+      - name: Setup Node.js (fallback)
+        if: ${{ hashFiles('.nvmrc') == '' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+      - name: Install dependencies
+        run: npm clean-install
+      - name: Verify the integrity of provenance attestations and registry signatures for installed dependencies
+        run: npm audit signatures
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # LOAD-BEARING: @semantic-release/git commits during the release;
+          # husky hooks must not run against the bot commit (this broke
+          # nswds-tokens releases when it regressed — see tokens #105/#107).
+          HUSKY: 0
+        run: npx semantic-release

@@ -1,0 +1,41 @@
+# Reusable implementation — repos call this via the synced validate-branch-name.yml stub.
+# Edit here; never in a consumer repo.
+name: Validate Branch Name (reusable)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check-branch-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout base branch policy
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 1
+          path: .base-policy
+
+      - name: Check branch name
+        shell: bash
+        env:
+          # Pass the attacker-controllable branch name via env, never interpolated
+          # into the script body — otherwise backticks/$()/; in a fork branch name
+          # would execute during YAML→shell expansion, before the regex check runs.
+          BRANCH_NAME: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          # Source policy from the PR base commit so PR changes cannot alter validation.
+          # shellcheck source=/dev/null
+          source "${GITHUB_WORKSPACE}/.base-policy/scripts/branch-name-config.sh"
+          echo "Branch name: $BRANCH_NAME"
+
+          if [[ ! "$BRANCH_NAME" =~ $BRANCH_REGEX && ! "$BRANCH_NAME" =~ $SNYK_REGEX ]]; then
+            echo "❌ Branch name '$BRANCH_NAME' does not follow naming convention."
+            exit 1
+          fi
+
+          echo "✅ Branch name '$BRANCH_NAME' follows naming convention."
