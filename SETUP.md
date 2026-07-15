@@ -10,6 +10,8 @@ These steps need org-admin access and can't be automated from a workstation.
 
 1. Org settings → Developer settings → **GitHub Apps** → New GitHub App
    - Name: `nswds-devops-sync` (anything unique)
+   - Homepage URL: `https://github.com/digitalnsw/nswds-devops` (required field,
+     informational only)
    - Uncheck *Webhook → Active* (not needed)
    - Repository permissions:
      - **Contents: Read and write**
