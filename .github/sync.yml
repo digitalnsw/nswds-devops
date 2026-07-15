@@ -1,8 +1,9 @@
 # File-sync map for BetaHuhn/repo-file-sync-action (driven by workflows/sync.yml).
 # Changes merged to main open a "chore(ci): …" PR in every repo listed below.
 #
-# PILOT PHASE: only `reviewers` (group 1) and `nswds-ui` (group 2) are active.
-# Uncomment the remaining repos after both pilot PRs have merged cleanly.
+# ROLLOUT: pilots (reviewers, nswds-ui) merged 2026-07-15; batch 2
+# (digitalnsw, attestation, nswds-email) active. Uncomment batch 3, then
+# batch 4 (nswds-tokens, nswds-app, ictds-portal-flows — extra review) next.
 #
 # NEVER add `deleteOrphaned: true` — repos mix their own scripts and workflows
 # into the same directories; the sync must only ever write the paths listed here.
@@ -12,8 +13,9 @@ group:
   # Repos on the stock semantic-release config.
   - repos: |
       digitalnsw/reviewers
-    #  digitalnsw/digitalnsw
-    #  digitalnsw/attestation
+      digitalnsw/digitalnsw
+      digitalnsw/attestation
+      digitalnsw/nswds-email
     #  digitalnsw/awards
     #  digitalnsw/engagement
     #  digitalnsw/ictds-risk
@@ -21,7 +23,6 @@ group:
     #  digitalnsw/nswds-public-sans
     #  digitalnsw/nswds-email-framework
     #  digitalnsw/nswds-email-starter
-    #  digitalnsw/nswds-email
     #  digitalnsw/nswds-design
     #  digitalnsw/nswds-email-builder
     files:
