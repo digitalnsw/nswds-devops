@@ -20,11 +20,14 @@ These steps need org-admin access and can't be automated from a workstation.
        only on the `.github/workflows/` stub files
    - Where can this app be installed: *Only on this account*
 2. Generate a **private key** (downloads a `.pem`).
-3. **Install the app** on the org, selecting these repos: `nswds-devops`
-   plus all consumer repos (digitalnsw, attestation, awards, engagement,
-   reviewers, ictds-portal-flows, ictds-risk, images, nswds-app, nswds-tokens,
-   nswds-ui, nswds-public-sans, nswds-email-framework, nswds-email-starter,
-   nswds-email, nswds-design, nswds-email-builder).
+3. **Install the app** on the org with **All repositories** — new repos are
+   then covered automatically, and onboarding is a single sync.yml edit. The
+   sync only ever opens PRs in repos explicitly listed in `.github/sync.yml`,
+   so "all" doesn't mean it touches everything. Trade-off to remember: the
+   app's private key (held only on nswds-devops) then grants org-wide write,
+   so keep nswds-devops `main` branch-protected, and switch the installation
+   to "Only select repositories" if the org ever gains a repo a sync bot must
+   never touch.
 4. On **this repo** (nswds-devops) → Settings → Secrets and variables → Actions:
    - Variable `SYNC_APP_ID` = the App ID (App settings page)
    - Secret `SYNC_APP_PRIVATE_KEY` = full contents of the `.pem`
