@@ -4,16 +4,12 @@ These steps need org-admin access and can't be automated from a workstation.
 
 ## 0. Create the GitHub repo and push
 
-From this directory (history is ready locally):
-
-```sh
-gh repo create digitalnsw/shared-build-scripts --private --source . --push
-```
+✅ Done — created as `digitalnsw/nswds-devops` (2026-07-15).
 
 ## 1. GitHub App for the sync (recommended over a PAT — no expiry)
 
 1. Org settings → Developer settings → **GitHub Apps** → New GitHub App
-   - Name: `shared-build-scripts-sync` (anything unique)
+   - Name: `nswds-devops-sync` (anything unique)
    - Uncheck *Webhook → Active* (not needed)
    - Repository permissions:
      - **Contents: Read and write**
@@ -22,12 +18,12 @@ gh repo create digitalnsw/shared-build-scripts --private --source . --push
        only on the `.github/workflows/` stub files
    - Where can this app be installed: *Only on this account*
 2. Generate a **private key** (downloads a `.pem`).
-3. **Install the app** on the org, selecting these repos: `shared-build-scripts`
+3. **Install the app** on the org, selecting these repos: `nswds-devops`
    plus all consumer repos (digitalnsw, attestation, awards, engagement,
    reviewers, ictds-portal-flows, ictds-risk, images, nswds-app, nswds-tokens,
    nswds-ui, nswds-public-sans, nswds-email-framework, nswds-email-starter,
    nswds-email, nswds-design, nswds-email-builder).
-4. On **this repo** (shared-build-scripts) → Settings → Secrets and variables → Actions:
+4. On **this repo** (nswds-devops) → Settings → Secrets and variables → Actions:
    - Variable `SYNC_APP_ID` = the App ID (App settings page)
    - Secret `SYNC_APP_PRIVATE_KEY` = full contents of the `.pem`
 

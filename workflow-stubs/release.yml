@@ -1,4 +1,4 @@
-# Synced from digitalnsw/shared-build-scripts — DO NOT EDIT in this repo.
+# Synced from digitalnsw/nswds-devops — DO NOT EDIT in this repo.
 # The implementation lives in that repo's reusable-release.yml.
 # The elevated permissions live HERE: a reusable workflow can never exceed
 # what the caller grants.
@@ -16,5 +16,5 @@ permissions:
 
 jobs:
   release:
-    uses: digitalnsw/shared-build-scripts/.github/workflows/reusable-release.yml@main
+    uses: digitalnsw/nswds-devops/.github/workflows/reusable-release.yml@main
     secrets: inherit

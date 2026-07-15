@@ -1,4 +1,4 @@
-# Synced from digitalnsw/shared-build-scripts — DO NOT EDIT in this repo.
+# Synced from digitalnsw/nswds-devops — DO NOT EDIT in this repo.
 # The implementation lives in that repo's reusable-commit-types-sync.yml.
 # The path filters live HERE because workflow_call has none.
 name: Commit type sync
@@ -23,5 +23,5 @@ permissions:
 
 jobs:
   check:
-    uses: digitalnsw/shared-build-scripts/.github/workflows/reusable-commit-types-sync.yml@main
+    uses: digitalnsw/nswds-devops/.github/workflows/reusable-commit-types-sync.yml@main
     secrets: inherit

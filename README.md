@@ -1,4 +1,4 @@
-# shared-build-scripts
+# nswds-devops
 
 Single source of truth for the digitalnsw shared build tooling. Everything that used to be copy-pasted between repos lives here once:
 
@@ -19,7 +19,7 @@ Single source of truth for the digitalnsw shared build tooling. Everything that 
 2. The `sync` workflow ([.github/workflows/sync.yml](.github/workflows/sync.yml)) opens a `chore(ci): sync shared build tooling` PR in every repo listed in [.github/sync.yml](.github/sync.yml).
 3. Each repo reviews and merges its PR. Repo-specific files are never touched (the sync only writes the exact paths listed; `deleteOrphaned` is off).
 
-Reusable workflow changes propagate instantly to every repo once the `v1` tag is moved — no sync PR needed. Stubs reference `digitalnsw/shared-build-scripts/.github/workflows/reusable-*.yml@v1`.
+Reusable workflow changes propagate instantly to every repo once the `v1` tag is moved — no sync PR needed. Stubs reference `digitalnsw/nswds-devops/.github/workflows/reusable-*.yml@v1`.
 
 ## Rules
 

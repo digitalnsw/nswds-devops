@@ -107,7 +107,7 @@ HOOK_TEMPLATE_DIR="${SCRIPT_DIR}/husky"
 for hook in prepare-commit-msg commit-msg; do
   src="${HOOK_TEMPLATE_DIR}/${hook}"
   if [[ ! -f "$src" ]]; then
-    printf "❌ Missing hook template: %s (sync scripts/husky/ from shared-build-scripts).\n" "$src" >&2
+    printf "❌ Missing hook template: %s (sync scripts/husky/ from nswds-devops).\n" "$src" >&2
     exit 1
   fi
   cp "$src" ".husky/${hook}"

@@ -1,4 +1,4 @@
-# Synced from digitalnsw/shared-build-scripts — DO NOT EDIT in this repo.
+# Synced from digitalnsw/nswds-devops — DO NOT EDIT in this repo.
 # The implementation lives in that repo's reusable-openai-pr-description.yml.
 name: Autofill PR description
 
@@ -12,5 +12,5 @@ permissions:
 
 jobs:
   openai-pr-description:
-    uses: digitalnsw/shared-build-scripts/.github/workflows/reusable-openai-pr-description.yml@main
+    uses: digitalnsw/nswds-devops/.github/workflows/reusable-openai-pr-description.yml@main
     secrets: inherit

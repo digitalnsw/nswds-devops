@@ -1,4 +1,4 @@
-# Synced from digitalnsw/shared-build-scripts — DO NOT EDIT in this repo.
+# Synced from digitalnsw/nswds-devops — DO NOT EDIT in this repo.
 # The implementation lives in that repo's reusable-validate-branch-name.yml.
 name: Validate Branch Name
 
@@ -11,5 +11,5 @@ permissions:
 
 jobs:
   check-branch-name:
-    uses: digitalnsw/shared-build-scripts/.github/workflows/reusable-validate-branch-name.yml@main
+    uses: digitalnsw/nswds-devops/.github/workflows/reusable-validate-branch-name.yml@main
     secrets: inherit
