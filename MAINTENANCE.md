@@ -122,9 +122,23 @@ pointer itself changes. Renovate branches (`renovate/…`) are exempted in
 `branch-name-config.sh` alongside dependabot's. This repo's own
 `renovate.json` also enables the github-actions manager.
 
+**Confluence docs sync**: every merge to `main` that touches
+`docs/best-practices/**` republishes the guides to Confluence — one page per
+file under GDS → Application Support → **Development Best Practice**
+(`confluence-sync.yml` → `.github/scripts/confluence-sync.sh`, using
+[mark](https://github.com/kovetskiy/mark), pinned by version + checksum).
+Confluence is a read-only mirror; each page carries a banner saying so.
+Fragile-by-design bits: pages and folders are matched **by title** (a
+guide's H1), so retitling a guide creates a fresh Confluence page and
+orphans the old one, renaming either folder in Confluence breaks the sync,
+and deleting a guide never deletes its page — clean up by hand. Credentials
+are repository secrets `CONFLUENCE_USER` / `CONFLUENCE_TOKEN` (Atlassian API
+token); page edits are attributed to that account, so move to a service
+account if the token owner ever leaves.
+
 ## Troubleshooting
 
-Every entry below is something that actually happened on 2026-07-15.
+Every entry below is something that actually happened (2026-07-15 onward).
 
 | Symptom | Cause | Fix |
 |---|---|---|
@@ -135,6 +149,7 @@ Every entry below is something that actually happened on 2026-07-15.
 | Consumer PR: "Expected — waiting for status to be reported" forever | a ruleset requires a check by its old single name | rename required context to the `job / job` form (nswds-design's "Protect main" already updated) |
 | `check-branch-name` red on a repo's *first* sync PR | base branch lacks the `chore/repo-sync` exemption until that PR merges | expected once; merge past it |
 | commitlint job: npm `EUSAGE` "can only install with an existing package-lock.json" | lockfile missing **or corrupt** — check it parses, don't trust the error text | see ONBOARDING pre-flight (a); nswds-public-sans had conflict markers committed inside it |
+| Renovate "lock file maintenance" PR red on `install / install` (and commitlint) with `npm ci … not in sync` | from-scratch lockfile regeneration hits an npm peer-nesting bug: `@conventional-changelog/git-client@3` peers need `conventional-commits-filter@^6` while semantic-release's stack needs `^5`; regen hoists 5.0.0 and nests nothing (incremental Renovate updates resolve the same tree correctly) | close the PR (nswds-email#454 has the full write-up); retry from the Dependency Dashboard after the commitlint/semantic-release stacks re-align |
 | Snyk license/security red on a lockfile change | Snyk's baseline of main was unparseable, so every pre-existing issue reads as "introduced" | merge the lockfile fix; Snyk re-baselines. MPL-2.0 flags on lightningcss binaries come via @nswds/app in every repo — org license-policy call, not a repo bug |
 | `check-npm-artifacts` red (nswds-app) | committed `dist/` built before semantic-release bumped the version it inlines | `npm run build:npm` on the branch, commit dist |
 | prettier --check red on synced configs (nswds-ui) | config formatting not stable across consumer prettier configs | see the ≤80-column rule under day-to-day changes |
