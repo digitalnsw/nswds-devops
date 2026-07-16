@@ -30,5 +30,6 @@ changes enforced behaviour (a workflow, a config, a script), update the
 matching guide in the same PR.
 
 These guides are mirrored automatically to Confluence (GDS space →
-Development Best Practice) on every merge to `main` — the repo is the
-source of truth; never edit the Confluence copies.
+Application Support → Development Best Practice) on every merge to
+`main` — the repo is the source of truth; never edit the Confluence
+copies.
