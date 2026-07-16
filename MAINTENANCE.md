@@ -91,7 +91,9 @@ nswds-email-issues' CI stops resolving entirely.
   unreviewed.
 
 **RELEASE_DEPLOY_KEY** (per-repo, only where `main` is ruleset-protected;
-currently just nswds-design): the release workflow auto-detects the secret
+as of 2026-07-16 that is every repo on the sync — the "Protect main"
+ruleset requires `commitlint / commitlint` + `install / install` from the
+synced ci.yml stub): the release workflow auto-detects the secret
 and pushes release commits over SSH as a deploy key that's a bypass actor on
 the ruleset. To provision one:
 

@@ -1,0 +1,53 @@
+# Reusable implementation — repos call this via the synced ci.yml stub.
+# Edit here; never in a consumer repo.
+#
+# This is the merge gate rulesets require (context: "install / install").
+# It ports nswds-design's local CI workflow: the pull_request event checks
+# out the test merge of PR + base, so a bad conflict resolution or a
+# corrupted lockfile fails here before it can land on main.
+name: CI (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node version used when the caller repo has no .nvmrc
+        type: string
+        default: '24'
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # npm ci reports a lockfile with conflict markers as "no package-lock.json",
+      # which is misleading — catch markers in any tracked file with a clear error.
+      - name: Check for unresolved merge conflict markers
+        run: |
+          if git grep -nE '^(<{7}|>{7}) '; then
+            echo "❌ Unresolved merge conflict markers found in the files above."
+            exit 1
+          fi
+
+      - name: Setup Node.js (.nvmrc)
+        if: ${{ hashFiles('.nvmrc') != '' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+      - name: Setup Node.js (fallback)
+        if: ${{ hashFiles('.nvmrc') == '' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      # Fails on any manifest/lockfile mismatch — the check Snyk-corrupted
+      # lockfiles used to sail past when nothing enforced it.
+      - name: Install dependencies
+        run: npm clean-install
+
+      - name: Build
+        run: npm run build --if-present
