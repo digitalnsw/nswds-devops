@@ -1,5 +1,10 @@
 # Semantic Versioning Strategy
 
+We follow [Semantic Versioning 2.0.0](https://semver.org): versions are
+`MAJOR.MINOR.PATCH`, where **MAJOR** = incompatible API or behaviour
+changes, **MINOR** = backwards-compatible new functionality, **PATCH** =
+backwards-compatible bug fixes.
+
 Versions are **computed, never chosen**. semantic-release derives the next
 version from the conventional commits landed on `main` since the last
 release — nobody edits a version number by hand.
@@ -38,3 +43,16 @@ upgrading semantic-release without re-verifying bang handling.
   Manually pushed `v*` tags will desync npm and git and trip the
   release-verification checks (nswds-tokens/nswds-ui poll npm to catch
   exactly this).
+
+## Stability guidelines
+
+- `0.x.y` is initial development — anything may change at any time.
+- `1.0.0` signals stable, production-ready software; from then on every
+  breaking change **must** land as a major (the bang-commit rules above are
+  how that promise is kept).
+- Consumers use semver-compatible ranges (`^1.2.3`) with the lockfile as
+  the true pin ([Dependency Management](dependency-management.md)).
+- Pre-releases (`2.0.0-beta.3`) aren't configured today — `main` is the
+  only release branch. If we need them, the path is semantic-release
+  prerelease branches (e.g. `next`) configured centrally, not hand-tagged
+  alphas.

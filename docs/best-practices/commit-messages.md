@@ -16,8 +16,33 @@ every PR (the local hook can be bypassed; the CI check cannot).
 
 **Allowed types** (source of truth: [`commit-types.mjs`](../../commit-types.mjs),
 synced everywhere; the `commit-types-sync` check keeps the YAML mirror in
-lockstep): `feat fix refactor perf style test build ops docs chore merge
-revert`.
+lockstep):
+
+| Type | Description | Releases? |
+| --- | --- | --- |
+| `feat` | A new feature | minor |
+| `fix` | A bug fix | patch |
+| `perf` | Performance improvement | patch |
+| `style` | Formatting/whitespace, no code change | patch |
+| `refactor` | Code change that neither fixes nor adds | no |
+| `test` | Adding or updating tests | no |
+| `build` | Build tooling or external dependencies | no |
+| `ops` | Operational/infrastructure changes (CI, workflows) | no |
+| `docs` | Documentation-only changes | no |
+| `chore` | Routine maintenance (deps, config) | no |
+| `merge` | Merge bookkeeping | no |
+| `revert` | Reverts a previous commit | no |
+
+Examples:
+
+```
+feat(auth): add login endpoint
+fix(ui): correct button spacing on mobile
+docs(readme): clarify installation instructions
+chore(deps): update axios to v1.3.1
+refactor(api): simplify error handling
+test(utils): add unit test for date parser
+```
 
 ## Why it matters more here than usual
 
@@ -36,7 +61,24 @@ Write the PR title as the changelog entry you want users to read.
 - Subject: imperative, lower-case, no trailing period — "add shared CI
   merge gate", not "Added the CI gate.".
 - Scope when it helps navigation: `feat(sync): …`, `chore(deps): …`.
-- Breaking: `type!: subject` **plus** a `BREAKING CHANGE:` footer.
+- Breaking: `type!: subject` **plus** a `BREAKING CHANGE:` footer that
+  spells out the migration:
+
+  ```
+  feat(auth)!: remove legacy auth support
+
+  BREAKING CHANGE: The `legacyLogin()` method has been removed.
+  Use `newLogin()` instead.
+  ```
+
+- Reverts reference what they undo, in subject and body:
+
+  ```
+  revert: feat(auth): add login endpoint
+
+  This reverts commit abc123.
+  ```
+
 - Bots are aligned, not exempted: Renovate commits as `chore(deps):`, the
   sync as `chore(ci):` — both pass the same lint. The only ignored pattern
   is the bot's own `chore(release): x.y.z [skip ci]` commit.

@@ -4,6 +4,20 @@ Architecture and rules for CI/CD workflows across the fleet. The full
 operating manual is [MAINTENANCE.md](../../MAINTENANCE.md); this is the
 practice summary.
 
+## The shared workflows
+
+What every repo runs via its synced stubs:
+
+| Stub | Purpose | Trigger | Needs |
+| --- | --- | --- | --- |
+| `ci.yml` | Merge gate: conflict-marker check, `npm clean-install`, build (`install / install`, required) | `pull_request` | — |
+| `commitlint.yml` | Lints every PR commit message (`commitlint / commitlint`, required) | `pull_request` | — |
+| `validate-branch-name.yml` | Enforces the branch naming policy from the PR base commit | `pull_request` (opened/edited/reopened) | — |
+| `commit-types-sync.yml` | Keeps the commit-type YAML mirror in lockstep with `commit-types.mjs` | PR/push touching those files | — |
+| `ai-pr-title.yml` | Rewrites the PR title to Conventional Commits form from the branch's commits | `pull_request` (incl. synchronize) | `OPENAI_API_KEY` |
+| `openai-pr-description.yml` | Autofills the PR description from the diff | `pull_request` (opened) | `OPENAI_API_KEY` |
+| `release.yml` | semantic-release on merge ([Releases](releases.md)) | `push` to `main` | `RELEASE_DEPLOY_KEY` |
+
 ## Architecture: stubs call reusables
 
 - **Consumer repos hold synced stubs** (`.github/workflows/*.yml`, marked

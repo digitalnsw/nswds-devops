@@ -37,6 +37,18 @@ guarantees nothing corrupt lands regardless of who proposed it.
   red `install / install` on a bot PR as "close and regenerate", not
   "resolve and force".
 
+## Regular maintenance
+
+Automation handles the treadmill; humans still review the estate. At least
+quarterly, per repo:
+
+- prune unused packages (every dependency is review + scan + update load);
+- work the Dependency Dashboard backlog — especially majors that have been
+  parked;
+- confirm no high/critical vulnerabilities are sitting unaddressed in Snyk;
+- document major upgrades (framework/library swaps) in the README — the
+  changelog only records *that* a bump shipped, not the migration.
+
 ## Adding dependencies
 
 - Justify new runtime deps in the PR — every one is an attack surface Snyk

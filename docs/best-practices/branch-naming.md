@@ -12,16 +12,33 @@ cannot loosen the policy that judges it).
 <type>[/issue/<id>|/ticket/<id>]/<slug>
 ```
 
-- **type** — one of: `feat fix hotfix release docs build test refactor
-  style chore export ai copilot cursor claude codex`
-  (note: this list is *not* identical to commit types — `ops` is a commit
-  type but not a branch type).
+- **type** — one of (note: this list is *not* identical to commit types —
+  `ops` is a commit type but not a branch type):
+
+  | Type | Purpose |
+  | --- | --- |
+  | `feat` | New features or enhancements |
+  | `fix` | Fixes for issues found in development or testing |
+  | `hotfix` | Urgent fixes for production issues |
+  | `release` | Release preparation (version bumps, final tweaks) |
+  | `docs` | Documentation-only changes |
+  | `build` | Build system / CI / tooling updates |
+  | `test` | Tests, experiments, prototypes, exploratory work |
+  | `refactor` | Non-functional restructuring or cleanup |
+  | `style` | Formatting-only changes |
+  | `chore` | Routine maintenance (deps, minor config) |
+  | `export` | Platform exports (e.g. Power Platform solutions) |
+  | `ai` `copilot` `cursor` `claude` `codex` | Branches authored by AI tooling |
+
 - **slug** — lowercase alphanumerics; dots/hyphens only *between*
-  alphanumerics (`release/v1.2.0` ✓, `feat/-bad-` ✗).
-- Optional issue/ticket segment: `fix/issue/123/lockfile-repair`.
+  alphanumerics (`release/v1.2.0` ✓, `feat/-bad-` ✗). Keep it short and
+  specific — a reader should guess the change from the name; avoid vague
+  slugs like `feat/updates`.
+- Optional issue/ticket segment: `fix/issue/123/lockfile-repair`,
+  `feat/ticket/ABC-456/add-login-button`.
 
 Examples: `feat/shared-ci-gate`, `build/release-deploy-key`,
-`docs/best-practice-guides`.
+`docs/best-practice-guides`, `hotfix/fix-production-api-timeout`.
 
 ## Bot exemptions
 
@@ -34,7 +51,9 @@ weakening the standard pattern.
 ## Practices
 
 - Use `scripts/create-branch.sh` to create branches — it validates against
-  the same regexes before you've written any code.
+  the same regexes before you've written any code (and
+  `scripts/suggest-branch-name.sh` can propose one). Both are documented in
+  [Command Documentation](command-documentation.md).
 - Branch type should match the eventual commit type (a `feat/…` branch
   merging as `fix:` is a smell that the scope changed — rename or split).
 - Delete branches on merge; the rulesets block deletion of `main` itself.

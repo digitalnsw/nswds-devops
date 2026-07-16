@@ -24,6 +24,31 @@ printWidth 100. The same bytes must satisfy both, so in these files:
   rather than letting prettier wrap it — an 80-wrapped line gets *unwrapped*
   by a width-100 config and fails the other repo's check.
 
+## Prettier
+
+Prettier owns formatting; linters own correctness. House style (per-repo
+`.prettierrc`, JS/TS repos):
+
+- single quotes, no semicolons, 2-space indentation, trailing commas (ES5);
+- `.prettierignore` excludes generated output (`build/`, `node_modules/`);
+- run via `npm run format`, or on save with editor integration.
+
+Repos differ on `printWidth` (80 vs 100) — which is exactly why the shared
+`.mjs` configs follow the 80-column rule above.
+
+## ESLint
+
+Flat config (`eslint.config.mjs`). Next.js repos extend
+`next/core-web-vitals` + `next/typescript`, plus
+`plugin:prettier/recommended` with:
+
+```js
+'prettier/prettier': 'error'
+```
+
+so formatting violations surface as lint errors in `npm run lint` — one
+command reports everything.
+
 ## Rules
 
 - Linters run in CI, not just locally — a rule that isn't enforced by a
