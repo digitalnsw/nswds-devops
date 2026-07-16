@@ -22,6 +22,8 @@ jobs:
           # hooks source files that only exist in consumer repos.
           shellcheck -x -e SC1091 scripts/*.sh
           shellcheck -e SC1091 scripts/husky/commit-msg scripts/husky/prepare-commit-msg
+          # Repo-local CI helpers (not synced to consumers).
+          shellcheck -x .github/scripts/*.sh
 
   workflow-lint:
     runs-on: ubuntu-latest

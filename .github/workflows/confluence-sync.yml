@@ -1,0 +1,49 @@
+# Mirrors docs/best-practices/*.md to Confluence (space GDS, folder
+# "Development Best Practice") — one page per guide, updated in place on
+# every merge to main that touches them. Confluence is a read-only mirror;
+# the repo is the source of truth. Ops notes: MAINTENANCE.md.
+name: Confluence docs sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/best-practices/**
+      - .github/scripts/confluence-sync.sh
+      - .github/workflows/confluence-sync.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # One publish at a time; a queued push supersedes an unstarted older one.
+    concurrency:
+      group: confluence-sync
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+
+      # Pinned by version + checksum: the binary receives the Confluence
+      # credentials, so an unreviewed upstream release must never reach it.
+      # To upgrade, bump MARK_VERSION and MARK_SHA256 together (checksum of
+      # mark_Linux_x86_64.tar.gz from the release's checksums.txt).
+      - name: Install mark
+        env:
+          MARK_VERSION: v16.5.1
+          MARK_SHA256: 98ea0a9450885efe41d5e6a7ecc23e7cd983e7eb7f867e7819f4317c3728ab84
+        run: |
+          curl -fsSL -o mark.tgz "https://github.com/kovetskiy/mark/releases/download/${MARK_VERSION}/mark_Linux_x86_64.tar.gz"
+          echo "${MARK_SHA256}  mark.tgz" | sha256sum -c -
+          tar -xzf mark.tgz mark
+          sudo install -m 0755 mark /usr/local/bin/mark
+          rm mark.tgz mark
+
+      - name: Publish guides to Confluence
+        env:
+          MARK_BASE_URL: https://dsia.atlassian.net/wiki
+          MARK_USERNAME: ${{ secrets.CONFLUENCE_USER }}
+          MARK_PASSWORD: ${{ secrets.CONFLUENCE_TOKEN }}
+        run: .github/scripts/confluence-sync.sh
