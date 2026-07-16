@@ -49,5 +49,11 @@ jobs:
       - name: Install dependencies
         run: npm clean-install
 
+      # App repos whose builds need deploy-time env (Next.js page-data
+      # collection hits auth/DB) opt out with a repo Actions variable:
+      # Settings → Secrets and variables → Actions → Variables →
+      # CI_SKIP_BUILD=true. The conflict-marker and lockfile gates above
+      # still run everywhere — only the build is skipped.
       - name: Build
+        if: ${{ vars.CI_SKIP_BUILD != 'true' }}
         run: npm run build --if-present
