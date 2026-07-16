@@ -40,6 +40,8 @@ group:
         dest: git-conventional-commits.yaml
       - source: release.config.mjs
         dest: release.config.mjs
+      - source: repo-files/renovate.json
+        dest: renovate.json
       - source: workflow-stubs/
         dest: .github/workflows/
 
@@ -69,6 +71,8 @@ group:
         dest: .github/workflows/openai-pr-description.yml
       - source: workflow-stubs/ci.yml
         dest: .github/workflows/ci.yml
+      - source: repo-files/renovate.json
+        dest: renovate.json
 
   # ── Group 2b: nswds-tokens ───────────────────────────────────────────────
   # Like nswds-ui it keeps its own release.yml + release config, but its
@@ -99,6 +103,8 @@ group:
         dest: .github/workflows/openai-pr-description.yml
       - source: workflow-stubs/ci.yml
         dest: .github/workflows/shared-ci.yml
+      - source: repo-files/renovate.json
+        dest: renovate.json
 
   # ── Group 3: nswds-app ───────────────────────────────────────────────────
   # Publishes @nswds/app via @semantic-release/npm, so it keeps its own
@@ -114,6 +120,8 @@ group:
         dest: commitlint.config.mjs
       - source: git-conventional-commits.yaml
         dest: git-conventional-commits.yaml
+      - source: repo-files/renovate.json
+        dest: renovate.json
       - source: workflow-stubs/
         dest: .github/workflows/
 
@@ -148,3 +156,5 @@ group:
         dest: .github/workflows/ci.yml
       - source: workflow-stubs/release.yml
         dest: .github/workflows/semantic-release.yml
+      - source: repo-files/renovate.json
+        dest: renovate.json

@@ -112,6 +112,16 @@ rm release-deploy-key release-deploy-key.pub
 
 then add **Deploy keys** to the ruleset's bypass list.
 
+**Renovate** (Mend GitHub App): dependency-update PRs for every repo.
+Policy lives in this repo's `default.json` (shared preset — grouped weekly
+non-majors, monthly lockfile maintenance, semantic commits, security PRs
+left to Snyk); consumers get a synced `renovate.json` that extends it
+(source: `repo-files/renovate.json`). Preset changes apply on Renovate's
+next run — no sync needed; the synced file only changes if the `extends`
+pointer itself changes. Renovate branches (`renovate/…`) are exempted in
+`branch-name-config.sh` alongside dependabot's. This repo's own
+`renovate.json` also enables the github-actions manager.
+
 ## Troubleshooting
 
 Every entry below is something that actually happened on 2026-07-15.
