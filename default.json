@@ -1,0 +1,18 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Shared Renovate preset for digitalnsw repos. Consumer repos extend this via the synced renovate.json (source: repo-files/renovate.json). Edit HERE; Renovate reads it from main at run time, so changes apply everywhere without a sync.",
+  "extends": ["config:recommended", ":semanticCommits", "group:allNonMajor"],
+  "timezone": "Australia/Sydney",
+  "schedule": ["before 7am on monday"],
+  "prConcurrentLimit": 5,
+  "labels": ["dependencies"],
+  "vulnerabilityAlerts": {
+    "enabled": false,
+    "description": "Security alerting/fix PRs stay with Snyk — avoids duplicate PRs for the same CVE."
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 7am on the first day of the month"],
+    "description": "Monthly full lockfile regeneration with real npm — keeps lockfiles fresh and valid."
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "nswds-devops' own Renovate config — extends the shared preset (default.json) and additionally maintains GitHub Action versions in this repo's workflows.",
+  "extends": ["github>digitalnsw/nswds-devops"],
+  "enabledManagers": ["npm", "github-actions"]
+}
