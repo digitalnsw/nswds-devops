@@ -32,6 +32,19 @@ actors.
   the checks make them safe to merge, not safe to ignore. No auto-merge on
   bot PRs until drift has been boring for a good while.
 - Draft PRs for work-in-progress; the AI title/description workflows fill in
-  scaffolding on open, but you own the final title.
+  scaffolding on open, but **you own the final result** — review and edit the
+  generated description so it summarises the change clearly, links related
+  issues/tickets, and calls out any breaking changes or manual steps. Avoid
+  vague titles like "final changes" or "fix stuff"; the title is the commit
+  and the changelog line.
 - Admin bypass is for emergencies, and every bypass should be explainable
   after the fact.
+
+## Before you merge
+
+- [ ] Title follows Conventional Commits and says what ships
+- [ ] Branch follows the naming convention
+- [ ] Related issues/tickets linked
+- [ ] Tests added or updated for changed behaviour
+- [ ] Documentation updated if a contract changed
+- [ ] CI green and branch up to date with `main`

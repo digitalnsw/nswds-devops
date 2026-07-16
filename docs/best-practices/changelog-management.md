@@ -1,5 +1,9 @@
 # Changelog Management Strategy
 
+The changelog exists so consumers can answer "what changed and does it
+affect me?" without reading diffs — clear, human-readable, and current on
+every release, with zero manual upkeep.
+
 Changelogs are **generated, never hand-written**. On every release,
 semantic-release's changelog plugin prepends the release's commits to
 `CHANGELOG.md`, and the same notes become the GitHub Release body. The bot

@@ -29,6 +29,60 @@ this guide covers the practices tools can't fully check.
 - **No secrets in code or config**, ever — GitHub repo secrets for CI,
   platform env vars (e.g. Vercel) for runtime. See [Environments](environments.md).
 
+## TypeScript
+
+- Enable **strict mode** in `tsconfig.json` — catch issues at compile time.
+- Explicit types for function parameters and return values.
+- Prefer `unknown` over `any`, then narrow; avoid `as` assertions unless
+  there's no alternative (and comment why when there isn't).
+
+```ts
+interface User {
+  id: string
+  name: string
+}
+
+function greet(user: User): string {
+  return `Hello, ${user.name}!`
+}
+```
+
+## React components & hooks
+
+- Functional components only; hooks for state and lifecycle logic.
+- A component file exports a single default component, co-locates its
+  styles where applicable, and keeps logic minimal — extract anything
+  substantial to hooks or helpers.
+- Custom hooks are prefixed `use` (e.g. `useUserData`), kept pure and
+  composable — side effects live inside `useEffect`, nowhere else.
+
+## State management
+
+- Local state: `useState` / `useReducer`.
+- App-wide shared state: context — sparingly. If context wiring gets
+  complex, reach for a lightweight store (e.g. Zustand or Jotai) before a
+  heavyweight one.
+
+## Structure
+
+- Pure, reusable logic lives in `/utils` (or `/hooks` for hooks) with
+  names that say what they do (`formatDate`, `slugify`).
+- Prefer a feature-based folder structure (`/features/auth/…`) over
+  type-based buckets once a repo grows beyond a handful of components.
+- Keep test files next to the files they test: `Component.test.tsx`
+  ([Testing](testing.md)).
+
+## Clean code
+
+- Avoid deeply nested code — 2–3 levels; extract early returns or helpers.
+- Meaningful, self-documenting names beat comments that restate mechanics.
+- Remove unused variables and dead code — deletion is a feature.
+- DRY, but don't over-abstract: the wrong abstraction costs more than a
+  little duplication.
+- Atomic commits: each represents a single logical change, small but not
+  trivial, and passes lint/format checks
+  ([Commit Messages](commit-messages.md)).
+
 ## When in doubt
 
 Match the surrounding code. Consistency within a repo beats personal
