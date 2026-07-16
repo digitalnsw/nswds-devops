@@ -69,6 +69,8 @@ group:
         dest: .github/workflows/ai-pr-title.yml
       - source: workflow-stubs/openai-pr-description.yml
         dest: .github/workflows/openai-pr-description.yml
+      - source: workflow-stubs/ci.yml
+        dest: .github/workflows/ci.yml
 
   # ── Group 3: nswds-app ───────────────────────────────────────────────────
   # Publishes @nswds/app via @semantic-release/npm, so it keeps its own
@@ -114,5 +116,7 @@ group:
         dest: .github/workflows/ai-pr-title.yml
       - source: workflow-stubs/openai-pr-description.yml
         dest: .github/workflows/openai-pr-description.yml
+      - source: workflow-stubs/ci.yml
+        dest: .github/workflows/ci.yml
       - source: workflow-stubs/release.yml
         dest: .github/workflows/semantic-release.yml
