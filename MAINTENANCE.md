@@ -48,11 +48,17 @@ for the stragglers. (The @main → @v1 migration ran exactly this way across
 all 17 repos and was uneventful.)
 
 **Changing the sync map** (`.github/sync.yml`): remember the group
-constraints — group 2 (nswds-ui, nswds-tokens) never receives `release.yml`
-or `release.config.mjs`; group 3 (nswds-app) never receives
+constraints — groups 2a/2b (nswds-ui, nswds-tokens) never receive
+`release.yml` or `release.config.mjs`; group 3 (nswds-app) never receives
 `release.config.mjs`; group 4 (ictds-portal-flows) never receives
 `release.yml` **because its release.yml is a Power Platform production
 deploy pipeline** — the release stub maps to `semantic-release.yml` there.
+Also: nswds-tokens' `.github/workflows/ci.yml` is its own lint/test/typecheck
+pipeline — the shared merge-gate stub maps to `shared-ci.yml` there (the
+`install / install` ruleset context is job-based, so the filename doesn't
+matter). Filename collisions are the recurring trap of this system: before
+syncing any new workflow stub, check which repos already have a file by that
+name.
 And never, under any circumstances, add `deleteOrphaned: true` — repos keep
 their own files in `scripts/` and `.github/workflows/`, and that flag would
 delete them all.

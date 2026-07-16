@@ -43,13 +43,11 @@ group:
       - source: workflow-stubs/
         dest: .github/workflows/
 
-  # ── Group 2: bespoke release pipelines ───────────────────────────────────
-  # nswds-ui (monorepo publish + registry checks) and nswds-tokens (npm publish
-  # + release verification) keep their own release.yml AND release config
-  # (both publish with @semantic-release/npm enabled).
+  # ── Group 2a: nswds-ui ───────────────────────────────────────────────────
+  # Monorepo publish + registry checks: keeps its own release.yml AND release
+  # config (publishes with @semantic-release/npm enabled).
   - repos: |
       digitalnsw/nswds-ui
-      digitalnsw/nswds-tokens
     files:
       - source: scripts/
         dest: scripts/
@@ -71,6 +69,36 @@ group:
         dest: .github/workflows/openai-pr-description.yml
       - source: workflow-stubs/ci.yml
         dest: .github/workflows/ci.yml
+
+  # ── Group 2b: nswds-tokens ───────────────────────────────────────────────
+  # Like nswds-ui it keeps its own release.yml + release config, but its
+  # .github/workflows/ci.yml is ALSO its own (lint/typecheck/test/validate
+  # pipeline) — filename collision with the shared merge-gate stub, so that
+  # stub lands as shared-ci.yml here. The "install / install" ruleset context
+  # is job-based and unaffected by the filename.
+  - repos: |
+      digitalnsw/nswds-tokens
+    files:
+      - source: scripts/
+        dest: scripts/
+      - source: commit-types.mjs
+        dest: commit-types.mjs
+      - source: commitlint.config.mjs
+        dest: commitlint.config.mjs
+      - source: git-conventional-commits.yaml
+        dest: git-conventional-commits.yaml
+      - source: workflow-stubs/commitlint.yml
+        dest: .github/workflows/commitlint.yml
+      - source: workflow-stubs/validate-branch-name.yml
+        dest: .github/workflows/validate-branch-name.yml
+      - source: workflow-stubs/commit-types-sync.yml
+        dest: .github/workflows/commit-types-sync.yml
+      - source: workflow-stubs/ai-pr-title.yml
+        dest: .github/workflows/ai-pr-title.yml
+      - source: workflow-stubs/openai-pr-description.yml
+        dest: .github/workflows/openai-pr-description.yml
+      - source: workflow-stubs/ci.yml
+        dest: .github/workflows/shared-ci.yml
 
   # ── Group 3: nswds-app ───────────────────────────────────────────────────
   # Publishes @nswds/app via @semantic-release/npm, so it keeps its own
