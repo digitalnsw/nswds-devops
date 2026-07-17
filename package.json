@@ -4,7 +4,7 @@
   "description": "Single source of truth for the digitalnsw shared build tooling: commit/branch/PR scripts, commitlint + release configs, and reusable GitHub workflows. Changes here are synced out to consumer repos as pull requests.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/digitalnsw/nswds-devops.git"
+    "url": "git+ssh://git@github.com/digitalnsw/nswds-devops.git"
   },
   "license": "ISC",
   "private": true,
