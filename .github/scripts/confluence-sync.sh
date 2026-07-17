@@ -11,8 +11,12 @@ set -euo pipefail
 
 DOCS_DIR="docs/best-practices"
 SPACE_KEY="GDS"
-# Ancestry of the target folder. mark matches folders by TITLE, not ID —
-# renaming either folder in Confluence breaks the sync (see MAINTENANCE.md).
+# Ancestry of the target folder. mark matches everything by TITLE, not ID —
+# renaming the anchor page or either folder in Confluence breaks the sync
+# (see MAINTENANCE.md). The anchor is the GDS space home page: mark requires
+# a Parent *page* above a folder chain and scopes folder lookup to it —
+# without it, folders that sit under the home page are treated as not found.
+PARENT_ANCHOR="Tech Enablement and Design"
 FOLDER_CHAIN=("Application Support" "Development Best Practice")
 REPO_BLOB_URL="https://github.com/digitalnsw/nswds-devops/blob/main"
 
@@ -36,6 +40,7 @@ for src in "$DOCS_DIR"/*.md; do
 
   {
     printf -- '<!-- Space: %s -->\n' "$SPACE_KEY"
+    printf -- '<!-- Parent: %s -->\n' "$PARENT_ANCHOR"
     for folder in "${FOLDER_CHAIN[@]}"; do
       printf -- '<!-- Folder: %s -->\n' "$folder"
     done

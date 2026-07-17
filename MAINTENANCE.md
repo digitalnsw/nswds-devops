@@ -128,10 +128,12 @@ file under GDS → Application Support → **Development Best Practice**
 (`confluence-sync.yml` → `.github/scripts/confluence-sync.sh`, using
 [mark](https://github.com/kovetskiy/mark), pinned by version + checksum).
 Confluence is a read-only mirror; each page carries a banner saying so.
-Fragile-by-design bits: pages and folders are matched **by title** (a
+Fragile-by-design bits: everything is matched **by title** (page title = a
 guide's H1), so retitling a guide creates a fresh Confluence page and
-orphans the old one, renaming either folder in Confluence breaks the sync,
-and deleting a guide never deletes its page — clean up by hand. Credentials
+orphans the old one; renaming either folder — or the space home page
+"Tech Enablement and Design", which mark needs as the anchor *page* above
+the folder chain — breaks the sync; and deleting a guide never deletes its
+page — clean up by hand. Credentials
 are repository secrets `CONFLUENCE_USER` / `CONFLUENCE_TOKEN` (Atlassian API
 token); page edits are attributed to that account, so move to a service
 account if the token owner ever leaves.
