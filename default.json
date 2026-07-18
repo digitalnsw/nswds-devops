@@ -23,6 +23,18 @@
       "matchPackageNames": ["npm"],
       "matchUpdateTypes": ["major"],
       "enabled": false
+    },
+    {
+      "description": "In-range lockfile-only bumps of override-pinned packages are disabled: Renovate applies them via `npm install <pkg>@<version>`, which adds the package as a direct dependency whose spec conflicts with the override, so npm aborts with EOVERRIDE and the whole grouped PR ships a stale lockfile that fails npm ci everywhere (see nswds-email#459, fast-uri). Monthly lockFileMaintenance regenerates with a plain `npm install` and keeps these pins fresh, so nothing is lost.",
+      "matchDepTypes": ["overrides"],
+      "matchUpdateTypes": ["lockFileUpdate"],
+      "enabled": false
+    },
+    {
+      "description": "conventional-changelog-conventionalcommits v10 is blocked: preset v10's render-function templates are incompatible with @semantic-release/release-notes-generator@14 — commit analysis still computes correct release types, but generateNotes silently emits an empty changelog body (reproduced with the shared release.config.mjs; tracked upstream as issue #992). Remove once a release compatible with release-notes-generator 14 ships. NOTE: v10 can also arrive transitively (@commitlint/config-conventional@21 depends on ccc ^10 and hoists it where the preset loader finds it — this blanked nswds-email changelogs 1.140.5–1.140.12 via nswds-email#437), so repos running semantic-release must also carry a direct v9 pin.",
+      "matchPackageNames": ["conventional-changelog-conventionalcommits"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
     }
   ]
 }
