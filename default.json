@@ -6,6 +6,7 @@
   "schedule": ["before 7am on monday"],
   "prConcurrentLimit": 5,
   "labels": ["dependencies"],
+  "gitIgnoredAuthors": ["41898282+github-actions[bot]@users.noreply.github.com"],
   "vulnerabilityAlerts": {
     "enabled": false,
     "description": "Security alerting/fix PRs stay with Snyk — avoids duplicate PRs for the same CVE."
