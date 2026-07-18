@@ -14,5 +14,14 @@
     "enabled": true,
     "schedule": ["before 7am on the first day of the month"],
     "description": "Monthly full lockfile regeneration with real npm — keeps lockfiles fresh and valid."
-  }
+  },
+  "packageRules": [
+    {
+      "description": "npm engine majors are blocked until the platform bundles the new major. engine-strict=true means bumping engines.npm ahead of the Vercel/CI bundled npm fails every install with EBADENGINE (see nswds-email#460 — npm 12 needs Node ^22.22.2 || ^24.15.0, expected bundled with Node 26 ~Oct 2026). Remove this rule as part of the coordinated adoption pass (reusable-ci + engines.node floor + lockfile regen, same shape as nswds-email#458).",
+      "matchDepTypes": ["engines"],
+      "matchPackageNames": ["npm"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    }
+  ]
 }
