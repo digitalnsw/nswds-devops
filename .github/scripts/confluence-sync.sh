@@ -45,6 +45,12 @@ for src in "$DOCS_DIR"/*.md; do
       printf -- '<!-- Folder: %s -->\n' "$folder"
     done
     printf -- '<!-- Title: %s -->\n' "$title"
+    # This blank line is load-bearing: mark's metadata parser consumes the
+    # first line that isn't a single-line <!-- Key: value --> header, so a
+    # multi-line Include placed directly after the headers loses its opening
+    # line and the banner renders as a code block. The blank line is the
+    # sacrifice that keeps the Include intact (verified against mark 16.5.1).
+    printf -- '\n'
     printf -- '<!-- Include: ac:box\n'
     printf -- '     Icon: true\n'
     printf -- '     Name: info\n'
