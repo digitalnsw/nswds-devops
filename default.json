@@ -35,6 +35,12 @@
       "matchPackageNames": ["conventional-changelog-conventionalcommits"],
       "matchUpdateTypes": ["major"],
       "enabled": false
+    },
+    {
+      "description": "typescript majors (6/7) are blocked: the typescript@7 npm package is the native Go compiler and require('typescript') exposes no JS compiler API, so `next build` fails (Next 16.2.x: 'required package(s) not installed', broke CI and Vercel deploy), eslint crashes via @typescript-eslint/typescript-estree (peer range >=4.8.4 <6.1.0), and prettier-plugin-organize-imports silently no-ops — imports stop being sorted while format hooks keep passing (see nswds-email#444; reproduced 2026-07-18). Native `tsc -b` itself works. Remove when Next.js and typescript-eslint declare TS 6/7 support.",
+      "matchPackageNames": ["typescript"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
     }
   ]
 }
