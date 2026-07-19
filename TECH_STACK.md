@@ -163,6 +163,29 @@ that verification (2026-07-19) found no longer/never in use.
 
 - 🔍 [Sanity](https://www.sanity.io/) — headless CMS. Not used yet;
   earmarked for evaluation as the content layer for future work.
+- 🔍 [Sentry](https://sentry.io/) (or equivalent) — error monitoring.
+  Currently **no repo has any runtime error tracking**; the biggest gap
+  in the stack. One org, a project per repo, config delivered via the
+  file-sync like the rest of the shared tooling.
+- 🔍 Fleet test gate — a `test` job in the shared `reusable-ci.yml` that
+  runs `npm test` where the script exists and skips where it doesn't.
+  Today only the design-system repos and nswds-email have tests, and CI
+  runs none of them; this lets coverage grow repo-by-repo without a
+  fleet-wide mandate.
+- 🔍 Accessibility automation —
+  [@axe-core/playwright](https://github.com/dequelabs/axe-core-npm) in
+  the repos that already run Playwright, and Storybook's
+  [a11y addon](https://storybook.js.org/addons/@storybook/addon-a11y) in
+  nswds-ui. axe currently exists only in nswds-email-framework, while
+  every property carries WCAG 2.2 AA obligations.
+- 🔍 Environment validation at build time —
+  [@t3-oss/env-nextjs](https://env.t3.gg/) (zod is already in all six
+  app repos). Turns missing-secret failures from runtime 500s into
+  build-time errors; pairs naturally with the Neon/Better Auth migration
+  since every repo's `DATABASE_URL` and auth secrets change anyway.
+- 🔍 [Vercel Analytics](https://vercel.com/analytics) fleet-wide — today
+  only awards and nswds-email have it; decide deliberately whether
+  that's policy or drift.
 
 ### Previously listed, not found in use — review before deleting
 
