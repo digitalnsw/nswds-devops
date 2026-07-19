@@ -1,3 +1,9 @@
+## [1.8.2](https://github.com/digitalnsw/nswds-devops/compare/v1.8.1...v1.8.2) (2026-07-19)
+
+### Bug Fixes
+
+* **release:** pin conventional-changelog-conventionalcommits to v9 so release notes render ([#24](https://github.com/digitalnsw/nswds-devops/issues/24)) ([4dce544](https://github.com/digitalnsw/nswds-devops/commit/4dce544befe1892177a85257abacf4d94ab10056))
+
 ## [1.8.1](https://github.com/digitalnsw/nswds-devops/compare/v1.8.0...v1.8.1) (2026-07-19)
 
 ## [1.8.0](https://github.com/digitalnsw/nswds-devops/compare/v1.7.0...v1.8.0) (2026-07-19)
