@@ -57,3 +57,75 @@ jobs:
       - name: Build
         if: ${{ vars.CI_SKIP_BUILD != 'true' }}
         run: npm run build --if-present
+
+  # Lint gate. Added after nswds-app#418 showed a fatally broken `eslint .`
+  # (ESLint 10 plugin crash) merging with all checks green — nothing here ran
+  # lint. `--if-present` no-ops in repos without a lint script; repos whose
+  # lint is temporarily red can opt out with a repo Actions variable
+  # (Settings → Secrets and variables → Actions → Variables → CI_SKIP_LINT=true).
+  # Not required by rulesets unless a repo adds the "install / lint" context.
+  lint:
+    if: ${{ vars.CI_SKIP_LINT != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js (.nvmrc)
+        if: ${{ hashFiles('.nvmrc') != '' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+      - name: Setup Node.js (fallback)
+        if: ${{ hashFiles('.nvmrc') == '' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install dependencies
+        run: npm clean-install
+
+      - name: Lint
+        run: npm run lint --if-present
+
+  # Test gate: runs the repo's vitest suite when a vitest config exists.
+  # Same silent-gap rationale as lint — nswds-app's storybook browser suite
+  # never ran on PRs. Browser-mode suites need a Playwright browser, installed
+  # only when the repo depends on playwright. Opt out with CI_SKIP_TESTS=true.
+  # Not required by rulesets unless a repo adds the "install / test" context.
+  test:
+    if: ${{ vars.CI_SKIP_TESTS != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js (.nvmrc)
+        if: ${{ hashFiles('.nvmrc') != '' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+      - name: Setup Node.js (fallback)
+        if: ${{ hashFiles('.nvmrc') == '' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install dependencies
+        if: ${{ hashFiles('vitest.config.*') != '' }}
+        run: npm clean-install
+
+      - name: Install Playwright browser (browser-mode vitest)
+        if: ${{ hashFiles('vitest.config.*') != '' }}
+        run: |
+          if node -e "const p=require('./package.json');process.exit((p.devDependencies?.playwright||p.dependencies?.playwright)?0:1)"; then
+            npx playwright install chromium --with-deps
+          else
+            echo "No playwright dependency — skipping browser install."
+          fi
+
+      - name: Run vitest
+        if: ${{ hashFiles('vitest.config.*') != '' }}
+        run: npx vitest run
+
+      - name: No vitest config
+        if: ${{ hashFiles('vitest.config.*') == '' }}
+        run: echo "No vitest config — nothing to run."
