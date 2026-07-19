@@ -6,6 +6,8 @@ guarantees nothing corrupt lands regardless of who proposed it.
 
 ## Renovate (routine updates)
 
+Full operating manual: [Renovate](renovate.md). The strategy in brief:
+
 - Org policy lives in this repo's [`default.json`](../../default.json)
   preset; every repo's synced `renovate.json` just extends it. Change
   policy **here** — it applies fleet-wide on Renovate's next run.

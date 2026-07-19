@@ -21,6 +21,7 @@ have not adopted org-wide yet, it says so at the top.
 | [Changelog Management Strategy](changelog-management.md) | Yes (semantic-release) |
 | [Testing Strategy](testing.md) | Partly (per-repo) |
 | [Dependency Management Strategy](dependency-management.md) | Yes (Renovate + Snyk + install gate) |
+| [Renovate](renovate.md) | Yes (Mend app + shared preset) |
 | [Environment Strategy](environments.md) | Partly |
 | [Documentation Strategy](documentation.md) | Convention |
 | [Release Strategy](releases.md) | Yes (reusable release workflow) |
