@@ -41,6 +41,12 @@
       "matchPackageNames": ["typescript"],
       "matchUpdateTypes": ["major"],
       "enabled": false
+    },
+    {
+      "description": "eslint majors are blocked: ESLint 10 removed context.getFilename(), which eslint-plugin-react 7.37.5 (pulled in transitively by eslint-config-next, incl. latest 16.2.10) still calls — every eslint invocation crashes with a TypeError before linting a single file, even on plain .ts files (reproduced on nswds-app#418; upstream jsx-eslint/eslint-plugin-react#3977, vercel/next.js#89764). PR CI does not run lint, so the breakage would merge green and only surface in local dev. Remove once eslint-config-next ships with an ESLint-10-compatible eslint-plugin-react (watch vercel/next.js#89764), and re-check the other capped peers (eslint-plugin-import, eslint-plugin-jsx-a11y) at the same time.",
+      "matchPackageNames": ["eslint"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
     }
   ]
 }
