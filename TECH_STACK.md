@@ -133,15 +133,20 @@ playbook (branching, backups, migrations, session handling) instead of
 two. nswds-app is the reference implementation — it already runs the
 full target stack (Better Auth + Neon + Drizzle).
 
-| Repo | Database today | Auth today | To migrate |
-| --- | --- | --- | --- |
-| attestation | Turso | Auth.js v5 beta | database + auth |
-| engagement | Turso | Auth.js v5 beta | database + auth |
-| nswds-email | Turso | Auth.js v5 beta | database + auth, plus its test harness (hardwired to `TURSO_DATABASE_URL=file::memory:`) |
-| reviewers | Turso | Auth.js v5 beta | database + auth |
-| awards | Neon ✅ | Auth.js v5 beta | auth only |
-| nswds-app | Neon ✅ | Better Auth ✅ | — (reference) |
-| digitalnsw | Neon ✅ | — | — |
+| Repo | Database today | Auth today | To migrate | Tracking |
+| --- | --- | --- | --- | --- |
+| reviewers | Turso | Auth.js v5 beta | database + auth | [reviewers#252](https://github.com/digitalnsw/reviewers/issues/252) (the playbook — full detail lives here) |
+| engagement | Turso | Auth.js v5 beta | database + auth | [engagement#218](https://github.com/digitalnsw/engagement/issues/218) |
+| attestation | Turso | Auth.js v5 beta | database + auth | [attestation#188](https://github.com/digitalnsw/attestation/issues/188) |
+| nswds-email | Turso | Auth.js v5 beta (3 providers: credentials + magic link + Entra) | database + auth + its Turso-coupled test harness; planned as three PRs | [nswds-email#465](https://github.com/digitalnsw/nswds-email/issues/465) |
+| awards | Neon ✅ | Auth.js v5 beta (credentials + email-OTP MFA + magic link + Entra) | auth only, in place | [awards#56](https://github.com/digitalnsw/awards/issues/56) |
+| nswds-app | Neon ✅ | Better Auth ✅ | — (reference) | — |
+| digitalnsw | Neon ✅ | — | — | — |
+
+Rows are in execution order: the three SSO-only template clones first
+(reviewers proves the playbook, engagement and attestation repeat it),
+then the two complex-auth repos. Each issue is a full scope — current
+state, work items, data mapping, cutover/rollback, risks, sizing.
 
 Migrate database and auth **together per repo**: doing the database
 first would convert Auth.js's user/account/session tables to Postgres
