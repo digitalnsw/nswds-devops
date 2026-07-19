@@ -18,8 +18,7 @@
   },
   "packageRules": [
     {
-      "description": "npm engine majors are blocked until the platform bundles the new major. engine-strict=true means bumping engines.npm ahead of the Vercel/CI bundled npm fails every install with EBADENGINE (see nswds-email#460 — npm 12 needs Node ^22.22.2 || ^24.15.0, expected bundled with Node 26 ~Oct 2026). Remove this rule as part of the coordinated adoption pass (reusable-ci + engines.node floor + lockfile regen, same shape as nswds-email#458).",
-      "matchDepTypes": ["engines"],
+      "description": "npm majors are blocked everywhere they appear (engines, overrides, devDependencies) until the platform bundles the new major. engine-strict=true means pulling in npm ahead of the Vercel/CI bundled npm fails every install with EBADENGINE (see nswds-email#460 — npm 12 needs Node ^22.22.2 || ^24.15.0, expected bundled with Node 26 ~Oct 2026). Remove this rule as part of the coordinated adoption pass (reusable-ci + engines.node floor + lockfile regen, same shape as nswds-email#458).",
       "matchPackageNames": ["npm"],
       "matchUpdateTypes": ["major"],
       "enabled": false
