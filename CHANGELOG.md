@@ -1,3 +1,5 @@
+## [1.8.0](https://github.com/digitalnsw/nswds-devops/compare/v1.7.0...v1.8.0) (2026-07-19)
+
 ## [1.7.0](https://github.com/digitalnsw/nswds-devops/compare/v1.6.2...v1.7.0) (2026-07-17)
 
 ## [1.6.2](https://github.com/digitalnsw/nswds-devops/compare/v1.6.1...v1.6.2) (2026-07-16)
