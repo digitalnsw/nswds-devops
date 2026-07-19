@@ -7,6 +7,8 @@ annotations note where something is only used in a subset.
 
 - ✅ in use today (verified against each repo's `package.json`/config,
   2026-07-19)
+- ⚠️ in use today but migrating away — see the
+  [Standardisation roadmap](#standardisation-roadmap)
 - 🔍 discovery — not currently in use; parked for review (see
   [Discovery](#discovery))
 
@@ -99,17 +101,52 @@ The layer this repo provides to every other repo — see
 
 ## Auth & Access Management
 
-- ✅ [Auth.js (NextAuth)](https://authjs.dev/) — attestation, awards,
-  engagement, nswds-email, reviewers
-- ✅ [Better Auth](https://www.better-auth.com/) — nswds-app
+Standard going forward: **Better Auth** (reference implementation:
+nswds-app).
+
+- ✅ [Better Auth](https://www.better-auth.com/) — nswds-app; the fleet
+  standard for all new and migrated auth
+- ⚠️ [Auth.js (NextAuth)](https://authjs.dev/) — attestation, awards,
+  engagement, nswds-email, reviewers; every one is on the v5 **beta**
+  (`5.0.0-beta.x`). Migrating away → Better Auth
 
 ## Database & ORM
 
-- ✅ [Neon](https://neon.tech/) — awards, nswds-app, digitalnsw
-- ✅ [Turso](https://turso.tech/) (libSQL) — attestation, engagement,
-  nswds-email, reviewers
+Standard going forward: **Neon Postgres + Drizzle ORM**.
+
+- ✅ [Neon](https://neon.tech/) (Postgres) — awards, nswds-app, digitalnsw;
+  the fleet standard for all new and migrated databases
+- ⚠️ [Turso](https://turso.tech/) (libSQL) — attestation, engagement,
+  nswds-email, reviewers. Migrating away → Neon Postgres
 - ✅ [Drizzle ORM](https://orm.drizzle.team/) — the standard ORM wherever
-  there's a database (6 repos)
+  there's a database (6 repos). Spans both database stacks (libsql and
+  neon drivers), so it survives the migration: repos swap dialect and
+  driver, not ORM
+
+## Standardisation roadmap
+
+Decisions (2026-07-19): consolidate every database on **Neon Postgres**
+and every auth stack on **Better Auth** (Drizzle adapter). Drivers: half
+the fleet is already on Neon; Auth.js has the whole fleet sitting on a
+v5 beta; and one database + one auth stack means one operational
+playbook (branching, backups, migrations, session handling) instead of
+two. nswds-app is the reference implementation — it already runs the
+full target stack (Better Auth + Neon + Drizzle).
+
+| Repo | Database today | Auth today | To migrate |
+| --- | --- | --- | --- |
+| attestation | Turso | Auth.js v5 beta | database + auth |
+| engagement | Turso | Auth.js v5 beta | database + auth |
+| nswds-email | Turso | Auth.js v5 beta | database + auth, plus its test harness (hardwired to `TURSO_DATABASE_URL=file::memory:`) |
+| reviewers | Turso | Auth.js v5 beta | database + auth |
+| awards | Neon ✅ | Auth.js v5 beta | auth only |
+| nswds-app | Neon ✅ | Better Auth ✅ | — (reference) |
+| digitalnsw | Neon ✅ | — | — |
+
+Migrate database and auth **together per repo**: doing the database
+first would convert Auth.js's user/account/session tables to Postgres
+only to reshape the same tables again for Better Auth. One change window
+per repo touches them once.
 
 ## Email Infrastructure
 
