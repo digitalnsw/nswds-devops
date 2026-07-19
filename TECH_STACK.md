@@ -21,12 +21,18 @@ annotations note where something is only used in a subset.
 - ✅ [Tailwind CSS V4](https://tailwindcss.com/) — fleet-wide (16 repos)
 - ✅ [NSW Design System](https://designsystem.nsw.gov.au/) — via the
   `@nswds/*` packages built in nswds-ui / nswds-app / nswds-tokens and
-  consumed across the fleet
-- ✅ [shadcn/ui](https://ui.shadcn.com/) — nswds-ui, ictds-risk; the
-  cva/lucide component pattern is also used in awards, nswds-app,
-  nswds-email
-- ✅ [Radix UI](https://www.radix-ui.com/) — awards, nswds-app, nswds-email
-  (also underpins shadcn/ui)
+  consumed across the fleet. nswds-ui is the newer generation and
+  supersedes nswds-app.
+- ✅ [Base UI](https://base-ui.com/) — the headless primitive layer for
+  `@nswds/ui` (nswds-ui). Replaces Radix UI as nswds-ui supersedes
+  nswds-app.
+- ✅ [shadcn/ui](https://ui.shadcn.com/) — component pattern and CLI;
+  nswds-ui distributes `@nswds/ui` components through its own shadcn
+  registry (`apps/registry`). Also ictds-risk, and the cva/lucide pattern
+  in awards, nswds-app, nswds-email
+- ✅ [Radix UI](https://www.radix-ui.com/) — awards, nswds-app, nswds-email.
+  Legacy-generation primitives: being superseded by Base UI as nswds-ui
+  replaces nswds-app
 - ✅ [next-themes](https://github.com/pacocoursey/next-themes) — dark-mode
   theming (6 repos)
 - ✅ [Sass](https://sass-lang.com/) — nswds-tokens build pipeline only
