@@ -1,0 +1,53 @@
+# Weekly canary for the conventional-changelog-conventionalcommits (ccc) v10 block.
+#
+# The fleet pins ccc to ^9 because preset v10 renders an empty changelog body
+# under @semantic-release/release-notes-generator (see default.json and the note
+# in release.config.mjs; tracked upstream as release-notes-generator#992). This
+# job installs the LATEST release-notes-generator + ccc and checks whether they
+# render real notes again. The day they do, it opens a single tracking issue to
+# lift the Renovate block and bump the 16 pins together. No-op until then.
+#
+# Repo-local to nswds-devops — NOT synced to consumers.
+name: ccc v10 canary
+
+on:
+  schedule:
+    - cron: '17 8 * * 1' # Mondays 08:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Probe latest release-notes-generator + ccc
+        id: probe
+        run: node .github/scripts/ccc-v10-canary.mjs
+
+      - name: Open tracking issue when the block can be lifted
+        if: steps.probe.outputs.resolved == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BODY_FILE: ${{ steps.probe.outputs.body_file }}
+        run: |
+          set -euo pipefail
+          # Idempotent: one open tracking issue at a time, keyed on the label.
+          gh label create ccc-v10-canary \
+            --description 'ccc v10 unblock canary' --color 0e8a16 --force
+          if [ "$(gh issue list --state open --label ccc-v10-canary --json number --jq 'length')" -gt 0 ]; then
+            echo 'Tracking issue already open; nothing to do.'
+            exit 0
+          fi
+          gh issue create \
+            --title 'ccc v10 preset support has landed — lift the Renovate block' \
+            --label ccc-v10-canary \
+            --body-file "$BODY_FILE"
