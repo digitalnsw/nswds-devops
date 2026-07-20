@@ -1,3 +1,9 @@
+## [1.9.0](https://github.com/digitalnsw/nswds-devops/compare/v1.8.2...v1.9.0) (2026-07-20)
+
+### Features
+
+* **ci:** add a weekly canary that flags when the ccc v10 block can lift ([#27](https://github.com/digitalnsw/nswds-devops/issues/27)) ([5d34c4c](https://github.com/digitalnsw/nswds-devops/commit/5d34c4c8026717a3cf3d9d40e2f0f6f21217e39b)), closes [release-notes-generator#992](https://github.com/digitalnsw/release-notes-generator/issues/992)
+
 ## [1.8.2](https://github.com/digitalnsw/nswds-devops/compare/v1.8.1...v1.8.2) (2026-07-19)
 
 ### Bug Fixes
