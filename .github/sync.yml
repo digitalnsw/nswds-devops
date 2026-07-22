@@ -29,6 +29,7 @@ group:
       digitalnsw/nswds-community
       digitalnsw/nswds-signature
       digitalnsw/nswds-email-issues
+      digitalnsw/dtl-sandbox
     files:
       - source: scripts/
         dest: scripts/
