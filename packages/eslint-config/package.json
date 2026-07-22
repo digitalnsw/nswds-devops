@@ -1,0 +1,23 @@
+{
+  "name": "@nswds/eslint-config",
+  "version": "0.0.0",
+  "description": "Shared ESLint flat config for the NSW Design System fleet (Next.js + Prettier).",
+  "license": "MIT",
+  "type": "module",
+  "main": "index.mjs",
+  "exports": {
+    ".": "./index.mjs"
+  },
+  "files": [
+    "index.mjs"
+  ],
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "peerDependencies": {
+    "eslint": ">=9",
+    "eslint-config-next": ">=15",
+    "eslint-config-prettier": ">=10",
+    "eslint-plugin-prettier": ">=5"
+  }
+}

@@ -1,0 +1,24 @@
+# ── Canonical base (synced from nswds-devops) ───────────────────────────────
+# Repo-specific generated files go BELOW this block, under a "# repo-specific"
+# heading, so the next sync doesn't clobber them (see note in the PR).
+
+node_modules
+.next
+.husky
+coverage
+out
+build
+dist
+public
+storybook-static
+stories
+playwright-report
+test-results
+.nyc_output
+junit.xml
+docs
+*.log
+package-lock.json
+.prettierignore
+.stylelintignore
+.eslintignore
