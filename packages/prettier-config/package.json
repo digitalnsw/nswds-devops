@@ -2,7 +2,7 @@
   "name": "@nswds/prettier-config",
   "version": "0.0.0",
   "description": "Shared Prettier configuration for the NSW Design System fleet.",
-  "license": "MIT",
+  "license": "ISC",
   "main": "index.json",
   "exports": {
     ".": "./index.json"

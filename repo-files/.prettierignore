@@ -16,7 +16,6 @@ playwright-report
 test-results
 .nyc_output
 junit.xml
-docs
 *.log
 package-lock.json
 .prettierignore

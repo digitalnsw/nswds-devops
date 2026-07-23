@@ -27,7 +27,8 @@ base in a local `.prettierrc.mjs` instead of the `package.json` key:
 
 ```js
 // .prettierrc.mjs
-import base from '@nswds/prettier-config'
+// The package exports JSON, so the import needs a JSON import attribute.
+import base from '@nswds/prettier-config' with { type: 'json' }
 
 export default {
   ...base,

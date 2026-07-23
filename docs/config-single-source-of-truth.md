@@ -5,7 +5,7 @@ Six config files had drifted across the fleet with no canonical version:
 `.prettierignore`. This establishes one source of truth for each and a rollout
 plan to converge the 22 repos onto it.
 
-The files split into two distribution mechanisms, because the file-sync action
+The files split into three distribution mechanisms, because the file-sync action
 (`BetaHuhn/repo-file-sync-action`) **overwrites the whole destination file** —
 fine for files that are identical fleet-wide, destructive for files that carry
 legitimate per-repo content.
@@ -38,6 +38,9 @@ is private and has `@semantic-release/npm` disabled. Enabling it needs:
 1. An npm org/scope (`@nswds`) publish token as a repo secret, and
 2. A release/publish path for `packages/*` (workspaces + `@semantic-release/npm`,
    or a dedicated publish workflow).
+3. A deliberate license decision: the packages currently declare `ISC` to match
+   the repo root, but the repo has no `LICENSE` file. Before publishing, confirm
+   the intended license for `@nswds/*` and add a `LICENSE` file accordingly.
 
 Until then the packages are the reviewed source of truth but not installable.
 

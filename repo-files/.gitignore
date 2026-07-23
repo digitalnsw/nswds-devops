@@ -4,7 +4,7 @@
 # so the next sync doesn't clobber them (see note in the PR).
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
