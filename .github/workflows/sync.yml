@@ -8,6 +8,7 @@ on:
     paths:
       - scripts/**
       - workflow-stubs/**
+      - repo-files/**
       - commit-types.mjs
       - commitlint.config.mjs
       - git-conventional-commits.yaml
