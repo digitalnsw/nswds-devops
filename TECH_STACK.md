@@ -104,20 +104,20 @@ The layer this repo provides to every other repo — see
 Standard going forward: **Better Auth** (reference implementation:
 nswds-app).
 
-- ✅ [Better Auth](https://www.better-auth.com/) — nswds-app; the fleet
-  standard for all new and migrated auth
+- ✅ [Better Auth](https://www.better-auth.com/) — nswds-app, reviewers;
+  the fleet standard for all new and migrated auth
 - ⚠️ [Auth.js (NextAuth)](https://authjs.dev/) — attestation, awards,
-  engagement, nswds-email, reviewers; every one is on the v5 **beta**
+  engagement, nswds-email; every one is on the v5 **beta**
   (`5.0.0-beta.x`). Migrating away → Better Auth
 
 ## Database & ORM
 
 Standard going forward: **Neon Postgres + Drizzle ORM**.
 
-- ✅ [Neon](https://neon.tech/) (Postgres) — awards, nswds-app, digitalnsw;
-  the fleet standard for all new and migrated databases
+- ✅ [Neon](https://neon.tech/) (Postgres) — awards, nswds-app, digitalnsw,
+  reviewers; the fleet standard for all new and migrated databases
 - ⚠️ [Turso](https://turso.tech/) (libSQL) — attestation, engagement,
-  nswds-email, reviewers. Migrating away → Neon Postgres
+  nswds-email. Migrating away → Neon Postgres
 - ✅ [Drizzle ORM](https://orm.drizzle.team/) — the standard ORM wherever
   there's a database (6 repos). Spans both database stacks (libsql and
   neon drivers), so it survives the migration: repos swap dialect and
@@ -135,7 +135,7 @@ full target stack (Better Auth + Neon + Drizzle).
 
 | Repo | Database today | Auth today | To migrate | Tracking |
 | --- | --- | --- | --- | --- |
-| reviewers | Turso | Auth.js v5 beta | database + auth | [reviewers#252](https://github.com/digitalnsw/reviewers/issues/252) (the playbook — full detail lives here) |
+| reviewers | Neon ✅ | Better Auth ✅ | — (migrated 2026-07-23) | [reviewers#252](https://github.com/digitalnsw/reviewers/issues/252) (the playbook — full detail lives here) |
 | engagement | Turso | Auth.js v5 beta | database + auth | [engagement#218](https://github.com/digitalnsw/engagement/issues/218) |
 | attestation | Turso | Auth.js v5 beta | database + auth | [attestation#188](https://github.com/digitalnsw/attestation/issues/188) |
 | nswds-email | Turso | Auth.js v5 beta (3 providers: credentials + magic link + Entra) | database + auth + its Turso-coupled test harness; planned as three PRs | [nswds-email#465](https://github.com/digitalnsw/nswds-email/issues/465) |
