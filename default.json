@@ -46,6 +46,14 @@
       "matchPackageNames": ["eslint"],
       "matchUpdateTypes": ["major"],
       "enabled": false
+    },
+    {
+      "description": "0.x minors are split out of the all-non-major group into their own PRs. Under SemVer a 0.x release carries no compatibility guarantee — 0.a.b -> 0.c.d may break freely — but Renovate still classifies that bump as `minor`, so `group:allNonMajor` batches it with genuinely safe updates. That is how @figma/rest-api-spec 0.33.0 -> 0.41.0 rode into nswds-tokens#130 behind 45 other bumps: 0.35.0 widened VariableValue to include null, `typeof null === 'object'` broke narrowing in compareVariableValues, and `npm run typecheck` failed — a review-time catch that a 400-line lockfile diff invites you to skim past. Ungrouping gives each 0.x minor its own PR, its own diff, and its own release notes to read. 0.x patches stay grouped: they remain bug-fix-only by convention and are the bulk of the volume.",
+      "matchPackageNames": ["*"],
+      "matchCurrentVersion": "<1.0.0",
+      "matchUpdateTypes": ["minor"],
+      "groupName": null,
+      "groupSlug": null
     }
   ]
 }
