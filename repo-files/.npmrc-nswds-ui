@@ -1,0 +1,14 @@
+# Synced from digitalnsw/nswds-devops — DO NOT EDIT in this repo.
+# nswds-ui variant: the canonical repo-files/.npmrc does NOT apply here.
+#
+# provenance attestation is intentionally OFF: npm only supports provenance
+# for PUBLIC source repositories, and this repo is private — with it enabled,
+# every publish fails with E422 ("Unsupported GitHub Actions source repository
+# visibility: private"), which silently stranded v1.8.0–v2.1.0 as git tags
+# that never reached npm. Re-enable if the repo is ever made public.
+provenance=false
+
+# NOTE: engine-strict=true is deliberately NOT set here yet, unlike the rest of
+# the fleet. This is a Turborepo monorepo whose workspace packages each carry
+# their own engines; turning it on should be a deliberate pass that checks every
+# package, not a side effect of adopting the shared .npmrc.
