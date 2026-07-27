@@ -44,11 +44,6 @@ there is no `NPM_TOKEN` to rotate.
 
 `@nswds/prettier-config` still lives in `packages/` and is still unpublishable
 for the same reason. It needs the same extraction before Phase 3 can complete.
-3. A deliberate license decision: the packages currently declare `ISC` to match
-   the repo root, but the repo has no `LICENSE` file. Before publishing, confirm
-   the intended license for `@nswds/*` and add a `LICENSE` file accordingly.
-
-Until then the packages are the reviewed source of truth but not installable.
 
 ## Mechanism C — base + repo-specific tail (`.gitignore`, `.prettierignore`)
 
