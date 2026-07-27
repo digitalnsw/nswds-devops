@@ -29,7 +29,7 @@ express "shared base + local override"; an npm package can.
 
 | Package | Replaces | Consumer usage | Home |
 |---------|----------|----------------|------|
-| `@nswds/eslint-config` | per-repo `eslint.config.mjs` | `export default [...nswds, globalIgnores([...repo-specific])]` | [digitalnsw/nswds-eslint-config](https://github.com/digitalnsw/nswds-eslint-config) |
+| `@nswds/eslint-config` | per-repo `eslint.config.mjs` | `export default [...nswds, globalIgnores(['repo-specific/**'])]` | [digitalnsw/nswds-eslint-config](https://github.com/digitalnsw/nswds-eslint-config) |
 | `@nswds/prettier-config` | per-repo `.prettierrc` | `"prettier": "@nswds/prettier-config"` in `package.json` | `packages/` here |
 
 `@nswds/eslint-config` **has moved out of this repo** into
