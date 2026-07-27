@@ -27,17 +27,23 @@ For files that are (or should be) byte-identical everywhere.
 For config that every repo needs but each may extend. Copying a file can't
 express "shared base + local override"; an npm package can.
 
-| Package | Replaces | Consumer usage |
-|---------|----------|----------------|
-| `@nswds/eslint-config` | per-repo `eslint.config.mjs` | `export default [...nswds, globalIgnores([...repo-specific])]` |
-| `@nswds/prettier-config` | per-repo `.prettierrc` | `"prettier": "@nswds/prettier-config"` in `package.json` |
+| Package | Replaces | Consumer usage | Home |
+|---------|----------|----------------|------|
+| `@nswds/eslint-config` | per-repo `eslint.config.mjs` | `export default [...nswds, globalIgnores([...repo-specific])]` | [digitalnsw/nswds-eslint-config](https://github.com/digitalnsw/nswds-eslint-config) |
+| `@nswds/prettier-config` | per-repo `.prettierrc` | `"prettier": "@nswds/prettier-config"` in `package.json` | `packages/` here |
 
-Both live in `packages/` here. **Publishing is not yet wired up** — nswds-devops
-is private and has `@semantic-release/npm` disabled. Enabling it needs:
+`@nswds/eslint-config` **has moved out of this repo** into
+[digitalnsw/nswds-eslint-config](https://github.com/digitalnsw/nswds-eslint-config).
+It could never be published from here: nswds-devops is `"private": true` at the
+root and deliberately comments out `@semantic-release/npm`, so it releases a
+changelog and GitHub release but never touches npm. That is why the package sat
+at `0.0.0` with zero adopters while all 12 Next.js repos kept hand-maintaining
+their own `eslint.config.mjs`. Its own repo mirrors the nswds-tokens release
+setup — semantic-release + `@semantic-release/npm` + OIDC trusted publishing, so
+there is no `NPM_TOKEN` to rotate.
 
-1. An npm org/scope (`@nswds`) publish token as a repo secret, and
-2. A release/publish path for `packages/*` (workspaces + `@semantic-release/npm`,
-   or a dedicated publish workflow).
+`@nswds/prettier-config` still lives in `packages/` and is still unpublishable
+for the same reason. It needs the same extraction before Phase 3 can complete.
 3. A deliberate license decision: the packages currently declare `ISC` to match
    the repo root, but the repo has no `LICENSE` file. Before publishing, confirm
    the intended license for `@nswds/*` and add a `LICENSE` file accordingly.
@@ -74,9 +80,14 @@ several repos already carry, and includes `*.err`.
 2. **Phase 2 — `.nvmrc` / `.npmrc`:** verify the two Node-22 repos, then add
    `repo-files/.nvmrc` and `repo-files/.npmrc` to the sync map (handling the
    nswds-ui `.npmrc` variant). Merging fans out `chore(ci):` PRs.
-3. **Phase 3 — packages:** wire up publishing, publish `@nswds/eslint-config`
-   and `@nswds/prettier-config`, then migrate repos one group at a time
-   (Renovate keeps them current after).
+3. **Phase 3 — packages:** `@nswds/eslint-config` is extracted to its own repo
+   with publishing wired up; it needs a one-time manual first publish before
+   OIDC trusted publishing can take over (npm cannot bind a trusted publisher to
+   a package name that has never been published). `@nswds/prettier-config` still
+   needs the same extraction. Then migrate repos one group at a time — each
+   adopting repo drops its local `eslint.config.mjs` body *and* the
+   `@eslint/compat` `fixupConfigRules` wrapper, since the shim now lives inside
+   the package. Renovate keeps them current after.
 4. **Phase 4 — ignore files:** roll out the `.gitignore` / `.prettierignore`
    base via the chosen Mechanism-C approach.
 
