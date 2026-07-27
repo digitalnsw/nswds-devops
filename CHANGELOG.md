@@ -1,3 +1,9 @@
+## [1.9.1](https://github.com/digitalnsw/nswds-devops/compare/v1.9.0...v1.9.1) (2026-07-27)
+
+### Bug Fixes
+
+* **eslint-config:** shim eslint-config-next for ESLint 10 ([#37](https://github.com/digitalnsw/nswds-devops/issues/37)) ([9c4542f](https://github.com/digitalnsw/nswds-devops/commit/9c4542f5e147334c7be4bcec0f6106ed97321ce6)), closes [vercel/next.js#89764](https://github.com/vercel/next.js/issues/89764)
+
 ## [1.9.0](https://github.com/digitalnsw/nswds-devops/compare/v1.8.2...v1.9.0) (2026-07-20)
 
 ### Features
