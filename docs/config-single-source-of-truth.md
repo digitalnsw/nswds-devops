@@ -16,8 +16,8 @@ For files that are (or should be) byte-identical everywhere.
 
 | File | Canonical | Notes |
 |------|-----------|-------|
-| `.nvmrc` | `24.16.0` | Full pin. **dtl-sandbox** and **nswds-tokens** currently run Node 22 — verify their build/CI on 24 before adding them to the sync group. |
-| `.npmrc` | `engine-strict=true` | **nswds-ui** additionally needs `provenance=false` (private-publish workaround). Its sync group gets a variant source, or it keeps that line as a repo-specific override. |
+| `.nvmrc` | `24.16.0` | Full pin. **Synced — all groups.** The earlier caveat about dtl-sandbox and nswds-tokens running Node 22 is resolved: every repo in the map is on `24.16.0`. |
+| `.npmrc` | `engine-strict=true` | **Synced — all groups.** **nswds-ui takes a variant source** (`repo-files/.npmrc-nswds-ui`), because it needs `provenance=false`: npm only supports provenance for public source repos, and a whole-file sync of the canonical would strand its releases as git tags that never reach npm (as v1.8.0–v2.1.0 were). |
 
 `.gitignore` and `.prettierignore` **also** live in `repo-files/` as a canonical
 **base**, but they are NOT clean whole-file syncs — see Mechanism C.
@@ -81,9 +81,17 @@ several repos already carry, and includes `*.err`.
 
 1. **Phase 1 (this PR):** establish the canonical files + packages + this plan
    in nswds-devops. No `sync.yml` change — merging does not touch other repos.
-2. **Phase 2 — `.nvmrc` / `.npmrc`:** verify the two Node-22 repos, then add
-   `repo-files/.nvmrc` and `repo-files/.npmrc` to the sync map (handling the
-   nswds-ui `.npmrc` variant). Merging fans out `chore(ci):` PRs.
+2. **Phase 2 — `.nvmrc` / `.npmrc`: done.** `.nvmrc` was mapped in every group
+   during the original rollout, and every repo now reports `24.16.0`, which
+   resolved the Node-22 caveat. `.npmrc` is mapped as of this change: 21 repos
+   take `repo-files/.npmrc`, and nswds-ui takes `repo-files/.npmrc-nswds-ui`
+   so its `provenance=false` survives.
+
+   Adding `engine-strict=true` to the 12 repos that lacked it is safe today —
+   every repo's `.nvmrc` (`24.16.0`) satisfies its own declared `engines.node`,
+   so nothing that installed before stops installing. It is load-bearing going
+   forward: it converts a silently-ignored `engines` warning into a failure in
+   the `install / install` job that rulesets already require.
 3. **Phase 3 — packages:** both packages are extracted to their own repos with
    publishing wired up. Each still needs a **one-time manual first publish**
    (`npm publish --access public`) before OIDC trusted publishing can take over —

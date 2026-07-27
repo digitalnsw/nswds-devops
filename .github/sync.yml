@@ -45,6 +45,8 @@ group:
         dest: renovate.json
       - source: repo-files/.nvmrc
         dest: .nvmrc
+      - source: repo-files/.npmrc
+        dest: .npmrc
       - source: workflow-stubs/
         dest: .github/workflows/
 
@@ -78,6 +80,8 @@ group:
         dest: renovate.json
       - source: repo-files/.nvmrc
         dest: .nvmrc
+      - source: repo-files/.npmrc-nswds-ui
+        dest: .npmrc
 
   # ── Group 2b: nswds-tokens ───────────────────────────────────────────────
   # Like nswds-ui it keeps its own release.yml + release config, but its
@@ -112,6 +116,8 @@ group:
         dest: renovate.json
       - source: repo-files/.nvmrc
         dest: .nvmrc
+      - source: repo-files/.npmrc
+        dest: .npmrc
 
   # ── Group 3: nswds-app ───────────────────────────────────────────────────
   # Publishes @nswds/app via @semantic-release/npm, so it keeps its own
@@ -131,6 +137,8 @@ group:
         dest: renovate.json
       - source: repo-files/.nvmrc
         dest: .nvmrc
+      - source: repo-files/.npmrc
+        dest: .npmrc
       - source: workflow-stubs/
         dest: .github/workflows/
 
@@ -169,3 +177,5 @@ group:
         dest: renovate.json
       - source: repo-files/.nvmrc
         dest: .nvmrc
+      - source: repo-files/.npmrc
+        dest: .npmrc
