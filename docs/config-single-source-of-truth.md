@@ -48,10 +48,10 @@ Both carry a CI test that guards their specific silent-failure mode — the ESLi
 config lints a real JSX file (the ESLint 10 `getFilename` crash), and the
 Prettier config resolves every option through Prettier's own support info (typo'd
 keys are ignored rather than rejected).
-Both new repos ship an `ISC` `LICENSE` file, carrying over the licence the
-packages already declared. Note this differs from `@nswds/tokens`, which is
-MPL-2.0 — worth a deliberate call on whether `@nswds/*` should be consistent
-before the packages get wide adoption.
+Both new repos are **MPL-2.0**, matching `@nswds/tokens`, so the whole `@nswds/*`
+scope is consistent. The packages previously declared `ISC` — inherited from this
+repo's root rather than chosen for a published package. Relicensed before either
+was published, so there is no prior distribution under ISC to reconcile.
 
 Until then the packages are the reviewed source of truth but not installable.
 
