@@ -27,7 +27,7 @@ Synced into every repo's `scripts/` from this repo. The user-facing ones:
 | `./scripts/suggest-branch-name.sh` | Proposes a compliant branch name for your change. |
 | `./scripts/git-commit.sh` | AI-generated Conventional Commit message from your staged diff (commits via `git commit -F -`, so the commit-msg hook still lints it). |
 | `./scripts/pull-request.sh` | Generates a Conventional-Commits PR title from your branch's commits, asks for confirmation, then opens the PR with `gh pr create`. |
-| `./scripts/setup-commitlint.sh` | Installs and wires commitlint + the husky `commit-msg` hook in the current repo. Idempotent. |
+| `./scripts/setup-commitlint.sh` | Installs and wires commitlint + the husky hooks (`pre-commit`, `prepare-commit-msg`, `commit-msg`) in the current repo. Idempotent. |
 
 Supporting pieces you rarely invoke directly: `branch-name-config.sh`
 (policy source of truth), `conventional-commit-config.sh` +
@@ -36,7 +36,8 @@ Supporting pieces you rarely invoke directly: `branch-name-config.sh`
 `secret-redaction.sh` (detects and redacts secret-looking content **before
 any diff leaves the machine** for the OpenAI API), `wrap-commit-body.sh`
 (reflows AI prose to pass commitlint's line-length rule), and the husky
-`commit-msg` / `prepare-commit-msg` hooks that tie it together. OpenCommit
+`commit-msg` / `prepare-commit-msg` hooks that tie it together (plus a
+`pre-commit` hook that blocks unresolved merge conflict markers). OpenCommit
 (`oco`) also works locally if you prefer it — the hooks reflow and lint
 whatever tool wrote the message.
 
