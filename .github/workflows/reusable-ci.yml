@@ -87,7 +87,11 @@ jobs:
       - name: Lint
         run: npm run lint --if-present
 
-  # Test gate: runs the repo's vitest suite when a vitest config exists.
+  # Test gate: runs the repo's vitest suite when a vitest config exists, and
+  # falls back to `npm test --if-present` otherwise — repos that test with a
+  # different runner (nswds-eslint-config and nswds-prettier-config use
+  # node --test) previously got an "install / test" context that could never
+  # fail because every step was gated on a vitest config.
   # Same silent-gap rationale as lint — nswds-app's storybook browser suite
   # never ran on PRs. Browser-mode suites need a Playwright browser, installed
   # only when the repo depends on playwright. Opt out with CI_SKIP_TESTS=true.
@@ -110,7 +114,6 @@ jobs:
           node-version: ${{ inputs.node-version }}
 
       - name: Install dependencies
-        if: ${{ hashFiles('vitest.config.*') != '' }}
         run: npm clean-install
 
       - name: Install Playwright browser (browser-mode vitest)
@@ -126,6 +129,8 @@ jobs:
         if: ${{ hashFiles('vitest.config.*') != '' }}
         run: npx vitest run
 
-      - name: No vitest config
+      # `--if-present` keeps repos with no test script green, matching the
+      # build and lint gates.
+      - name: Run npm test (no vitest config)
         if: ${{ hashFiles('vitest.config.*') == '' }}
-        run: echo "No vitest config — nothing to run."
+        run: npm test --if-present
