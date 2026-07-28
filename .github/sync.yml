@@ -119,29 +119,6 @@ group:
       - source: repo-files/.npmrc
         dest: .npmrc
 
-  # ── Group 3: nswds-app ───────────────────────────────────────────────────
-  # Publishes @nswds/app via @semantic-release/npm, so it keeps its own
-  # release.config.mjs — but the stock release workflow (stub) is fine.
-  - repos: |
-      digitalnsw/nswds-app
-    files:
-      - source: scripts/
-        dest: scripts/
-      - source: commit-types.mjs
-        dest: commit-types.mjs
-      - source: commitlint.config.mjs
-        dest: commitlint.config.mjs
-      - source: git-conventional-commits.yaml
-        dest: git-conventional-commits.yaml
-      - source: repo-files/renovate.json
-        dest: renovate.json
-      - source: repo-files/.nvmrc
-        dest: .nvmrc
-      - source: repo-files/.npmrc
-        dest: .npmrc
-      - source: workflow-stubs/
-        dest: .github/workflows/
-
   # ── Group 2c: @nswds config packages ─────────────────────────────────────
   # nswds-eslint-config and nswds-prettier-config publish to npm over OIDC
   # trusted publishing, so like 2a/2b they keep their own release.yml (it
@@ -180,6 +157,29 @@ group:
         dest: .nvmrc
       - source: repo-files/.npmrc
         dest: .npmrc
+
+  # ── Group 3: nswds-app ───────────────────────────────────────────────────
+  # Publishes @nswds/app via @semantic-release/npm, so it keeps its own
+  # release.config.mjs — but the stock release workflow (stub) is fine.
+  - repos: |
+      digitalnsw/nswds-app
+    files:
+      - source: scripts/
+        dest: scripts/
+      - source: commit-types.mjs
+        dest: commit-types.mjs
+      - source: commitlint.config.mjs
+        dest: commitlint.config.mjs
+      - source: git-conventional-commits.yaml
+        dest: git-conventional-commits.yaml
+      - source: repo-files/renovate.json
+        dest: renovate.json
+      - source: repo-files/.nvmrc
+        dest: .nvmrc
+      - source: repo-files/.npmrc
+        dest: .npmrc
+      - source: workflow-stubs/
+        dest: .github/workflows/
 
   # ── Group 4: ictds-portal-flows ──────────────────────────────────────────
   # Its release.yml is a Power Platform PROD DEPLOY pipeline (name collision —
