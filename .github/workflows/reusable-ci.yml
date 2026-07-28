@@ -26,10 +26,32 @@ jobs:
 
       # npm ci reports a lockfile with conflict markers as "no package-lock.json",
       # which is misleading — catch markers in any tracked file with a clear error.
+      #
+      # All four marker types: `=======` closes every conflict block, and
+      # `|||||||` appears for anyone running merge.conflictStyle=diff3/zdiff3.
+      # The `( .*)?$` tail is load-bearing, not tidiness — `=======` ends the
+      # line with no label, so the pattern has to accept end-of-line, and
+      # anchoring it is what stops a bare `^={7}` prefix from matching a
+      # Markdown setext underline or the `=` rule under a LICENSE title
+      # (nswds-eslint-config's LICENSE line 2 is 34 `=` characters) and
+      # failing this job on every run, forever. Do not relax it to a prefix
+      # match.
+      #
+      # The exit status is captured rather than tested with `if git grep`,
+      # because git grep has three outcomes, not two: 0 found, 1 none, >1 the
+      # scan itself failed (128 for a bad pattern or a broken repo). Under a
+      # plain `if`, that third case is indistinguishable from "clean" and the
+      # gate would pass without having looked at anything. `|| status=$?` also
+      # keeps the expected exit 1 from tripping the shell's `-e`.
       - name: Check for unresolved merge conflict markers
         run: |
-          if git grep -nE '^(<{7}|>{7}) '; then
-            echo "❌ Unresolved merge conflict markers found in the files above."
+          status=0
+          git grep -InE '^(<{7}|={7}|>{7}|\|{7})( .*)?$' || status=$?
+          if [ "$status" -eq 0 ]; then
+            echo "::error::Unresolved merge conflict markers found in the files above."
+            exit 1
+          elif [ "$status" -ne 1 ]; then
+            echo "::error::git grep exited $status, so the scan never ran. Failing instead of reporting a clean tree."
             exit 1
           fi
 
