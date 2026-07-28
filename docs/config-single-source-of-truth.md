@@ -30,7 +30,31 @@ express "shared base + local override"; an npm package can.
 | Package | Replaces | Consumer usage | Home |
 |---------|----------|----------------|------|
 | `@nswds/eslint-config` | per-repo `eslint.config.mjs` | `export default [...nswds, globalIgnores(['repo-specific/**'])]` | [digitalnsw/nswds-eslint-config](https://github.com/digitalnsw/nswds-eslint-config) |
-| `@nswds/prettier-config` | per-repo `.prettierrc` | `"prettier": "@nswds/prettier-config"` in `package.json` | [digitalnsw/nswds-prettier-config](https://github.com/digitalnsw/nswds-prettier-config) |
+| `@nswds/prettier-config` | per-repo `.prettierrc` | `"prettier": "@nswds/prettier-config"` in `package.json`, or a `.prettierrc.mjs` that extends it — see below | [digitalnsw/nswds-prettier-config](https://github.com/digitalnsw/nswds-prettier-config) |
+
+The Prettier package has **two consumer shapes**, because the `package.json` key
+takes a bare package reference and cannot add options on top. Only base-only
+repos can use it — in practice just nswds-tokens. Every Tailwind repo needs the
+plugin block and an app-specific `tailwindStylesheet`, so it extends in a
+`.prettierrc.mjs` instead:
+
+```js
+import base from '@nswds/prettier-config' with { type: 'json' }
+
+const config = {
+  ...base,
+  plugins: ['prettier-plugin-organize-imports', 'prettier-plugin-tailwindcss'],
+  tailwindFunctions: ['clsx'],
+  tailwindStylesheet: './src/app/globals.css',
+}
+
+export default config
+```
+
+Assign to a variable rather than exporting the object literal: repos lint their
+own `.prettierrc.mjs`, and the literal form warns under
+`import/no-anonymous-default-export`, which `@nswds/eslint-config` inherits from
+`eslint-config-next/core-web-vitals`.
 
 **Both packages have moved out of this repo**, and `packages/` is gone. Neither
 could ever be published from here: nswds-devops is `"private": true` at the root
@@ -92,16 +116,31 @@ several repos already carry, and includes `*.err`.
    so nothing that installed before stops installing. It is load-bearing going
    forward: it converts a silently-ignored `engines` warning into a failure in
    the `install / install` job that rulesets already require.
-3. **Phase 3 — packages:** both packages are extracted to their own repos with
-   publishing wired up. Each still needs a **one-time manual first publish**
-   (`npm publish --access public`) before OIDC trusted publishing can take over —
-   npm cannot bind a trusted publisher to a package name that has never been
-   published. After that first publish, configure the trusted publisher on
-   npmjs.com against the repo and `release.yml`, and every merge to `main`
-   publishes itself. Then migrate repos one group at a time: each adopting repo
-   drops its local `eslint.config.mjs` body *and* its `@eslint/compat`
-   `fixupConfigRules` wrapper (the shim lives in the package now), and replaces
-   `.prettierrc` with the `"prettier"` key. Renovate keeps them current after.
+3. **Phase 3 — packages: done.** Both are published and adopted fleet-wide;
+   the first-publish/OIDC bootstrap described above is complete, so every merge
+   to `main` in either package repo now publishes itself.
+
+   - **`@nswds/eslint-config` (1.0.2)** — adopted by 13 repos. Each dropped its
+     local `eslint.config.mjs` body *and* its `@eslint/compat`
+     `fixupConfigRules` wrapper; the shim lives in the package. nswds-tokens and
+     nswds-ui are the two non-adopters: tokens is not a Next app, and nswds-ui
+     extends via its internal `@workspace/eslint-config`.
+   - **`@nswds/prettier-config` (1.0.1)** — adopted by all 15 repos. No
+     hand-copied `.prettierrc` remains anywhere in the fleet. 13 Tailwind repos
+     use the `.prettierrc.mjs` extend form, nswds-tokens uses the `package.json`
+     key, and nswds-ui extends through `@workspace/prettier-config`.
+
+   **Zero files were reformatted.** Every repo's `.prettierrc` was already
+   byte-identical to the package's `index.json`, so this was pure
+   de-duplication. Each migration was gated on two checks: `prettier
+   --list-different` identical before and after, and `resolveConfig()` on a
+   source file exactly equal to the deleted `.prettierrc`. Note the first check
+   is *unchanged*, not *empty* — most repos have a non-empty baseline
+   (`CHANGELOG.md`, drizzle metadata, generated token output are not formatted),
+   so "empty" would be the wrong pass condition and would have falsely blocked
+   correct changes.
+
+   Renovate keeps both packages current from here.
 4. **Phase 4 — ignore files:** roll out the `.gitignore` / `.prettierignore`
    base via the chosen Mechanism-C approach.
 
