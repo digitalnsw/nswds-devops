@@ -56,8 +56,8 @@ Three files, two of them here:
 | File | Role |
 | --- | --- |
 | [`default.json`](../../default.json) (this repo) | **The org preset. The only file you edit to change policy.** Renovate resolves `github>digitalnsw/nswds-devops` to this file *from `main` at run time*, so a merged change applies fleet-wide on the next Renovate run — no sync, no tag move. |
-| [`repo-files/renovate.json`](../../repo-files/renovate.json) (synced out) | What consumer repos hold: a two-line `extends` pointer at the preset, npm manager only. Delivered by the file-sync like everything else; it only ever needs re-syncing if the pointer itself changes. Marked DO NOT EDIT — a consumer-side edit is silently overwritten by the next sync PR. |
-| [`renovate.json`](../../renovate.json) (this repo's own) | This repo dogfoods the same preset but additionally enables the `github-actions` manager, so Renovate also maintains the action pins in `reusable-*.yml`. (SHA-pinned third-party actions stay pinned — Renovate updates the SHA and keeps the version comment.) |
+| [`repo-files/renovate.json`](../../repo-files/renovate.json) (synced out) | What consumer repos hold: a two-line `extends` pointer at the preset, with the `npm` and `github-actions` managers enabled — Renovate maintains both package deps and the action versions in each repo's workflow stubs. Delivered by the file-sync like everything else; it only ever needs re-syncing if the pointer or manager list changes. Marked DO NOT EDIT — a consumer-side edit is silently overwritten by the next sync PR. |
+| [`renovate.json`](../../renovate.json) (this repo's own) | This repo dogfoods the same preset with the same two managers, so Renovate also maintains the action pins in `reusable-*.yml`. (SHA-pinned third-party actions stay pinned — Renovate updates the SHA and keeps the version comment.) |
 
 The preset itself extends Renovate's
 [`config:recommended`](https://docs.renovatebot.com/presets-config/#configrecommended),
