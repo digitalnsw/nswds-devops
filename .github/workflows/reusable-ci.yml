@@ -87,10 +87,20 @@ jobs:
       - name: Lint
         run: npm run lint --if-present
 
-  # Test gate: runs the repo's vitest suite when a vitest config exists.
-  # Same silent-gap rationale as lint — nswds-app's storybook browser suite
-  # never ran on PRs. Browser-mode suites need a Playwright browser, installed
-  # only when the repo depends on playwright. Opt out with CI_SKIP_TESTS=true.
+  # Test gate: runs the repo's vitest suite when a vitest config exists,
+  # otherwise its `npm test` script. Same silent-gap rationale as lint —
+  # nswds-app's storybook browser suite never ran on PRs. Browser-mode suites
+  # need a Playwright browser, installed only when the repo depends on
+  # playwright. Opt out with CI_SKIP_TESTS=true.
+  #
+  # The npm-test path was added after nswds-email#485: gating the whole job on
+  # a vitest config meant repos testing with `node --test` reported a green
+  # "install / test" having installed nothing and run nothing — on that PR it
+  # passed against a lockfile that could not install at all. Four repos were
+  # affected (awards, nswds-email, nswds-eslint-config, nswds-prettier-config);
+  # their suites were confirmed green from a clean checkout before this landed.
+  # The npm-init default stub ("Error: no test specified") is treated as absent
+  # so onboarding a repo that never wrote tests doesn't fail CI.
   # Not required by rulesets unless a repo adds the "install / test" context.
   test:
     if: ${{ vars.CI_SKIP_TESTS != 'true' }}
@@ -126,6 +136,30 @@ jobs:
         if: ${{ hashFiles('vitest.config.*') != '' }}
         run: npx vitest run
 
-      - name: No vitest config
+      # No vitest config: fall back to the repo's own `npm test`, if it has a
+      # real one. Detected in a step rather than an `if:` expression because
+      # workflow expressions can't read package.json.
+      - name: Detect npm test script
+        id: npm-test
         if: ${{ hashFiles('vitest.config.*') == '' }}
-        run: echo "No vitest config — nothing to run."
+        run: |
+          if [ -f package.json ] && node -e "
+            const t = (require('./package.json').scripts || {}).test || '';
+            process.exit(t && !/no test specified/.test(t) ? 0 : 1);
+          "; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies (npm test)
+        if: ${{ steps.npm-test.outputs.present == 'true' }}
+        run: npm clean-install
+
+      - name: Run npm test
+        if: ${{ steps.npm-test.outputs.present == 'true' }}
+        run: npm test
+
+      - name: Nothing to run
+        if: ${{ hashFiles('vitest.config.*') == '' && steps.npm-test.outputs.present != 'true' }}
+        run: echo "No vitest config and no npm test script — nothing to run."
