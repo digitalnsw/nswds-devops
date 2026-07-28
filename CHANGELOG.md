@@ -1,3 +1,9 @@
+## [1.11.0](https://github.com/digitalnsw/nswds-devops/compare/v1.10.1...v1.11.0) (2026-07-28)
+
+### Features
+
+* **husky:** add a shared pre-commit hook blocking conflict markers ([#50](https://github.com/digitalnsw/nswds-devops/issues/50)) ([f7d0403](https://github.com/digitalnsw/nswds-devops/commit/f7d040346ec6bec331f7093254df89d0f6c283f7))
+
 ## [1.10.1](https://github.com/digitalnsw/nswds-devops/compare/v1.10.0...v1.10.1) (2026-07-28)
 
 ### Bug Fixes
