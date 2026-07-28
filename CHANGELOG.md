@@ -1,3 +1,9 @@
+## [1.10.1](https://github.com/digitalnsw/nswds-devops/compare/v1.10.0...v1.10.1) (2026-07-28)
+
+### Bug Fixes
+
+* **ci:** catch all four conflict-marker types and failed scans ([#48](https://github.com/digitalnsw/nswds-devops/issues/48)) ([c4ac359](https://github.com/digitalnsw/nswds-devops/commit/c4ac359ff098ffaf549803e82b08a8f62c740938))
+
 ## [1.10.0](https://github.com/digitalnsw/nswds-devops/compare/v1.9.1...v1.10.0) (2026-07-28)
 
 ### Features
