@@ -142,6 +142,45 @@ group:
       - source: workflow-stubs/
         dest: .github/workflows/
 
+  # ── Group 2c: @nswds config packages ─────────────────────────────────────
+  # nswds-eslint-config and nswds-prettier-config publish to npm over OIDC
+  # trusted publishing, so like 2a/2b they keep their own release.yml (it
+  # carries `id-token: write` and the post-release npm-vs-tag guard) and their
+  # own release.config.mjs (@semantic-release/npm enabled). Their ci.yml is
+  # also their own — a config smoke test — so the shared merge-gate stub lands
+  # as shared-ci.yml, exactly as in 2b. Syncing workflow-stubs/ wholesale here
+  # would overwrite both and silently disable trusted publishing.
+  - repos: |
+      digitalnsw/nswds-eslint-config
+      digitalnsw/nswds-prettier-config
+    files:
+      - source: scripts/
+        dest: scripts/
+      - source: commit-types.mjs
+        dest: commit-types.mjs
+      - source: commitlint.config.mjs
+        dest: commitlint.config.mjs
+      - source: git-conventional-commits.yaml
+        dest: git-conventional-commits.yaml
+      - source: workflow-stubs/commitlint.yml
+        dest: .github/workflows/commitlint.yml
+      - source: workflow-stubs/validate-branch-name.yml
+        dest: .github/workflows/validate-branch-name.yml
+      - source: workflow-stubs/commit-types-sync.yml
+        dest: .github/workflows/commit-types-sync.yml
+      - source: workflow-stubs/ai-pr-title.yml
+        dest: .github/workflows/ai-pr-title.yml
+      - source: workflow-stubs/openai-pr-description.yml
+        dest: .github/workflows/openai-pr-description.yml
+      - source: workflow-stubs/ci.yml
+        dest: .github/workflows/shared-ci.yml
+      - source: repo-files/renovate.json
+        dest: renovate.json
+      - source: repo-files/.nvmrc
+        dest: .nvmrc
+      - source: repo-files/.npmrc
+        dest: .npmrc
+
   # ── Group 4: ictds-portal-flows ──────────────────────────────────────────
   # Its release.yml is a Power Platform PROD DEPLOY pipeline (name collision —
   # never overwrite it). The shared release workflow lives in
