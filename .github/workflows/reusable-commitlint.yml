@@ -39,3 +39,21 @@ jobs:
           --from ${{ github.event.pull_request.base.sha }}
           --to ${{ github.event.pull_request.head.sha }}
           --verbose
+
+      # On a squash-merged repo the commits linted above are all discarded, and
+      # the squash subject comes from the PR title. That title is then the only
+      # string semantic-release ever analyses, so an unconventional or
+      # wrongly-typed one is a silently missed release rather than a cosmetic
+      # problem — a `chore:` title on a PR full of `fix:` commits ships nothing
+      # and nothing goes red. This is a step in the existing job on purpose: it
+      # inherits the `commitlint / commitlint` status context, so every repo
+      # already requiring that check gains title enforcement without touching a
+      # single ruleset.
+      #
+      # The title is untrusted — anyone can open a PR — so it is passed through
+      # the environment and quoted. Do not interpolate `${{ }}` into this run
+      # block: a crafted title would execute as shell.
+      - name: Validate PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$PR_TITLE" | npx commitlint --verbose
