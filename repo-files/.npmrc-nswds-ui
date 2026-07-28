@@ -8,7 +8,8 @@
 # that never reached npm. Re-enable if the repo is ever made public.
 provenance=false
 
-# NOTE: engine-strict=true is deliberately NOT set here yet, unlike the rest of
-# the fleet. This is a Turborepo monorepo whose workspace packages each carry
-# their own engines; turning it on should be a deliberate pass that checks every
-# package, not a side effect of adopting the shared .npmrc.
+# engine-strict matches the rest of the fleet. Enabled after checking every
+# workspace package: only the root (^22.14.0 || >=24.10.0, npm >=11.5.1) and
+# packages/ui (^22.14.0 || >=24.10.0) declare engines at all, and .nvmrc's
+# 24.16.0 — which ships npm 11.13.0 — satisfies both.
+engine-strict=true
