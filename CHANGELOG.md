@@ -1,3 +1,9 @@
+## [1.10.0](https://github.com/digitalnsw/nswds-devops/compare/v1.9.1...v1.10.0) (2026-07-28)
+
+### Features
+
+* **commitlint:** lint the PR title, not just the commits ([#44](https://github.com/digitalnsw/nswds-devops/issues/44)) ([eb76b61](https://github.com/digitalnsw/nswds-devops/commit/eb76b611ef1c7606ea692358c88218995fdbde32))
+
 ## [1.9.1](https://github.com/digitalnsw/nswds-devops/compare/v1.9.0...v1.9.1) (2026-07-27)
 
 ### Bug Fixes
