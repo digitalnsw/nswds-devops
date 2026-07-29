@@ -28,18 +28,24 @@ rather than letting prettier wrap it — an 80-wrapped line gets *unwrapped*
 by a width-100 config and then fails the other check.
 
 **Changing CI logic** (`reusable-*.yml`): merge to `main` as usual — nothing
-reaches consumers yet, because stubs pin `@v1`. Ship it by moving the tag:
+reaches consumers yet, because stubs pin `@v1`. Ship it with the **Promote
+v1** workflow (Actions → Promote v1 → run with the target SHA). Treat it
+like a deploy — it changes CI for every repo simultaneously. The workflow
+machine-enforces what used to be convention here: the target must be on
+`main` with all checks green, the previous target is recorded in the run
+summary, and the push happens over the release deploy key because
+`refs/tags/v*` is ruleset-protected against manual force-push. Rollback =
+re-run the workflow with the previous SHA from the last promotion's summary.
 
-```sh
-git fetch --tags
-git tag -f v1 <commit>        # normally the latest release commit
-git push -f origin v1
-```
+Don't wait for a release commit to promote: Renovate's `chore(deps)` bumps
+to the reusables never cut a release, so any green commit on `main`
+qualifies. The **v1 drift canary** (weekly) opens a tracking issue when
+unpromoted reusable-workflow changes sit on `main` for over a week.
 
-Rules for moving v1: central CI must be green on that commit, and treat it
-like a deploy — it changes CI for every repo simultaneously. Rollback is the
-same command pointed at the previous commit (tags before the move:
-`git rev-parse v1` and note it down).
+Emergency fallback if the promotion workflow itself is broken: temporarily
+disable the tag ruleset's enforcement, push the tag, re-enable — the same
+enforcement-disable two-step described for `main` in the bypass policy
+section below.
 
 **Breaking CI change**: don't move v1. Tag `v2`, update
 `workflow-stubs/*.yml` to `@v2`, merge — the sync delivers the migration to
@@ -164,7 +170,7 @@ Every entry below is something that actually happened (2026-07-15 onward).
 | Sync run: `[@octokit/auth-app] appId option is required` | `SYNC_APP_ID` secret missing/renamed | restore the repo secret |
 | Sync run: `could not read Password for 'https://***@github.com'` | App token passed as `GH_PAT` | it must go in `GH_INSTALLATION_TOKEN` |
 | Sync run: `ENOENT: .github/sync.yml` | driver has no checkout step | keep `actions/checkout` before the sync action |
-| Consumer check: "workflow was not found" | Actions access setting reset, or the `v1` tag missing/deleted | fix the access setting; re-push the tag |
+| Consumer check: "workflow was not found" | Actions access setting reset, or the `v1` tag missing/deleted | fix the access setting; re-promote via the Promote v1 workflow |
 | Consumer PR: "Expected — waiting for status to be reported" forever | a ruleset requires a check by its old single name | rename required context to the `job / job` form (nswds-design's "Protect main" already updated) |
 | `check-branch-name` red on a repo's *first* sync PR | base branch lacks the `chore/repo-sync` exemption until that PR merges | expected once; merge past it |
 | commitlint job: npm `EUSAGE` "can only install with an existing package-lock.json" | lockfile missing **or corrupt** — check it parses, don't trust the error text | see ONBOARDING pre-flight (a); nswds-public-sans had conflict markers committed inside it |
