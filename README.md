@@ -32,11 +32,13 @@ that call them, pinned to the floating `v1` tag:
 jobs:
   commitlint:
     uses: digitalnsw/nswds-devops/.github/workflows/reusable-commitlint.yml@v1
-    secrets: inherit
 ```
 
-Moving the `v1` tag changes CI for all 17 repos at once, instantly, with no
-PRs. That's the point — and also why the tag only moves deliberately, after
+(Stubs that need a secret map it explicitly — `secrets: inherit` is not used.)
+
+Moving the `v1` tag changes CI for all 24 consumer repos at once, instantly,
+with no PRs. That's the point — and also why the tag is ruleset-protected and
+only moves through the **Promote v1** workflow, behind a reviewer gate, after
 CI here is green. See MAINTENANCE.md for the exact motion.
 
 I deliberately chose this split over publishing an npm package: the sync PRs

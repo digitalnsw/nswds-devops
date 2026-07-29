@@ -14,18 +14,17 @@ they broke.
 1. Edit here, on a branch, PR into `main`. CI shellchecks the scripts and
    actionlints the workflows; the commit-types-sync check keeps the YAML in
    lockstep with `commit-types.mjs`.
-2. On merge, the sync opens a `chore(ci): …` PR in all 17 repos. They merge
+2. On merge, the sync opens a `chore(ci): …` PR in all 24 consumer repos. They merge
    on their own schedule; until they do they just run the previous version.
 3. That's it. Never edit these files in a consumer repo — the next sync
    overwrites it silently.
 
-Two formatting constraints on the `.mjs` configs, learned the hard way:
-nswds-ui runs `prettier --check` in CI with printWidth 80 / no semicolons,
-while other repos use printWidth 100. Keep every line in these files ≤80
-columns and semicolon-free and the same bytes satisfy both configs. If you
-add a long expression, restructure it (block body, extracted variable)
-rather than letting prettier wrap it — an 80-wrapped line gets *unwrapped*
-by a width-100 config and then fails the other check.
+One formatting constraint on the `.mjs` configs: the whole fleet now formats
+with `@nswds/prettier-config` (printWidth 100, no semicolons) — including
+nswds-ui, whose workspace prettier config extends it. Keep these files in
+that style and every consumer's `format:check` stays green. (The old
+"≤80 columns for nswds-ui" rule is gone: nswds-ui moved to the shared
+config on 2026-07-28.)
 
 **Changing CI logic** (`reusable-*.yml`): merge to `main` as usual — nothing
 reaches consumers yet, because stubs pin `@v1`. Ship it with the **Promote
@@ -39,8 +38,11 @@ re-run the workflow with the previous SHA from the last promotion's summary.
 
 Don't wait for a release commit to promote: Renovate's `chore(deps)` bumps
 to the reusables never cut a release, so any green commit on `main`
-qualifies. The **v1 drift canary** (weekly) opens a tracking issue when
-unpromoted reusable-workflow changes sit on `main` for over a week.
+qualifies. Release commits themselves are `[skip ci]` and carry **no check
+runs**, so the workflow refuses them — promote the merge commit beneath (a
+release commit only adds CHANGELOG/version on top of it). The **v1 drift
+canary** (weekly) opens a tracking issue when unpromoted reusable-workflow
+changes sit on `main` for over a week.
 
 Emergency fallback if the promotion workflow itself is broken: temporarily
 disable the tag ruleset's enforcement, push the tag, re-enable — the same
@@ -161,6 +163,19 @@ are repository secrets `CONFLUENCE_USER` / `CONFLUENCE_TOKEN` (Atlassian API
 token); page edits are attributed to that account, so move to a service
 account if the token owner ever leaves.
 
+**Repo-local automation** (none of these sync to consumers):
+
+- `promote-v1.yml` — the only sanctioned way to move `v1` (see "Changing CI
+  logic" above): environment-gated, deploy-key push, records the previous
+  target.
+- `v1-drift-canary.yml` — weekly; opens a `v1-drift` issue when unpromoted
+  `reusable-*.yml` changes sit on `main` for over a week.
+- `ccc-v10-canary.yml` — weekly; probes whether the upstream
+  release-notes-generator fix has landed and opens a `ccc-v10-canary` issue
+  the day the Renovate ccc block can be lifted.
+- `confluence-sync.yml` — mirrors `docs/best-practices/` to Confluence
+  (title-matched pages; retitling a guide orphans its page).
+
 ## Troubleshooting
 
 Every entry below is something that actually happened (2026-07-15 onward).
@@ -177,7 +192,7 @@ Every entry below is something that actually happened (2026-07-15 onward).
 | Renovate "lock file maintenance" PR red on `install / install` (and commitlint) with `npm ci … not in sync` | from-scratch lockfile regeneration hits an npm peer-nesting bug: `@conventional-changelog/git-client@3` peers need `conventional-commits-filter@^6` while semantic-release's stack needs `^5`; regen hoists 5.0.0 and nests nothing (incremental Renovate updates resolve the same tree correctly) | close the PR (nswds-email#454 has the full write-up); retry from the Dependency Dashboard after the commitlint/semantic-release stacks re-align |
 | Snyk license/security red on a lockfile change | Snyk's baseline of main was unparseable, so every pre-existing issue reads as "introduced" | merge the lockfile fix; Snyk re-baselines. MPL-2.0 flags on lightningcss binaries come via @nswds/app in every repo — org license-policy call, not a repo bug |
 | `check-npm-artifacts` red (nswds-app) | committed `dist/` built before semantic-release bumped the version it inlines | `npm run build:npm` on the branch, commit dist |
-| prettier --check red on synced configs (nswds-ui) | config formatting not stable across consumer prettier configs | see the ≤80-column rule under day-to-day changes |
+| prettier --check red on synced configs | a synced `.mjs` was committed in non-fleet style | format it with `@nswds/prettier-config` (printWidth 100, no semicolons) before merging centrally |
 | Push to this repo rejected mid-work | semantic-release pushed a `chore(release): x.y.z [skip ci]` commit after your last fetch | `git pull --rebase`, push again — routine |
 | Confluence pages: the "Synced from GitHub" banner renders as a raw code block with a stray `-->` | mark's metadata parser consumes the first non-header line after the `<!-- Key: value -->` block; the multi-line `ac:box` Include sat directly against the headers, so its opening line was eaten and the rest rendered as indented code | keep the blank line between the header comments and the Include in `confluence-sync.sh` (fixed 2026-07-19; verified against mark 16.5.1 with `--compile-only`) |
 | Release run: `GH013` on `git push … https://github.com/<repo>.git` even with `RELEASE_DEPLOY_KEY` set | `package.json` `repository.url` was an `https://` URL — semantic-release prefers it over the SSH origin the deploy-key checkout configures, so the push skips the bypass actor | use the `git+ssh://git@github.com/…` form in `repository.url` (fixed here 2026-07-17; consumer sweep same day found nswds-tokens as the only other exposure — fixed via tokens #127; the rest have no `repository` field and fall back to the SSH origin) |
@@ -192,6 +207,21 @@ Every entry below is something that actually happened (2026-07-15 onward).
 - The commit vocabulary (`commit-types.mjs`) and branch vocabulary
   (`branch-name-config.sh`) are fleet-wide decisions. Changing them changes
   policy everywhere; announce before merging.
+
+## Exceptions register
+
+Sanctioned divergences from the fleet baseline. Anything diverging and NOT
+listed here should be treated as drift and converged.
+
+| Repo | Divergence | Why | Converge when |
+|---|---|---|---|
+| nswds-ui | Workspace eslint-config package (ESLint ^9, only-warn + per-app `--max-warnings 0`) instead of `@nswds/eslint-config` | Turborepo needs per-package presets; its `eslint-plugin-react` import lacks the fixup shim, so an eslint major would crash lint | Its workspace base wraps or adopts `@nswds/eslint-config/base`; pair with lifting the Renovate eslint-major block |
+| nswds-tokens | Bespoke `eslint.config.js` (documented in its file header) | Token pipeline, predates the `./base` entry point | Next config change — adopt `@nswds/eslint-config/base` |
+| nswds-ui | `engines` `^22.14.0 \|\| >=24.10.0`, `.npmrc` `provenance=false` | Documented in `.npmrc-nswds-ui` (private-repo npm E422) | Repo goes public / engines revalidated |
+| ictds-portal-flows | `release.yml` is a Power Platform PROD deploy; the release stub maps to `semantic-release.yml` (sync group 4) | Filename collision with a production pipeline | n/a — permanent |
+| ictds-portal-flows | PROD deploy approval is the `RELEASE_APPROVERS` allowlist in `release.yml`, not GitHub environment required reviewers | Required reviewers on private repos is Enterprise-only (org is on Team) | Enterprise upgrade or repo visibility change |
+| dtl-sandbox | Deploys are manual `pulumi up` from operator machines; CI gates are typecheck + lint only | Sandbox stack; `pulumi preview` on PRs via Azure OIDC is planned, pending federated-credential setup | OIDC federation lands |
+| digitalnsw, images, nswds-email-issues | No ESLint over mirror/static content (digitalnsw lints `api/` + `scripts/` only) | Scraped mirror / static assets / issue tracker — nothing meaningful to lint | n/a |
 
 ## History / decision notes
 

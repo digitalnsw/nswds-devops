@@ -1,0 +1,13 @@
+# Advisory ownership routing. No required-review rule is attached while the
+# team is a single active maintainer (GitHub forbids self-approval, so a
+# >=1-approval rule would deadlock every PR) — attach one in the "Protect
+# main" ruleset when a second active maintainer exists. Until then this file
+# documents the blast-radius surfaces: push access to main here equals
+# org-wide write (sync App key), fleet CI (v1 tag), and fleet Renovate
+# policy (default.json, read from main at runtime).
+* @laurenhitchon
+/default.json @laurenhitchon
+/.github/sync.yml @laurenhitchon
+/.github/workflows/ @laurenhitchon
+/workflow-stubs/ @laurenhitchon
+/scripts/ @laurenhitchon
