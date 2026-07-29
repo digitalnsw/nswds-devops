@@ -105,10 +105,10 @@ Standard going forward: **Better Auth** (reference implementation:
 nswds-app).
 
 - ✅ [Better Auth](https://www.better-auth.com/) — nswds-app, reviewers,
-  attestation; the fleet standard for all new and migrated auth
-- ⚠️ [Auth.js (NextAuth)](https://authjs.dev/) — awards,
-  engagement, nswds-email; every one is on the v5 **beta**
-  (`5.0.0-beta.x`). Migrating away → Better Auth
+  attestation, awards; the fleet standard for all new and migrated auth
+- ⚠️ [Auth.js (NextAuth)](https://authjs.dev/) — engagement, nswds-email;
+  every one is on the v5 **beta** (`5.0.0-beta.x`). Migrating away →
+  Better Auth
 
 ## Database & ORM
 
@@ -140,7 +140,7 @@ full target stack (Better Auth + Neon + Drizzle).
 | engagement | Turso | Auth.js v5 beta | database + auth | [engagement#218](https://github.com/digitalnsw/engagement/issues/218) |
 | attestation | Neon ✅ | Better Auth ✅ | — (migrated 2026-07-23) | [attestation#188](https://github.com/digitalnsw/attestation/issues/188) |
 | nswds-email | Turso | Auth.js v5 beta (3 providers: credentials + magic link + Entra) | database + auth + its Turso-coupled test harness; planned as three PRs | [nswds-email#465](https://github.com/digitalnsw/nswds-email/issues/465) |
-| awards | Neon ✅ | Auth.js v5 beta (credentials + email-OTP MFA + magic link + Entra) | auth only, in place | [awards#56](https://github.com/digitalnsw/awards/issues/56) |
+| awards | Neon ✅ | Better Auth ✅ | — (migrated 2026-07-21) | [awards#56](https://github.com/digitalnsw/awards/issues/56) |
 | nswds-app | Neon ✅ | Better Auth ✅ | — (reference) | — |
 | digitalnsw | Neon ✅ | — | — | — |
 
