@@ -13,4 +13,5 @@ permissions:
 jobs:
   generate-title:
     uses: ./.github/workflows/reusable-ai-pr-title.yml
-    secrets: inherit
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

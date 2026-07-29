@@ -21,6 +21,7 @@ permissions:
 jobs:
   install:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -89,6 +90,7 @@ jobs:
   lint:
     if: ${{ vars.CI_SKIP_LINT != 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -109,6 +111,58 @@ jobs:
       - name: Lint
         run: npm run lint --if-present
 
+  # Format gate. The fleet's Prettier options are centralised in
+  # @nswds/prettier-config, but every repo's `format` script is write-mode —
+  # without a CI check the standard is convention, and drift only surfaces as
+  # noisy style diffs in later PRs (awards#74 needed a follow-up style commit
+  # for exactly this). Runs only when the repo has a Prettier config: a
+  # config file, or the package.json "prettier" key — the latter is how
+  # nswds-tokens and the config packages consume it, and workflow expressions
+  # can't read package.json, hence the probe step (same pattern as the
+  # npm-test probe below). Repos with latent unformatted files opt out with
+  # CI_SKIP_FORMAT=true while they sweep.
+  # Not required by rulesets unless a repo adds the "install / format" context.
+  format:
+    if: ${{ vars.CI_SKIP_FORMAT != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Detect Prettier config
+        id: prettier
+        run: |
+          present=false
+          if ls .prettierrc .prettierrc.* prettier.config.* >/dev/null 2>&1; then
+            present=true
+          elif [ -f package.json ] && node -e "process.exit(require('./package.json').prettier ? 0 : 1)"; then
+            present=true
+          fi
+          echo "present=$present" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js (.nvmrc)
+        if: ${{ steps.prettier.outputs.present == 'true' && hashFiles('.nvmrc') != '' }}
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+      - name: Setup Node.js (fallback)
+        if: ${{ steps.prettier.outputs.present == 'true' && hashFiles('.nvmrc') == '' }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install dependencies
+        if: ${{ steps.prettier.outputs.present == 'true' }}
+        run: npm clean-install
+
+      - name: Check formatting
+        if: ${{ steps.prettier.outputs.present == 'true' }}
+        run: npx --no-install prettier --check .
+
+      - name: Nothing to run
+        if: ${{ steps.prettier.outputs.present != 'true' }}
+        run: echo "No Prettier config file or package.json prettier key — nothing to check."
+
   # Test gate: runs the repo's vitest suite when a vitest config exists,
   # otherwise its `npm test` script. Same silent-gap rationale as lint —
   # nswds-app's storybook browser suite never ran on PRs. Browser-mode suites
@@ -127,6 +181,7 @@ jobs:
   test:
     if: ${{ vars.CI_SKIP_TESTS != 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 
@@ -156,7 +211,9 @@ jobs:
 
       - name: Run vitest
         if: ${{ hashFiles('vitest.config.*') != '' }}
-        run: npx vitest run
+        # --no-install: a repo with a vitest config but no vitest dependency
+        # should fail loudly, not have npx fetch and run latest from the registry.
+        run: npx --no-install vitest run
 
       # No vitest config: fall back to the repo's own `npm test`, if it has a
       # real one. Detected in a step rather than an `if:` expression because

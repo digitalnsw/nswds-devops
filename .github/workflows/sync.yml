@@ -22,6 +22,7 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # One sync at a time; a queued push supersedes an unstarted older one.
     concurrency:
       group: repo-sync

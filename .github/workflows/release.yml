@@ -15,4 +15,5 @@ permissions:
 jobs:
   release:
     uses: ./.github/workflows/reusable-release.yml
-    secrets: inherit
+    secrets:
+      RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}

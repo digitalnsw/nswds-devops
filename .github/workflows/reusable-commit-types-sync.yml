@@ -17,6 +17,7 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -34,8 +35,9 @@ jobs:
 
       # Install commitlint without touching the repo's manifest so the check
       # runs the same way in this repo (no package.json) and in consumer repos.
+      # Pinned exact — see the matching note in reusable-ai-pr-title.yml.
       - name: Install commitlint
-        run: npm install --no-save @commitlint/cli @commitlint/config-conventional
+        run: npm install --no-save @commitlint/cli@21.2.1 @commitlint/config-conventional@21.2.0
 
       - name: Check commit type lists are in sync
         run: ./scripts/check-commit-types-sync.sh
