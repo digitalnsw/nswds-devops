@@ -56,14 +56,14 @@ jobs:
         # Pin via the file instead of lts/* so a release can't regenerate a
         # lockfile on a newer Node/npm than the rest of the repo uses.
         if: ${{ hashFiles('.nvmrc') != '' }}
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false
       - name: Setup Node.js (fallback)
         if: ${{ hashFiles('.nvmrc') == '' }}
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node-version }}
           registry-url: 'https://registry.npmjs.org'
