@@ -1,3 +1,9 @@
+## [1.12.0](https://github.com/digitalnsw/nswds-devops/compare/v1.11.0...v1.12.0) (2026-07-29)
+
+### Features
+
+* **ci:** gate v1 promotion behind a reviewed workflow and add a drift canary ([393a549](https://github.com/digitalnsw/nswds-devops/commit/393a54910862d3d5901cab5866645ca8501126f9))
+
 ## [1.11.0](https://github.com/digitalnsw/nswds-devops/compare/v1.10.1...v1.11.0) (2026-07-28)
 
 ### Features
