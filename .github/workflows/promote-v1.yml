@@ -1,0 +1,82 @@
+# Gated promotion of the mutable v1 tag — the ref every consumer stub
+# executes reusable workflows from (with that repo's secrets in reach), so a
+# tag move is a fleet-wide deploy and is treated like one:
+#
+#   - refs/tags/v* is ruleset-protected; nobody force-pushes it by hand.
+#   - This workflow is the promotion path. It runs behind the v1-promotion
+#     environment (required reviewer) and pushes over RELEASE_DEPLOY_KEY,
+#     the ruleset's bypass actor — the same model release commits use on
+#     the protected main branch.
+#   - The previous target is recorded in the run summary; rollback is
+#     re-running this workflow with that SHA.
+#
+# The preconditions that used to be convention in MAINTENANCE.md are
+# machine-enforced here: the target must be on main and its checks green.
+#
+# Repo-local to nswds-devops — NOT synced to consumers.
+name: Promote v1
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Commit SHA on main that v1 should point to
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promote-v1
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: promote
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: v1-promotion
+    steps:
+      - name: Checkout (deploy key)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
+
+      - name: Validate the target commit
+        id: target
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse --verify "${TARGET}^{commit}")"
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::${sha} is not on main — v1 only ever points at main history"
+            exit 1
+          fi
+          checks="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${sha}/check-runs?per_page=100" --jq '.check_runs')"
+          bad="$(jq '[.[] | select(.conclusion as $c | ["failure", "cancelled", "timed_out", "action_required"] | index($c))] | length' <<<"$checks")"
+          pending="$(jq '[.[] | select(.status != "completed")] | length' <<<"$checks")"
+          ok="$(jq '[.[] | select(.conclusion == "success")] | length' <<<"$checks")"
+          if [ "$bad" -gt 0 ] || [ "$pending" -gt 0 ] || [ "$ok" -eq 0 ]; then
+            echo "::error::check runs on ${sha}: ${ok} success, ${bad} failed, ${pending} pending — promotion needs all green"
+            exit 1
+          fi
+          echo "sha=${sha}" >>"$GITHUB_OUTPUT"
+
+      - name: Record the previous target and move the tag
+        env:
+          SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          set -euo pipefail
+          prev="$(git ls-remote origin refs/tags/v1 | cut -f1)"
+          {
+            echo '## v1 promotion'
+            echo "- previous: \`${prev:-none}\`"
+            echo "- new: \`${SHA}\`"
+            echo "- rollback: re-run this workflow with target \`${prev:-none}\`"
+          } >>"$GITHUB_STEP_SUMMARY"
+          git tag -f v1 "$SHA"
+          git push --force origin refs/tags/v1

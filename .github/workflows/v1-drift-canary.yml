@@ -1,0 +1,82 @@
+# Weekly canary for v1 promotion lag.
+#
+# Renovate lands dependency bumps to the reusable workflows as chore(deps)
+# commits, which never cut a release — so no release exists to prompt a v1
+# move, and the fleet can silently keep executing stale CI (observed
+# 2026-07-29: five action majors sat on main unpromoted, with the Release
+# job green). This probe opens a single tracking issue when main carries
+# week-old unpromoted changes to the executable surface
+# (.github/workflows/reusable-*.yml).
+#
+# Repo-local to nswds-devops — NOT synced to consumers.
+name: v1 drift canary
+
+on:
+  schedule:
+    - cron: '23 8 * * 1' # Mondays 08:23 UTC, just after the ccc canary
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Measure unpromoted reusable-workflow changes
+        id: drift
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet v1 >/dev/null; then
+            echo '::error::v1 tag not found'
+            exit 1
+          fi
+          count="$(git rev-list --count v1..origin/main -- '.github/workflows/reusable-*.yml')"
+          drifted=false
+          if [ "$count" -gt 0 ]; then
+            oldest="$(git log --reverse --format=%ct v1..origin/main -- '.github/workflows/reusable-*.yml' | head -n1)"
+            age_days="$(( ($(date +%s) - oldest) / 86400 ))"
+            if [ "$age_days" -ge 7 ]; then
+              drifted=true
+            fi
+            body="${RUNNER_TEMP}/v1-drift.md"
+            {
+              echo 'v1 is behind main on the executable workflow surface:'
+              echo
+              echo "- unpromoted commits touching \`reusable-*.yml\`: ${count} (oldest is ${age_days} days old)"
+              echo "- v1: \`$(git rev-parse v1)\` — main: \`$(git rev-parse origin/main)\`"
+              echo
+              echo '```'
+              git log --oneline v1..origin/main -- '.github/workflows/reusable-*.yml'
+              echo '```'
+              echo
+              echo 'Promote with the **Promote v1** workflow (Actions → Promote v1 → run with the target SHA).'
+            } >"$body"
+            echo "body_file=${body}" >>"$GITHUB_OUTPUT"
+          fi
+          echo "drifted=${drifted}" >>"$GITHUB_OUTPUT"
+
+      - name: Open tracking issue when v1 has drifted
+        if: steps.drift.outputs.drifted == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BODY_FILE: ${{ steps.drift.outputs.body_file }}
+        run: |
+          set -euo pipefail
+          # Idempotent: one open tracking issue at a time, keyed on the label.
+          gh label create v1-drift \
+            --description 'v1 lags main on reusable workflows' --color d93f0b --force
+          if [ "$(gh issue list --state open --label v1-drift --json number --jq 'length')" -gt 0 ]; then
+            echo 'Tracking issue already open; nothing to do.'
+            exit 0
+          fi
+          gh issue create \
+            --title 'v1 lags main on the reusable workflows — promote it' \
+            --label v1-drift \
+            --body-file "$BODY_FILE"
