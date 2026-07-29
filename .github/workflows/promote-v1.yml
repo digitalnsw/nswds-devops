@@ -56,7 +56,13 @@ jobs:
             echo "::error::${sha} is not on main — v1 only ever points at main history"
             exit 1
           fi
-          checks="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${sha}/check-runs?per_page=100" --jq '.check_runs')"
+          # Exclude this workflow's own check runs (jq: .name != "promote"):
+          # when the target is the current main head, this very job attaches
+          # to it as an in-progress check — counting itself as "pending" would
+          # make promotion structurally impossible, and an earlier failed
+          # attempt would poison the commit red forever. If the promote job
+          # is ever renamed, update the filter to match.
+          checks="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${sha}/check-runs?per_page=100" --jq '[.check_runs[] | select(.name != "promote")]')"
           bad="$(jq '[.[] | select(.conclusion as $c | ["failure", "cancelled", "timed_out", "action_required"] | index($c))] | length' <<<"$checks")"
           pending="$(jq '[.[] | select(.status != "completed")] | length' <<<"$checks")"
           ok="$(jq '[.[] | select(.conclusion == "success")] | length' <<<"$checks")"
