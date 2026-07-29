@@ -1,3 +1,9 @@
+## [1.13.1](https://github.com/digitalnsw/nswds-devops/compare/v1.13.0...v1.13.1) (2026-07-29)
+
+### Bug Fixes
+
+* **ci:** exclude the promote job's own check runs from promotion validation ([3b85a2f](https://github.com/digitalnsw/nswds-devops/commit/3b85a2f4d734c02f81439c774dfe69ea018c2998))
+
 ## [1.13.0](https://github.com/digitalnsw/nswds-devops/compare/v1.12.0...v1.13.0) (2026-07-29)
 
 ### Features
