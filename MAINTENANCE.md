@@ -112,6 +112,21 @@ rm release-deploy-key release-deploy-key.pub
 
 then add **Deploy keys** to the ruleset's bypass list.
 
+**Ruleset bypass policy**: the release deploy key is the ONLY bypass actor
+on every fleet ruleset. Repository admins are deliberately not bypass
+actors — an admin `git push` to `main` would skip the required
+`install / install` gate silently, recreating the exact
+green-but-never-checked failure mode the gates exist to stop (the fleet
+rollout originally granted admins an always-on bypass; it was removed
+2026-07-29 after a direct push demonstrated the hole in practice). If
+`main` must take a push while CI is broken, temporarily set the ruleset's
+enforcement to `disabled` (repo Settings → Rules, or
+`gh api -X PUT repos/digitalnsw/<repo>/rulesets/<id>` resending the full
+definition with `"enforcement": "disabled"`), push, and re-enable — a
+deliberate, auditable two-step rather than a standing exemption. When
+adding a bypass actor for a new automation, prefer a dedicated deploy key
+over any role- or team-based grant.
+
 **Renovate** (Mend GitHub App — full guide:
 [docs/best-practices/renovate.md](docs/best-practices/renovate.md)):
 dependency-update PRs for every repo.
