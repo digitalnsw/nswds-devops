@@ -68,12 +68,12 @@ jobs:
         # Single source of truth: .nvmrc pins the Node version for local dev and CI.
         # (commitlint v21 requires Node >=22.12.0.)
         if: ${{ steps.commitlint-config.outputs.present == 'true' && hashFiles('.nvmrc') != '' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
       - name: Setup Node.js (fallback)
         if: ${{ steps.commitlint-config.outputs.present == 'true' && hashFiles('.nvmrc') == '' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node-version }}
 
