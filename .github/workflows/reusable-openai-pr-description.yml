@@ -6,7 +6,7 @@ on:
   workflow_call:
     secrets:
       OPENAI_API_KEY:
-        description: "Supplied automatically by the stubs' `secrets: inherit`."
+        description: "Mapped explicitly by the stubs (least privilege — not inherit)."
         required: false
 
 permissions:
@@ -16,6 +16,7 @@ permissions:
 jobs:
   openai-pr-description:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     # Skip for fork PRs — secrets are not available there
     if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
 

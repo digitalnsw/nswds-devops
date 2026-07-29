@@ -11,12 +11,13 @@ on:
         default: '24'
     secrets:
       OPENAI_API_KEY:
-        description: "Supplied automatically by the stubs' `secrets: inherit`."
+        description: "Mapped explicitly by the stubs (least privilege — not inherit)."
         required: false
 
 jobs:
   generate-title:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     permissions:
       contents: read
@@ -80,7 +81,11 @@ jobs:
       - name: Install commitlint
         if: ${{ steps.commitlint-config.outputs.present == 'true' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
         shell: bash
-        run: npm install --no-save --no-fund --no-audit --loglevel=error @commitlint/cli @commitlint/config-conventional
+        # Pinned exact: an unpinned install here executes whatever npm serves
+        # as latest, on every PR, fleet-wide — the same class of risk the
+        # SHA-pinned actions policy exists for. Keep in step with the
+        # devDependency majors in package.json when Renovate bumps them.
+        run: npm install --no-save --no-fund --no-audit --loglevel=error @commitlint/cli@21.2.1 @commitlint/config-conventional@21.2.0
 
       - name: Get Current PR Title
         id: get-pr-title

@@ -13,4 +13,5 @@ permissions:
 jobs:
   openai-pr-description:
     uses: ./.github/workflows/reusable-openai-pr-description.yml
-    secrets: inherit
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

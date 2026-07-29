@@ -16,14 +16,15 @@ on:
       RELEASE_DEPLOY_KEY:
         description: >-
           Optional SSH deploy key (ruleset bypass actor) used to push release
-          commits to a protected default branch. Supplied automatically by the
-          stubs' `secrets: inherit` where the repo defines it.
+          commits to a protected default branch. Mapped explicitly by the
+          stubs (least privilege — not inherit); empty in repos without it.
         required: false
 
 jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # One release at a time, never cancelled mid-publish (a cancelled
     # semantic-release can tag without publishing).
     concurrency:
@@ -79,4 +80,52 @@ jobs:
           # husky hooks must not run against the bot commit (this broke
           # nswds-tokens releases when it regressed — see tokens #105/#107).
           HUSKY: 0
-        run: npx semantic-release
+        # --no-install: every fleet repo carries semantic-release as a
+        # devDependency; a repo missing it should fail here, not have npx
+        # fetch latest and run it with contents:write and the deploy key.
+        run: npx --no-install semantic-release
+
+  # Release failures are easy to miss: they happen post-merge where nobody is
+  # watching, and semantic-release may have already pushed the version tag so
+  # the repo LOOKS released. File (or bump) a labelled issue so every failure
+  # generates a notification and a visible artefact in the repo. Ported from
+  # nswds-ui's bespoke release.yml, where three releases (v1.8.0–v2.1.0) once
+  # failed without anyone noticing.
+  alert-on-failure:
+    name: File release-failure issue
+    needs: release
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Create or update the release-failure issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create release-failure \
+            --repo "$GITHUB_REPOSITORY" \
+            --color B60205 \
+            --description "Automated: a Release workflow run failed" \
+            --force
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          body="A Release workflow run failed — a git tag may exist without its release artefacts.
+
+          - Run: ${run_url}
+          - Commit: ${GITHUB_SHA}
+          - Repos that publish to npm: check for a git tag without a matching npm version.
+
+          _Filed automatically by the alert-on-failure job in reusable-release.yml._"
+          existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --label release-failure --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+            echo "Commented on existing issue #$existing"
+          else
+            gh issue create \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Release workflow failed" \
+              --label release-failure \
+              --assignee "$GITHUB_ACTOR" \
+              --body "$body"
+          fi

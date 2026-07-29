@@ -25,4 +25,3 @@ permissions:
 jobs:
   check:
     uses: ./.github/workflows/reusable-commit-types-sync.yml
-    secrets: inherit

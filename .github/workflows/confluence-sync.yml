@@ -19,6 +19,7 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # One publish at a time; a queued push supersedes an unstarted older one.
     concurrency:
       group: confluence-sync

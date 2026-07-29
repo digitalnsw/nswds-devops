@@ -17,4 +17,7 @@ permissions:
 jobs:
   release:
     uses: digitalnsw/nswds-devops/.github/workflows/reusable-release.yml@v1
-    secrets: inherit
+    secrets:
+      # Explicit mapping, not inherit — the release needs exactly one secret,
+      # and inherit would hand every repo secret to the called workflow.
+      RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}

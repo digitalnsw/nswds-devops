@@ -16,6 +16,7 @@ permissions:
 jobs:
   commitlint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       # Reusable workflows run in the caller's context: this checks out the
       # consumer repo, and its own devDependencies provide commitlint.
