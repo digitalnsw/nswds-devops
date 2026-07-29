@@ -28,7 +28,7 @@ jobs:
       cancel-in-progress: false
     steps:
       # The action reads CONFIG_PATH (and the source files) from the workspace.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Mint GitHub App token
         id: app

@@ -24,7 +24,7 @@ jobs:
       group: confluence-sync
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Pinned by version + checksum: the binary receives the Confluence
       # credentials, so an unreviewed upstream release must never reach it.

@@ -22,7 +22,7 @@ jobs:
   install:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # npm ci reports a lockfile with conflict markers as "no package-lock.json",
       # which is misleading — catch markers in any tracked file with a clear error.
@@ -90,7 +90,7 @@ jobs:
     if: ${{ vars.CI_SKIP_LINT != 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js (.nvmrc)
         if: ${{ hashFiles('.nvmrc') != '' }}
@@ -128,7 +128,7 @@ jobs:
     if: ${{ vars.CI_SKIP_TESTS != 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js (.nvmrc)
         if: ${{ hashFiles('.nvmrc') != '' }}

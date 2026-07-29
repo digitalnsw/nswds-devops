@@ -19,7 +19,7 @@ jobs:
     steps:
       # Reusable workflows run in the caller's context: this checks out the
       # consumer repo, and its own devDependencies provide commitlint.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Setup Node.js (.nvmrc)
