@@ -1,3 +1,9 @@
+## [1.13.0](https://github.com/digitalnsw/nswds-devops/compare/v1.12.0...v1.13.0) (2026-07-29)
+
+### Features
+
+* **ci:** harden the reusable workflows and stubs ([67072ab](https://github.com/digitalnsw/nswds-devops/commit/67072ab2ae2b4e079290b06a0b3a24154621eecd))
+
 ## [1.12.0](https://github.com/digitalnsw/nswds-devops/compare/v1.11.0...v1.12.0) (2026-07-29)
 
 ### Features
