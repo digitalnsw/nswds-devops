@@ -32,7 +32,7 @@ jobs:
 
       - name: Mint GitHub App token
         id: app
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           # Both stored as repository secrets (the App ID isn't sensitive, but
           # it was saved there; reading it as a secret is equally fine).
