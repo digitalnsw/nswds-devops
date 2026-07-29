@@ -84,7 +84,7 @@ jobs:
 
       - name: Get Current PR Title
         id: get-pr-title
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           # Retry transient GitHub API errors (5xx / network). The API occasionally
           # returns a 502 with an HTML error page; without retries that aborts the run.
@@ -183,7 +183,7 @@ jobs:
       - name: Get commit messages
         id: commits
         if: ${{ steps.validate-title.outputs.update_needed == 'true' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           CONVENTIONAL_COMMIT_REGEX: ${{ steps.conventional-config.outputs.regex || env.CONVENTIONAL_COMMIT_REGEX_DEFAULT }}
         with:
@@ -358,7 +358,7 @@ jobs:
       - name: Update PR Title if Invalid or Empty
         # Gate on having a suggested title; prevents hard-fail when AI didn't run.
         if: ${{ steps.validate-title.outputs.update_needed == 'true' && steps.ai.outputs.title != '' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           CONVENTIONAL_COMMIT_REGEX: ${{ steps.conventional-config.outputs.regex || env.CONVENTIONAL_COMMIT_REGEX_DEFAULT }}
           REFRESH_AUTO: ${{ steps.validate-title.outputs.refresh_auto }}
@@ -425,7 +425,7 @@ jobs:
       # below reflects what will actually become the squash commit subject.
       - name: Get final PR title
         id: final-title
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           retries: 3
           script: |
