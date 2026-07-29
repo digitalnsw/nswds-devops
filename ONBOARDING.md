@@ -119,7 +119,8 @@ What to expect:
 
 ## Coverage
 
-All 21 digitalnsw repos are on the sync as of 2026-07-15 (data,
+All 24 consumer repos are on the sync — the original rollout completed
+2026-07-15, and dtl-sandbox was added 2026-07-22 (data,
 nswds-community, nswds-signature and nswds-email-issues were onboarded last,
 following exactly this doc — their prep PRs are worked examples: both
 community and signature needed the lockfile repair from pre-flight (a),

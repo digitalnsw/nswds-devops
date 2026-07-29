@@ -46,7 +46,7 @@ the branch-naming policy in `scripts/branch-name-config.sh`.
   job**, not Renovate's — `vulnerabilityAlerts` is disabled in the preset so
   the two bots never open duplicate PRs for the same CVE.)
 - **Central policy, fleet-wide effect.** One preset file in this repo
-  governs all 17+ repos. A policy change lands everywhere on Renovate's
+  governs all 24 consumer repos. A policy change lands everywhere on Renovate's
   next run with no per-repo work at all.
 
 ## Where the config lives (and how it propagates)
@@ -146,7 +146,7 @@ is the source of truth; this table is the summary:
 | All updates to `overrides`-pinned packages | Two ways to the same broken lockfile: in-range bumps go in as a direct-dep install that conflicts with the override → `EOVERRIDE` → stale lockfile (nswds-email#459); range bumps half-apply it — outgoing entry removed, resolved one never added → `npm ci` fails `EUSAGE Missing: …`, with no artifact-update warning on the PR to give it away (nswds-email#485) | Renovate's npm manager writes correct lockfiles for `overrides`. Until then monthly lock file maintenance keeps the resolved versions fresh, and Snyk drives the range bumps by hand |
 | `conventional-changelog-conventionalcommits` v10 | incompatible with release-notes-generator 14: releases succeed but changelogs silently come out empty (nswds-email#437; upstream #992) | a v10.x compatible with release-notes-generator 14 ships |
 | `typescript` majors (6/7) | TS7 is the native compiler with no JS API: `next build` fails, typescript-eslint crashes, import-sorting silently no-ops (nswds-email#444) | Next.js + typescript-eslint declare TS 6/7 support |
-| `eslint` majors (10) | ESLint 10 removed `context.getFilename()`, still called by eslint-plugin-react — every lint invocation crashes, and PR CI wouldn't catch it (nswds-app#418; vercel/next.js#89764) | eslint-config-next ships an ESLint-10-compatible plugin set |
+| `eslint` majors (10) | ESLint 10 removed `context.getFilename()`, still called by eslint-plugin-react — every lint invocation crashes, and PR CI wouldn't catch it (nswds-app#418; vercel/next.js#89764). The `fixupConfigRules` shim now ships inside `@nswds/eslint-config`, and the 14 Next.js repos are on eslint ^10 through it — the block stays for **nswds-ui**, whose workspace config imports eslint-plugin-react with no shim | nswds-ui's workspace config wraps or adopts `@nswds/eslint-config/base` (re-check 2026-10) |
 
 **Adding a block** (the pattern): when an update breaks the fleet, add a
 `packageRules` entry to `default.json` with `matchPackageNames` /
