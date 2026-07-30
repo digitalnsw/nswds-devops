@@ -3,7 +3,7 @@
 Six config files had drifted across the fleet with no canonical version:
 `.nvmrc`, `.npmrc`, `.gitignore`, `eslint.config.mjs`, `.prettierrc`,
 `.prettierignore`. This establishes one source of truth for each and a rollout
-plan to converge the 22 repos onto it.
+plan to converge the fleet (24 consumer repos) onto it.
 
 The files split into three distribution mechanisms, because the file-sync action
 (`BetaHuhn/repo-file-sync-action`) **overwrites the whole destination file** —
@@ -34,7 +34,7 @@ express "shared base + local override"; an npm package can.
 
 The Prettier package has **two consumer shapes**, because the `package.json` key
 takes a bare package reference and cannot add options on top. Only base-only
-repos can use it — in practice just nswds-tokens. Every Tailwind repo needs the
+repos can use it — nswds-tokens and the two config packages. Every Tailwind repo needs the
 plugin block and an app-specific `tailwindStylesheet`, so it extends in a
 `.prettierrc.mjs` instead:
 
