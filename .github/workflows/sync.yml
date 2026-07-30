@@ -1,5 +1,5 @@
 # Pushes the shared files out to every consumer repo as PRs.
-# Target map: .github/sync.yml. Auth: GitHub App (see SETUP.md).
+# Target map: .github/sync.yml. Auth: GitHub App (see MAINTENANCE.md).
 name: Sync shared files to repos
 
 on:

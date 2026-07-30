@@ -2,7 +2,7 @@
 
 This is the complete path from a repo that does not exist yet (or exists
 outside the fleet) to a fully configured fleet member. A fleet member has:
-the synced tooling files, the seven shared CI workflows, a protected `main`
+the synced tooling files, the eight shared CI workflows, a protected `main`
 with required checks, Renovate and Snyk coverage, the shared ESLint and
 Prettier configs, and the release pipeline.
 
@@ -14,7 +14,7 @@ Start at **Path A** for a brand-new repo. For an existing repo, run the
 | Layer | Contents | Delivered by |
 |---|---|---|
 | Synced files | `scripts/` (shared shell tooling), `commit-types.mjs`, `commitlint.config.mjs`, `git-conventional-commits.yaml`, `release.config.mjs` (group 1 only), `renovate.json`, `.nvmrc`, `.npmrc` | File sync (step 5) |
-| Workflow stubs | `ci.yml`, `commitlint.yml`, `validate-branch-name.yml`, `commit-types-sync.yml`, `ai-pr-title.yml`, `openai-pr-description.yml`, `release.yml` — thin callers pinned to `@v1` | File sync (step 5) |
+| Workflow stubs | `ci.yml`, `commitlint.yml`, `validate-branch-name.yml`, `commit-types-sync.yml`, `ai-pr-title.yml`, `openai-pr-description.yml`, `release.yml`, `confluence-sync.yml` — thin callers pinned to `@v1` | File sync (step 5) |
 | Lint/format config | `@nswds/eslint-config` (npm) + `eslint.config.mjs`; `@nswds/prettier-config` (npm) + `.prettierrc.mjs` or `package.json` key | Manual (steps 2–3) |
 | Branch governance | "Protect main" ruleset (7 required checks, DeployKey bypass), branch auto-delete on merge | Manual (steps 1, 7) |
 | Release | semantic-release via the synced stub, pushing over `RELEASE_DEPLOY_KEY` | Manual key setup (step 6) |
@@ -308,6 +308,35 @@ GitHub Actions, workflow `release.yml`) so releases carry provenance with
 no `NPM_TOKEN` secret. The web UI's stricter publishing-access option can
 silently fail to save; `npm access set mfa=publish <package>` from a
 logged-in CLI is the reliable path.
+
+### 13. Confluence docs sync (optional)
+
+Every repo gets the `confluence-sync.yml` stub from the sync, but it
+publishes nothing until the repo opts in. To mirror markdown to Confluence
+(pages are read-only mirrors with a "synced from GitHub" banner; the repo
+stays the source of truth):
+
+1. Get the repo access to the Confluence credentials: ask an org admin to
+   add it to the repository list on the org-level `CONFLUENCE_USER` /
+   `CONFLUENCE_TOKEN` secrets, or set those as repo secrets (an Atlassian
+   account + API token that can write to the target space).
+2. Add a `.github/confluence-sync.yml` manifest — file or directory
+   sources mapped to folder chains in the GDS space (full schema and
+   caveats: [MAINTENANCE.md](MAINTENANCE.md) § Confluence docs sync):
+
+   ```yaml
+   pages:
+     - source: docs/runbooks/          # every *.md directly in the dir
+       folders: [Application Support, Runbooks]
+     - source: README.md               # a single file
+       folders: [Application Support, Team Docs]
+   ```
+
+3. Merge to `main` and check the "Confluence docs sync" run: one page per
+   file, page title = the file's H1. Titles are page identity in the
+   space — keep H1s unique across every synced file in the whole fleet —
+   and a retitled or deleted file orphans its old page (delete it in
+   Confluence by hand).
 
 ## Path B — existing repo pre-flight
 

@@ -79,9 +79,10 @@ The layer this repo provides to every other repo — see
 - ✅ Reusable GitHub Actions workflows — CI logic lives here once, consumed
   via thin synced stubs pinned to the floating `v1` tag
   ([GitHub Actions](docs/best-practices/github-actions.md))
-- ✅ [mark](https://github.com/kovetskiy/mark) — publishes
-  `docs/best-practices/**` to Confluence on every merge to `main`
-  (read-only mirror, version+checksum pinned)
+- ✅ [mark](https://github.com/kovetskiy/mark) — publishes the markdown
+  mapped in each repo's `.github/confluence-sync.yml` to Confluence on
+  every merge to `main` (read-only mirror, version+checksum pinned; this
+  repo maps `docs/best-practices/*.md`)
 
 ## Security & Dependency Management
 

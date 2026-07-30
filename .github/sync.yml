@@ -4,7 +4,7 @@
 # ROLLOUT COMPLETE 2026-07-15: all consumer repos active (24 as of 2026-07-22,
 # when dtl-sandbox joined group 1).
 # Onboarding a new repo = add it to the right group (group 1 unless it has a
-# bespoke release pipeline) — see SETUP.md.
+# bespoke release pipeline) — see ONBOARDING.md (step 5).
 #
 # NEVER add `deleteOrphaned: true` — repos mix their own scripts and workflows
 # into the same directories; the sync must only ever write the paths listed here.
@@ -77,6 +77,8 @@ group:
         dest: .github/workflows/openai-pr-description.yml
       - source: workflow-stubs/ci.yml
         dest: .github/workflows/ci.yml
+      - source: workflow-stubs/confluence-sync.yml
+        dest: .github/workflows/confluence-sync.yml
       - source: repo-files/renovate.json
         dest: renovate.json
       - source: repo-files/.nvmrc
@@ -113,6 +115,8 @@ group:
         dest: .github/workflows/openai-pr-description.yml
       - source: workflow-stubs/ci.yml
         dest: .github/workflows/shared-ci.yml
+      - source: workflow-stubs/confluence-sync.yml
+        dest: .github/workflows/confluence-sync.yml
       - source: repo-files/renovate.json
         dest: renovate.json
       - source: repo-files/.nvmrc
@@ -152,6 +156,8 @@ group:
         dest: .github/workflows/openai-pr-description.yml
       - source: workflow-stubs/ci.yml
         dest: .github/workflows/shared-ci.yml
+      - source: workflow-stubs/confluence-sync.yml
+        dest: .github/workflows/confluence-sync.yml
       - source: repo-files/renovate.json
         dest: renovate.json
       - source: repo-files/.nvmrc
@@ -213,6 +219,8 @@ group:
         dest: .github/workflows/ci.yml
       - source: workflow-stubs/release.yml
         dest: .github/workflows/semantic-release.yml
+      - source: workflow-stubs/confluence-sync.yml
+        dest: .github/workflows/confluence-sync.yml
       - source: repo-files/renovate.json
         dest: renovate.json
       - source: repo-files/.nvmrc

@@ -1,0 +1,87 @@
+# Reusable implementation — repos call this via the synced confluence-sync.yml
+# stub. Publishes the markdown mapped in the repo's .github/confluence-sync.yml
+# (one page per file) to Confluence with mark; repos without that manifest
+# no-op cleanly, so the stub can sync fleet-wide while adoption stays opt-in.
+# Edit here; never in a consumer repo. Ops notes: MAINTENANCE.md.
+name: Confluence sync (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      base-url:
+        description: Confluence wiki base URL the pages are published to
+        type: string
+        default: https://dsia.atlassian.net/wiki
+    secrets:
+      CONFLUENCE_USER:
+        description: >-
+          Atlassian account the pages are published as. Optional so the stub
+          can run in repos that have not opted in; when a manifest exists the
+          publish job requires it and fails with a pointer.
+        required: false
+      CONFLUENCE_TOKEN:
+        description: Atlassian API token for CONFLUENCE_USER
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # One publish per repo at a time; a queued push supersedes an unstarted
+    # older one but never cancels a publish mid-flight.
+    concurrency:
+      group: confluence-sync
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Look for a page manifest
+        id: manifest
+        run: |
+          if [ -f .github/confluence-sync.yml ]; then
+            echo "present=true" >>"$GITHUB_OUTPUT"
+            if [ ! -x scripts/confluence-sync.sh ]; then
+              echo "::error::.github/confluence-sync.yml exists but scripts/confluence-sync.sh is missing or not executable — merge this repo's pending repo-sync PR first"
+              exit 1
+            fi
+          else
+            echo "present=false" >>"$GITHUB_OUTPUT"
+            echo "No .github/confluence-sync.yml — this repo publishes nothing to Confluence (see ONBOARDING.md in nswds-devops to opt in)."
+          fi
+
+      - name: Require the Confluence credentials
+        if: steps.manifest.outputs.present == 'true'
+        env:
+          HAS_CREDS: ${{ secrets.CONFLUENCE_USER != '' && secrets.CONFLUENCE_TOKEN != '' }}
+        run: |
+          if [ "$HAS_CREDS" != "true" ]; then
+            echo "::error::.github/confluence-sync.yml exists but CONFLUENCE_USER / CONFLUENCE_TOKEN are empty — grant this repo access to the org secrets (or add repo secrets), or remove the manifest"
+            exit 1
+          fi
+
+      # Pinned by version + checksum: the binary receives the Confluence
+      # credentials, so an unreviewed upstream release must never reach it.
+      # To upgrade, bump MARK_VERSION and MARK_SHA256 together (checksum of
+      # mark_Linux_x86_64.tar.gz from the release's checksums.txt).
+      - name: Install mark
+        if: steps.manifest.outputs.present == 'true'
+        env:
+          MARK_VERSION: v16.5.1
+          MARK_SHA256: 98ea0a9450885efe41d5e6a7ecc23e7cd983e7eb7f867e7819f4317c3728ab84
+        run: |
+          curl -fsSL -o mark.tgz "https://github.com/kovetskiy/mark/releases/download/${MARK_VERSION}/mark_Linux_x86_64.tar.gz"
+          echo "${MARK_SHA256}  mark.tgz" | sha256sum -c -
+          tar -xzf mark.tgz mark
+          sudo install -m 0755 mark /usr/local/bin/mark
+          rm mark.tgz mark
+
+      - name: Publish to Confluence
+        if: steps.manifest.outputs.present == 'true'
+        env:
+          MARK_BASE_URL: ${{ inputs.base-url }}
+          MARK_USERNAME: ${{ secrets.CONFLUENCE_USER }}
+          MARK_PASSWORD: ${{ secrets.CONFLUENCE_TOKEN }}
+        run: ./scripts/confluence-sync.sh
