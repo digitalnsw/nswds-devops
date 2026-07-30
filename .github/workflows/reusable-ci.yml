@@ -1,6 +1,14 @@
 # Reusable implementation — repos call this via the synced ci.yml stub.
 # Edit here; never in a consumer repo.
 #
+# Caching policy: every setup-node step caches ~/.npm keyed on the lockfile
+# hash. This only changes where npm ci fetches tarballs from — node_modules
+# is still wiped and rebuilt, and npm ci still verifies every package
+# against the lockfile's integrity hashes, so the lockfile-integrity
+# guarantee this workflow exists for is untouched. Lockfile-bump PRs are
+# cold by definition. reusable-release deliberately stays UNCACHED
+# (package-manager-cache: false) — keep the publish path pristine.
+#
 # This is the merge gate rulesets require (context: "install / install").
 # It ports nswds-design's local CI workflow: the pull_request event checks
 # out the test merge of PR + base, so a bad conflict resolution or a
@@ -61,11 +69,15 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
       - name: Setup Node.js (fallback)
         if: ${{ hashFiles('.nvmrc') == '' }}
         uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
 
       # Fails on any manifest/lockfile mismatch — the check Snyk-corrupted
       # lockfiles used to sail past when nothing enforced it.
@@ -99,11 +111,15 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
       - name: Setup Node.js (fallback)
         if: ${{ hashFiles('.nvmrc') == '' }}
         uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm clean-install
@@ -145,11 +161,15 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
       - name: Setup Node.js (fallback)
         if: ${{ steps.prettier.outputs.present == 'true' && hashFiles('.nvmrc') == '' }}
         uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         if: ${{ steps.prettier.outputs.present == 'true' }}
@@ -190,11 +210,15 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
       - name: Setup Node.js (fallback)
         if: ${{ hashFiles('.nvmrc') == '' }}
         uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         if: ${{ hashFiles('vitest.config.*') != '' }}
