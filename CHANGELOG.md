@@ -1,3 +1,9 @@
+## [1.14.0](https://github.com/digitalnsw/nswds-devops/compare/v1.13.1...v1.14.0) (2026-07-30)
+
+### Features
+
+* **ci:** cache npm tarballs and supersede in-flight PR runs ([157d2dc](https://github.com/digitalnsw/nswds-devops/commit/157d2dcf507c632b39cdc0a4df5b8b5a7945a89b))
+
 ## [1.13.1](https://github.com/digitalnsw/nswds-devops/compare/v1.13.0...v1.13.1) (2026-07-29)
 
 ### Bug Fixes
