@@ -59,9 +59,11 @@ one-step rollout (and one-step rollback) for CI logic.
     ├── sync.yml                  # WHO gets WHAT (the four groups — see below)
     └── workflows/
         ├── sync.yml              # the sync driver (push to main + manual dispatch)
-        ├── reusable-*.yml        # the six real CI implementations (never synced)
+        ├── reusable-*.yml        # the seven real CI implementations (never synced)
         ├── ci.yml                # shellcheck + actionlint, gates every merge here
-        └── the rest              # this repo dogfooding its own stubs via local references
+        ├── promote-v1.yml        # the only sanctioned way to move v1 (reviewer-gated)
+        ├── v1-drift-canary.yml   # weekly: files an issue when v1 lags main on reusables
+        └── the rest              # dogfood stubs, ccc-v10 canary, confluence sync
 ```
 
 ## The four sync groups
@@ -71,21 +73,22 @@ be overwritten. `.github/sync.yml` encodes this as four groups:
 
 | Group | Repos | What's different |
 |---|---|---|
-| 1 | everything not listed below | full set: scripts, all four configs, all six stubs |
-| 2 | nswds-ui, nswds-tokens | keep their own `release.yml` AND release config (both publish to npm with bespoke verification) |
+| 1 | everything not listed below | full set: scripts, all four configs, all seven stubs |
+| 2 | nswds-ui, nswds-tokens, nswds-eslint-config, nswds-prettier-config | keep their own `release.yml` AND release config (all publish to npm with bespoke verification); where the repo keeps its own `ci.yml`, the shared CI stub lands as `shared-ci.yml` |
 | 3 | nswds-app | keeps its own `release.config.mjs` (publishes `@nswds/app`); stock release stub is fine |
-| 4 | ictds-portal-flows | ⚠️ its `release.yml` is a **Power Platform production deploy** that happens to share the filename — never overwrite it. The release stub maps to `semantic-release.yml` instead |
+| 4 | ictds-portal-flows | its `release.yml` is a **Power Platform production deploy** that happens to share the filename — never overwrite it. The release stub maps to `semantic-release.yml` instead |
 
-## The six shared CI checks
+## The seven shared CI checks
 
 | Stub (in each repo) | What it does |
 |---|---|
+| `ci.yml` | the merge gate: `install` (conflict-marker scan, `npm clean-install` lockfile check, build), `lint`, `test`, `format` (`prettier --check` when a Prettier config exists). Per-repo `CI_SKIP_*` variables opt individual jobs out. Superseded pushes cancel in-flight runs; npm tarballs are cached keyed on the lockfile |
 | `commitlint.yml` | lints PR commit messages against `commitlint.config.mjs` |
 | `validate-branch-name.yml` | enforces branch naming from `scripts/branch-name-config.sh` (read from the PR *base* so PRs can't alter their own policy) |
 | `commit-types-sync.yml` | fails if `commit-types.mjs` and `git-conventional-commits.yaml` disagree |
 | `ai-pr-title.yml` | generates/validates Conventional Commit PR titles via OpenAI |
 | `openai-pr-description.yml` | autofills empty PR descriptions |
-| `release.yml` | semantic-release on push to main (handles npm OIDC publish, deploy-key push to protected branches, HUSKY=0) |
+| `release.yml` | semantic-release on push to main (npm OIDC publish, deploy-key push to protected branches, HUSKY=0, failure-alert issue) |
 
 Note the check names: a reusable workflow reports as `commitlint / commitlint`
 (caller job / called job), not `commitlint`. Required-check rulesets must use
