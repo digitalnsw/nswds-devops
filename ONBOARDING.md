@@ -316,27 +316,49 @@ publishes nothing until the repo opts in. To mirror markdown to Confluence
 (pages are read-only mirrors with a "synced from GitHub" banner; the repo
 stays the source of truth):
 
-1. Get the repo access to the Confluence credentials: ask an org admin to
-   add it to the repository list on the org-level `CONFLUENCE_USER` /
-   `CONFLUENCE_TOKEN` secrets, or set those as repo secrets (an Atlassian
-   account + API token that can write to the target space).
-2. Add a `.github/confluence-sync.yml` manifest — file or directory
-   sources mapped to folder chains in the GDS space (full schema and
-   caveats: [MAINTENANCE.md](MAINTENANCE.md) § Confluence docs sync):
+1. Grant the repo the org-level `CONFLUENCE_USER` / `CONFLUENCE_TOKEN`
+   secrets (org admin; both secrets use a selected-repositories list):
+
+   ```sh
+   repo_id=$(gh api repos/digitalnsw/<repo> -q .id)
+   gh api -X PUT orgs/digitalnsw/actions/secrets/CONFLUENCE_USER/repositories/$repo_id
+   gh api -X PUT orgs/digitalnsw/actions/secrets/CONFLUENCE_TOKEN/repositories/$repo_id
+   ```
+
+2. Work out the destination folder chain: the exact folder **titles**,
+   top-down, beneath the GDS space home page. mark matches titles
+   exactly (case included — a folder really can be named "portal"). For
+   an existing folder, take the id from its URL, open
+   `https://dsia.atlassian.net/wiki/api/v2/folders/<id>` while signed
+   in, and follow `parentId` upward until `parentType` is `page` — the
+   titles you passed, reversed, are the chain. Folders that don't exist
+   yet are created on first publish.
+
+3. Pre-flight the files: every synced file needs an H1 (it becomes the
+   page title), no two synced files anywhere in the *fleet* may share
+   one, and a directory source publishes only the `*.md` directly
+   inside it — subdirectories need their own entries.
+
+4. Add a `.github/confluence-sync.yml` manifest — file or directory
+   sources mapped to folder chains (full schema and caveats:
+   [MAINTENANCE.md](MAINTENANCE.md) § Confluence docs sync):
 
    ```yaml
    pages:
-     - source: docs/runbooks/          # every *.md directly in the dir
-       folders: [Application Support, Runbooks]
+     - source: docs/                   # every *.md directly in the dir
+       folders: [Application Support, Applications, ICT DS, portal]
      - source: README.md               # a single file
-       folders: [Application Support, Team Docs]
+       folders: [Application Support, Applications, ICT DS, portal]
    ```
 
-3. Merge to `main` and check the "Confluence docs sync" run: one page per
-   file, page title = the file's H1. Titles are page identity in the
-   space — keep H1s unique across every synced file in the whole fleet —
-   and a retitled or deleted file orphans its old page (delete it in
-   Confluence by hand).
+5. Merge to `main` and confirm the "Confluence docs sync" run lists
+   every expected page. A retitled or deleted file orphans its old page
+   (delete it in Confluence by hand), and in a **private** repo the
+   rewritten links to non-synced files point at github.com — Confluence
+   readers without repo access hit a login wall on those links.
+
+(Worked example: ictds-portal-flows#66 — 13 pages into GDS →
+Application Support → Applications → ICT DS → portal.)
 
 ## Path B — existing repo pre-flight
 
