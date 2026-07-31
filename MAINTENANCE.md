@@ -27,7 +27,12 @@ that style and every consumer's `format:check` stays green. (The old
 config on 2026-07-28.)
 
 **Changing CI logic** (`reusable-*.yml`): merge to `main` as usual — nothing
-reaches consumers yet, because stubs pin `@v1`. Ship it with the **Promote
+reaches consumers yet, because stubs pin `@v1`. (One exception: a **new**
+reusable shipped together with a new synced stub. The sync delivers the stub
+to consumers immediately while its `@v1` ref still dangles, so every run of
+that stub fails with "workflow was not found" until promotion — promote `v1`
+past the commit that added the reusable before consumer sync PRs merge, or
+ship the reusable and promote first and the stub in a follow-up.) Ship it with the **Promote
 v1** workflow (Actions → Promote v1 → run with the target SHA). Treat it
 like a deploy — it changes CI for every repo simultaneously. The workflow
 machine-enforces what used to be convention here: the target must be on
@@ -147,21 +152,55 @@ pointer itself changes. Renovate branches (`renovate/…`) are exempted in
 `branch-name-config.sh` alongside dependabot's. This repo's own
 `renovate.json` also enables the github-actions manager.
 
-**Confluence docs sync**: every merge to `main` that touches
-`docs/best-practices/**` republishes the guides to Confluence — one page per
-file under GDS → Application Support → **Development Best Practice**
-(`confluence-sync.yml` → `.github/scripts/confluence-sync.sh`, using
-[mark](https://github.com/kovetskiy/mark), pinned by version + checksum).
-Confluence is a read-only mirror; each page carries a banner saying so.
+**Confluence docs sync** (fleet-wide, opt-in per repo): any repo with a
+`.github/confluence-sync.yml` manifest gets the markdown mapped there
+mirrored to Confluence — one page per file — on every merge to `main` that
+touches markdown, the manifest or the publisher. The pipeline is the synced
+`confluence-sync.yml` stub → `reusable-confluence-sync.yml@v1` →
+`scripts/confluence-sync.sh` (synced), publishing with
+[mark](https://github.com/kovetskiy/mark) (pinned by version + checksum).
+Repos without a manifest run the stub as a fast no-op, so the stub syncs
+everywhere while adoption stays case-by-case. Confluence is a read-only
+mirror; each page carries a banner saying so, and every run republishes
+every mapped page, so manual Confluence edits are overwritten on the next
+markdown merge (or on demand: Actions → Confluence docs sync → Run
+workflow).
+
+Extending the sync is one manifest entry — a file or a directory mapped to
+a folder chain in the GDS space:
+
+```yaml
+pages:
+  - source: docs/best-practices/     # directory → every *.md directly in it
+    folders: [Application Support, Development Best Practice]
+  - source: ONBOARDING.md            # single file → one page
+    folders: [Application Support, Fleet Operations]
+```
+
+Top-level `space:` / `parent:` keys override the defaults (`GDS`, anchored
+at the space home page "Tech Enablement and Design" — mark needs that
+Parent *page* above the folder chain or folders under the home page read as
+not found). mark creates missing folders on first publish. First-time
+opt-in for a repo that has never published: [ONBOARDING.md](ONBOARDING.md)
+step 13.
+
 Fragile-by-design bits: everything is matched **by title** (page title = a
-guide's H1), so retitling a guide creates a fresh Confluence page and
-orphans the old one; renaming either folder — or the space home page
-"Tech Enablement and Design", which mark needs as the anchor *page* above
-the folder chain — breaks the sync; and deleting a guide never deletes its
-page — clean up by hand. Credentials
-are repository secrets `CONFLUENCE_USER` / `CONFLUENCE_TOKEN` (Atlassian API
-token); page edits are attributed to that account, so move to a service
-account if the token owner ever leaves.
+file's H1), so retitling a file creates a fresh Confluence page and orphans
+the old one; page titles are unique per space, so no two synced files
+anywhere in the *fleet* may share an H1 (the script fails on duplicates
+within a repo but cannot see other repos' titles); renaming a target folder
+— or the anchor page — in Confluence breaks the sync; deleting a file or
+manifest entry never deletes its page — clean up by hand; and every publish
+writes a new page version even when nothing changed (deliberate: mark's
+`--changes-only` would also skip folder moves and let manual edits stick —
+see the header of `scripts/confluence-sync.sh`).
+
+Credentials: `CONFLUENCE_USER` / `CONFLUENCE_TOKEN` (Atlassian API token).
+This repo carries them as repository secrets; opted-in consumers should get
+them as org-level secrets scoped to a selected-repositories list (org
+Settings → Secrets and variables → Actions) so rotation stays one edit.
+Page edits are attributed to that account — move to a service account if
+the token owner ever leaves.
 
 **Repo-local automation** (none of these sync to consumers):
 
@@ -173,8 +212,6 @@ account if the token owner ever leaves.
 - `ccc-v10-canary.yml` — weekly; probes whether the upstream
   release-notes-generator fix has landed and opens a `ccc-v10-canary` issue
   the day the Renovate ccc block can be lifted.
-- `confluence-sync.yml` — mirrors `docs/best-practices/` to Confluence
-  (title-matched pages; retitling a guide orphans its page).
 
 ## Troubleshooting
 
@@ -194,7 +231,7 @@ Every entry below is something that actually happened (2026-07-15 onward).
 | `check-npm-artifacts` red (nswds-app) | committed `dist/` built before semantic-release bumped the version it inlines | `npm run build:npm` on the branch, commit dist |
 | prettier --check red on synced configs | a synced `.mjs` was committed in non-fleet style | format it with `@nswds/prettier-config` (printWidth 100, no semicolons) before merging centrally |
 | Push to this repo rejected mid-work | semantic-release pushed a `chore(release): x.y.z [skip ci]` commit after your last fetch | `git pull --rebase`, push again — routine |
-| Confluence pages: the "Synced from GitHub" banner renders as a raw code block with a stray `-->` | mark's metadata parser consumes the first non-header line after the `<!-- Key: value -->` block; the multi-line `ac:box` Include sat directly against the headers, so its opening line was eaten and the rest rendered as indented code | keep the blank line between the header comments and the Include in `confluence-sync.sh` (fixed 2026-07-19; verified against mark 16.5.1 with `--compile-only`) |
+| Confluence pages: the "Synced from GitHub" banner renders as a raw code block with a stray `-->` | mark's metadata parser consumes the first non-header line after the `<!-- Key: value -->` block; the multi-line `ac:box` Include sat directly against the headers, so its opening line was eaten and the rest rendered as indented code | keep the blank line between the header comments and the Include in `scripts/confluence-sync.sh` (fixed 2026-07-19; verified against mark 16.5.1 with `--compile-only`) |
 | Release run: `GH013` on `git push … https://github.com/<repo>.git` even with `RELEASE_DEPLOY_KEY` set | `package.json` `repository.url` was an `https://` URL — semantic-release prefers it over the SSH origin the deploy-key checkout configures, so the push skips the bypass actor | use the `git+ssh://git@github.com/…` form in `repository.url` (fixed here 2026-07-17; consumer sweep same day found nswds-tokens as the only other exposure — fixed via tokens #127; the rest have no `repository` field and fall back to the SSH origin) |
 
 ## Consumer expectations (the social contract)

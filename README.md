@@ -59,7 +59,7 @@ one-step rollout (and one-step rollback) for CI logic.
     ├── sync.yml                  # WHO gets WHAT (the four groups — see below)
     └── workflows/
         ├── sync.yml              # the sync driver (push to main + manual dispatch)
-        ├── reusable-*.yml        # the seven real CI implementations (never synced)
+        ├── reusable-*.yml        # the eight real CI implementations (never synced)
         ├── ci.yml                # shellcheck + actionlint, gates every merge here
         ├── promote-v1.yml        # the only sanctioned way to move v1 (reviewer-gated)
         ├── v1-drift-canary.yml   # weekly: files an issue when v1 lags main on reusables
@@ -73,12 +73,12 @@ be overwritten. `.github/sync.yml` encodes this as four groups:
 
 | Group | Repos | What's different |
 |---|---|---|
-| 1 | everything not listed below | full set: scripts, all four configs, all seven stubs |
+| 1 | everything not listed below | full set: scripts, all four configs, all eight stubs |
 | 2 | nswds-ui, nswds-tokens, nswds-eslint-config, nswds-prettier-config | keep their own `release.yml` AND release config (all publish to npm with bespoke verification); where the repo keeps its own `ci.yml`, the shared CI stub lands as `shared-ci.yml` |
 | 3 | nswds-app | keeps its own `release.config.mjs` (publishes `@nswds/app`); stock release stub is fine |
 | 4 | ictds-portal-flows | its `release.yml` is a **Power Platform production deploy** that happens to share the filename — never overwrite it. The release stub maps to `semantic-release.yml` instead |
 
-## The seven shared CI checks
+## The eight shared CI workflows
 
 | Stub (in each repo) | What it does |
 |---|---|
@@ -89,6 +89,7 @@ be overwritten. `.github/sync.yml` encodes this as four groups:
 | `ai-pr-title.yml` | generates/validates Conventional Commit PR titles via OpenAI |
 | `openai-pr-description.yml` | autofills empty PR descriptions |
 | `release.yml` | semantic-release on push to main (npm OIDC publish, deploy-key push to protected branches, HUSKY=0, failure-alert issue) |
+| `confluence-sync.yml` | publishes the markdown mapped in `.github/confluence-sync.yml` to Confluence on push to main — a no-op in repos without that manifest (opt-in per repo; see ONBOARDING.md) |
 
 Note the check names: a reusable workflow reports as `commitlint / commitlint`
 (caller job / called job), not `commitlint`. Required-check rulesets must use

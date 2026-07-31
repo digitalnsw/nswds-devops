@@ -17,17 +17,20 @@ What every repo runs via its synced stubs:
 | `ai-pr-title.yml` | Rewrites the PR title to Conventional Commits form from the branch's commits | `pull_request` (incl. synchronize) | `OPENAI_API_KEY` |
 | `openai-pr-description.yml` | Autofills the PR description from the diff | `pull_request` (opened) | `OPENAI_API_KEY` |
 | `release.yml` | semantic-release on merge ([Releases](releases.md)) | `push` to `main` | `RELEASE_DEPLOY_KEY` |
+| `confluence-sync.yml` | Publishes markdown mapped in `.github/confluence-sync.yml` to Confluence — no-op in repos without that manifest (opt-in; ONBOARDING step 13) | `push` to `main` (markdown/manifest/script paths) + manual dispatch | `CONFLUENCE_USER`, `CONFLUENCE_TOKEN` |
 
 ## Architecture: stubs call reusables
 
 - **Consumer repos hold synced stubs** (`.github/workflows/*.yml`, marked
   DO NOT EDIT) that do three things only: declare triggers, grant
-  permissions, and call a reusable workflow here with `secrets: inherit`.
+  permissions, and call a reusable workflow here, mapping each secret it
+  needs explicitly (`secrets: inherit` is never used).
 - **Logic lives in this repo's `reusable-*.yml`**, called at the floating
   **`@v1` tag**. Merging a reusable change here does nothing until `v1` is
-  moved (`git tag -f v1 <commit> && git push -f origin v1`) — treat the move
-  as a deploy; central CI must be green first. Breaking changes ship as a
-  new `@v2` tag plus a stub update, delivered as reviewable sync PRs.
+  moved via the reviewer-gated **Promote v1** workflow (manual tag pushes
+  are ruleset-blocked) — treat the move as a deploy; central CI must be
+  green first. Breaking changes ship as a new `@v2` tag plus a stub update,
+  delivered as reviewable sync PRs.
 - **Status-check contexts are `caller-job / called-job`** (e.g.
   `install / install`). Branch rulesets reference these names — renaming a
   job in a stub or reusable orphans every ruleset that requires it.

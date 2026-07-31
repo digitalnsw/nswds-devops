@@ -1,0 +1,12 @@
+# Page map for the Confluence docs sync (.github/workflows/confluence-sync.yml
+# → scripts/confluence-sync.sh). Each entry publishes markdown to the GDS
+# space as one Confluence page per file: a directory source publishes every
+# *.md directly inside it (not recursive); a file source publishes that file.
+# Page title = the file's H1; folders is the folder chain under the space's
+# anchor page. Optional top-level `space:` and `parent:` override the GDS
+# defaults. Full schema and caveats: MAINTENANCE.md § Confluence docs sync.
+#
+# Every fleet repo can carry a manifest like this one — see ONBOARDING.md.
+pages:
+  - source: docs/best-practices/
+    folders: [Application Support, Development Best Practice]
