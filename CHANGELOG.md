@@ -1,3 +1,9 @@
+## [1.15.0](https://github.com/digitalnsw/nswds-devops/compare/v1.14.0...v1.15.0) (2026-07-31)
+
+### Features
+
+* **ci:** make the Confluence sync manifest-driven and fleet-wide ([857325c](https://github.com/digitalnsw/nswds-devops/commit/857325c440e2913c6635444eb0d309bdfb3b22cf))
+
 ## [1.14.0](https://github.com/digitalnsw/nswds-devops/compare/v1.13.1...v1.14.0) (2026-07-30)
 
 ### Features
