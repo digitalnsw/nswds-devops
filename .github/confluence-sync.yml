@@ -10,3 +10,8 @@
 pages:
   - source: docs/best-practices/
     folders: [Application Support, Development Best Practice]
+  # Fleet ops docs live beside the guides folder, not inside it.
+  - source: ONBOARDING.md
+    folders: [Application Support]
+  - source: MAINTENANCE.md
+    folders: [Application Support]
