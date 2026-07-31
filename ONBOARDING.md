@@ -70,6 +70,10 @@ Create `package.json` with, at minimum:
   Prettier config exists — a missing script means a silently green gate, so
   wire up every one the repo can honestly run.
 
+Before installing anything, make sure `.gitignore` covers at least
+`node_modules/` and `.DS_Store` — a bare repo has no ignore file and the
+first `npm install` otherwise stages the entire dependency tree.
+
 ### 3. Install the toolchain
 
 Commit/release stack (every repo):
@@ -183,7 +187,9 @@ Reviewing that first sync PR:
 
 - Only expected paths: `scripts/` shared files, the root configs, and
   `.github/workflows/` stubs. Nothing repo-specific replaced.
-- Script exec bits survived (`git ls-tree` on the branch shows `100755`).
+- Script file modes match central: everything under `scripts/` is `100755`
+  except `scripts/husky/pre-commit`, which is `100644` by design
+  (`git ls-tree -r` on the branch).
 - `check-branch-name` reports red on this one PR only — the check reads
   branch policy from the PR *base*, which gains the `chore/repo-sync`
   exemption when this PR merges. It is not a required check; merge past it.
@@ -212,10 +218,11 @@ list:
 
 - Contexts from reusable workflows use the two-part `caller job / called
   job` form (`install / install`, not `install`).
-- Require only contexts the repo **demonstrably receives**. The Snyk
-  contexts come from the Snyk console integration (step 8) — require them
-  only after a PR has shown all three `…/snyk (DigitalNSW)` statuses
-  posting, or every merge blocks on "Expected — waiting for status".
+- Require only contexts the repo **demonstrably receives**. That is why the
+  recipe below deliberately omits the two Snyk contexts: they come from the
+  Snyk console integration (step 8), and requiring them before a PR has
+  shown all three `…/snyk (DigitalNSW)` statuses posting blocks every merge
+  on "Expected — waiting for status". They are added in step 10.
 
 ```sh
 gh api -X POST repos/digitalnsw/<repo>/rulesets --input - <<'EOF'
@@ -235,9 +242,7 @@ gh api -X POST repos/digitalnsw/<repo>/rulesets --input - <<'EOF'
         {"context": "install / install"},
         {"context": "install / lint"},
         {"context": "install / test"},
-        {"context": "install / format"},
-        {"context": "security/snyk (DigitalNSW)"},
-        {"context": "code/snyk (DigitalNSW)"}
+        {"context": "install / format"}
       ]
     }}
   ]
@@ -276,6 +281,14 @@ jobs, `commitlint / commitlint`, `check-branch-name / check-branch-name`,
 `generate-title / generate-title`, `openai-pr-description /
 openai-pr-description`, and the three Snyk statuses. Superseding a push
 mid-run cancels the in-flight CI run (stub-level concurrency).
+
+Once all three Snyk statuses have posted green, tighten the ruleset by
+adding the two Snyk merge gates (fetch the ruleset id from
+`gh api repos/digitalnsw/<repo>/rulesets`, append
+`{"context": "security/snyk (DigitalNSW)"}` and
+`{"context": "code/snyk (DigitalNSW)"}` to `required_status_checks`, and
+PUT it back). After the merge, confirm the PR branch auto-deleted (step 1)
+and the "Confluence docs sync" run on `main` is a fast green no-op.
 
 Repo Actions **variables** (not secrets) tune the shared CI where needed:
 
@@ -406,6 +419,6 @@ Then continue from Path A step 2, skipping anything the repo already has.
 
 ## Coverage
 
-All 24 consumer repos are on the sync. The fleet-wide expectations this doc
+All 25 consumer repos are on the sync. The fleet-wide expectations this doc
 targets (ruleset contexts, Snyk gating, format gate, engines range) are
 live on every member; a new repo should arrive at the same end state.
