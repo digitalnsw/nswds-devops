@@ -22,8 +22,9 @@ on:
       target:
         description: >-
           Commit SHA on main that v1 should point to. Leave empty to promote
-          the newest promotable commit on main (chore(release) [skip ci]
-          commits are skipped automatically).
+          the newest promotable commit among the last 10 on main
+          ("chore(release): x.y.z [skip ci]" release commits are skipped
+          automatically).
         required: false
         default: ''
         type: string

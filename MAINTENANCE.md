@@ -34,8 +34,9 @@ that stub fails with "workflow was not found" until promotion — promote `v1`
 past the commit that added the reusable before consumer sync PRs merge, or
 ship the reusable and promote first and the stub in a follow-up.) Ship it with the **Promote
 v1** workflow (Actions → Promote v1 → run with the target SHA, or leave the
-input empty to promote the newest promotable commit on main — release
-commits are skipped automatically). Treat it
+input empty to promote the newest promotable commit among the last 10 on
+main — `chore(release): x.y.z [skip ci]` release commits are skipped
+automatically). Treat it
 like a deploy — it changes CI for every repo simultaneously. The workflow
 machine-enforces what used to be convention here: the target must be on
 `main` with all checks green, the previous target is recorded in the run
