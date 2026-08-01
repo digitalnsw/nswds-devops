@@ -14,9 +14,6 @@ on:
       AI_GATEWAY_API_KEY:
         description: "Org-level Vercel AI Gateway key, mapped explicitly by the stubs (least privilege — not inherit)."
         required: false
-      OPENAI_API_KEY:
-        description: "Legacy (pre-AI-Gateway), no longer used. Declared so consumer stubs that haven't synced yet can still call this workflow without erroring; remove once every fleet stub maps AI_GATEWAY_API_KEY."
-        required: false
 
 permissions:
   contents: read
