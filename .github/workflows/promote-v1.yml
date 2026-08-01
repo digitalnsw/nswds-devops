@@ -20,8 +20,12 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: Commit SHA on main that v1 should point to
-        required: true
+        description: >-
+          Commit SHA on main that v1 should point to. Leave empty to promote
+          the newest promotable commit on main (chore(release) [skip ci]
+          commits are skipped automatically).
+        required: false
+        default: ''
         type: string
 
 permissions:
@@ -51,6 +55,32 @@ jobs:
           TARGET: ${{ inputs.target }}
         run: |
           set -euo pipefail
+
+          if [ -z "${TARGET}" ]; then
+            # No target given — walk back from the head of main to the newest
+            # promotable commit. Release commits are [skip ci] (no check runs)
+            # and can never pass the gate below, so skip them by subject; the
+            # check-run count guards against any other runless commit. The
+            # promote job's own check runs are excluded — a dispatch attaches
+            # this run to the current main head, which may be a release commit.
+            for candidate in $(git log --format='%H' -10 origin/main); do
+              subject="$(git log -1 --format='%s' "$candidate")"
+              case "$subject" in "chore(release):"*) continue ;; esac
+              runs="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${candidate}/check-runs?per_page=100" \
+                --jq '[.check_runs[] | select(.name != "promote")] | length')"
+              if [ "$runs" -gt 0 ]; then
+                TARGET="$candidate"
+                echo "ℹ️ No target given — auto-selected the newest promotable commit on main:"
+                echo "   ${candidate}  ${subject}"
+                break
+              fi
+            done
+            if [ -z "${TARGET}" ]; then
+              echo "::error::no promotable commit found in the last 10 commits on main (release commits and commits without check runs are skipped) — pass a target SHA explicitly"
+              exit 1
+            fi
+          fi
+
           sha="$(git rev-parse --verify "${TARGET}^{commit}")"
           if ! git merge-base --is-ancestor "$sha" origin/main; then
             echo "::error::${sha} is not on main — v1 only ever points at main history"
@@ -66,8 +96,15 @@ jobs:
           bad="$(jq '[.[] | select(.conclusion as $c | ["failure", "cancelled", "timed_out", "action_required"] | index($c))] | length' <<<"$checks")"
           pending="$(jq '[.[] | select(.status != "completed")] | length' <<<"$checks")"
           ok="$(jq '[.[] | select(.conclusion == "success")] | length' <<<"$checks")"
-          if [ "$bad" -gt 0 ] || [ "$pending" -gt 0 ] || [ "$ok" -eq 0 ]; then
-            echo "::error::check runs on ${sha}: ${ok} success, ${bad} failed, ${pending} pending — promotion needs all green"
+          # Two distinct refusals: real failures need investigation; pending
+          # checks just mean "too early" (the sync fan-out on a fresh merge
+          # commit runs for ~10 minutes) — nothing is wrong, re-run later.
+          if [ "$bad" -gt 0 ]; then
+            echo "::error::check runs on ${sha}: ${bad} FAILED (${ok} success, ${pending} pending) — investigate the failures before promoting"
+            exit 1
+          fi
+          if [ "$pending" -gt 0 ] || [ "$ok" -eq 0 ]; then
+            echo "::error::nothing has failed on ${sha} — ${pending} check(s) still running (${ok} green so far). A fresh merge commit's sync fan-out takes ~10 minutes; re-run this workflow once the checks finish."
             exit 1
           fi
           echo "sha=${sha}" >>"$GITHUB_OUTPUT"
