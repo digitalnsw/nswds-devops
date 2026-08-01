@@ -1,3 +1,9 @@
+## [1.18.0](https://github.com/digitalnsw/nswds-devops/compare/v1.17.1...v1.18.0) (2026-08-01)
+
+### Features
+
+* **ci:** add a type-check gate ([#81](https://github.com/digitalnsw/nswds-devops/issues/81)) ([f4a48f3](https://github.com/digitalnsw/nswds-devops/commit/f4a48f3b36cf9ef6b97473442da6075086167782)), closes [attestation#219](https://github.com/digitalnsw/attestation/issues/219)
+
 ## [1.17.1](https://github.com/digitalnsw/nswds-devops/compare/v1.17.0...v1.17.1) (2026-08-01)
 
 ### Bug Fixes
