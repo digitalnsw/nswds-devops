@@ -1,3 +1,9 @@
+## [1.17.0](https://github.com/digitalnsw/nswds-devops/compare/v1.16.0...v1.17.0) (2026-08-01)
+
+### Features
+
+* **ci:** fall back to Azure OpenAI when the AI Gateway is out of credits ([#78](https://github.com/digitalnsw/nswds-devops/issues/78)) ([4a925cd](https://github.com/digitalnsw/nswds-devops/commit/4a925cd101c3cfcc10355c691a8f77ab12fd2860))
+
 ## [1.16.0](https://github.com/digitalnsw/nswds-devops/compare/v1.15.0...v1.16.0) (2026-08-01)
 
 ### Features
