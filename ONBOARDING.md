@@ -207,9 +207,9 @@ add the public half as a **write** deploy key named `release-bot`, store the
 private half as the `RELEASE_DEPLOY_KEY` repo secret, delete both local key
 files.
 
-`OPENAI_API_KEY` (AI PR title/description workflows) is an org-level secret
-— nothing to do per repo. The sync App is installed org-wide — nothing to
-do per repo.
+`AI_GATEWAY_API_KEY` (AI PR title/description workflows; Vercel AI Gateway)
+is an org-level secret — nothing to do per repo. The sync App is installed
+org-wide — nothing to do per repo.
 
 ### 7. Branch protection
 

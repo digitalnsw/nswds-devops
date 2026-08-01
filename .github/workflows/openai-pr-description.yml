@@ -14,4 +14,4 @@ jobs:
   openai-pr-description:
     uses: ./.github/workflows/reusable-openai-pr-description.yml
     secrets:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}

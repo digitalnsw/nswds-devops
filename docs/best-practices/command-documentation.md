@@ -10,12 +10,14 @@ The shared scripts assume these are installed:
 | Tool | Used for | Install (macOS) |
 | --- | --- | --- |
 | GitHub CLI (`gh`) | `pull-request.sh` creates PRs; authenticate once with `gh auth login` | `brew install gh` |
-| `jq` | JSON handling for OpenAI API requests/responses | `brew install jq` |
-| `curl` | HTTP requests to the OpenAI API | pre-installed |
+| `jq` | JSON handling for AI Gateway requests/responses | `brew install jq` |
+| `curl` | HTTP requests to the AI Gateway | pre-installed |
 
-The AI-assisted scripts also need `OPENAI_API_KEY` in the environment. The
-default model is set once in `scripts/openai-config.sh` (override per-run
-with `OPENAI_MODEL=…`).
+The AI-assisted scripts also need `AI_GATEWAY_API_KEY` in the environment (a
+Vercel AI Gateway key — requests are routed through the gateway, not straight
+to a provider). The default model is set once in `scripts/openai-config.sh`
+(override per-run with `OPENAI_MODEL=…` using the gateway's `provider/model`
+form, e.g. `OPENAI_MODEL=openai/gpt-4o`; bare names are assumed OpenAI).
 
 ## The shared script suite
 
@@ -32,9 +34,9 @@ Synced into every repo's `scripts/` from this repo. The user-facing ones:
 Supporting pieces you rarely invoke directly: `branch-name-config.sh`
 (policy source of truth), `conventional-commit-config.sh` +
 `check-commit-types-sync.sh` (commit-type plumbing), `openai-config.sh` /
-`openai-request.sh` (shared OpenAI defaults + request helper),
+`openai-request.sh` (shared model defaults + AI Gateway request helper),
 `secret-redaction.sh` (detects and redacts secret-looking content **before
-any diff leaves the machine** for the OpenAI API), `wrap-commit-body.sh`
+any diff leaves the machine** for the AI Gateway), `wrap-commit-body.sh`
 (reflows AI prose to pass commitlint's line-length rule), and the husky
 `commit-msg` / `prepare-commit-msg` hooks that tie it together (plus a
 `pre-commit` hook that blocks unresolved merge conflict markers). OpenCommit
