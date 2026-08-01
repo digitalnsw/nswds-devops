@@ -86,7 +86,7 @@ be overwritten. `.github/sync.yml` encodes this as four groups:
 | `commitlint.yml` | lints PR commit messages against `commitlint.config.mjs` |
 | `validate-branch-name.yml` | enforces branch naming from `scripts/branch-name-config.sh` (read from the PR *base* so PRs can't alter their own policy) |
 | `commit-types-sync.yml` | fails if `commit-types.mjs` and `git-conventional-commits.yaml` disagree |
-| `ai-pr-title.yml` | generates/validates Conventional Commit PR titles via OpenAI |
+| `ai-pr-title.yml` | generates/validates Conventional Commit PR titles via the Vercel AI Gateway |
 | `openai-pr-description.yml` | autofills empty PR descriptions |
 | `release.yml` | semantic-release on push to main (npm OIDC publish, deploy-key push to protected branches, HUSKY=0, failure-alert issue) |
 | `confluence-sync.yml` | publishes the markdown mapped in `.github/confluence-sync.yml` to Confluence on push to main — a no-op in repos without that manifest (opt-in per repo; see ONBOARDING.md) |

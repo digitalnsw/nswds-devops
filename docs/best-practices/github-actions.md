@@ -14,8 +14,8 @@ What every repo runs via its synced stubs:
 | `commitlint.yml` | Lints every PR commit message (`commitlint / commitlint`, required) | `pull_request` | — |
 | `validate-branch-name.yml` | Enforces the branch naming policy from the PR base commit | `pull_request` (opened/edited/reopened) | — |
 | `commit-types-sync.yml` | Keeps the commit-type YAML mirror in lockstep with `commit-types.mjs` | PR/push touching those files | — |
-| `ai-pr-title.yml` | Rewrites the PR title to Conventional Commits form from the branch's commits | `pull_request` (incl. synchronize) | `OPENAI_API_KEY` |
-| `openai-pr-description.yml` | Autofills the PR description from the diff | `pull_request` (opened) | `OPENAI_API_KEY` |
+| `ai-pr-title.yml` | Rewrites the PR title to Conventional Commits form from the branch's commits | `pull_request` (incl. synchronize) | `AI_GATEWAY_API_KEY` (org-level) |
+| `openai-pr-description.yml` | Autofills the PR description from the diff | `pull_request` (opened) | `AI_GATEWAY_API_KEY` (org-level) |
 | `release.yml` | semantic-release on merge ([Releases](releases.md)) | `push` to `main` | `RELEASE_DEPLOY_KEY` |
 | `confluence-sync.yml` | Publishes markdown mapped in `.github/confluence-sync.yml` to Confluence — no-op in repos without that manifest (opt-in; ONBOARDING step 13) | `push` to `main` (markdown/manifest/script paths) + manual dispatch | `CONFLUENCE_USER`, `CONFLUENCE_TOKEN` |
 
@@ -40,8 +40,10 @@ What every repo runs via its synced stubs:
 - Permissions are declared in the stub, least-privilege, per workflow — a
   reusable can never exceed what the caller grants.
 - **Pin third-party actions to a commit SHA** when they hold write access or
-  secrets (`repo-file-sync-action`, `openai-pr-description` are pinned for
-  exactly this reason). First-party `actions/*` may float on major tags.
+  secrets (`repo-file-sync-action` is pinned for exactly this reason; the AI
+  PR title/description workflows call the Vercel AI Gateway in-house with
+  `curl` so no third-party action holds the key). First-party `actions/*`
+  may float on major tags.
 - Workflows that push to a protected `main` authenticate with the repo's
   `RELEASE_DEPLOY_KEY` (a deploy key that is a ruleset bypass actor), never
   a PAT. The reusable release workflow auto-detects the secret.

@@ -1,12 +1,21 @@
 # Reusable implementation — repos call this via the synced
 # openai-pr-description.yml stub. Edit here; never in a consumer repo.
+#
+# Implemented in-house with gh + curl against the Vercel AI Gateway
+# (Responses API). The previous platisd/openai-pr-description action only
+# talks to api.openai.com and can't be pointed at the gateway; dropping it
+# also means no third-party action holds the API key, and the diff is passed
+# through the fleet's shared secret redaction before it leaves the runner.
 name: Autofill PR description (reusable)
 
 on:
   workflow_call:
     secrets:
+      AI_GATEWAY_API_KEY:
+        description: "Org-level Vercel AI Gateway key, mapped explicitly by the stubs (least privilege — not inherit)."
+        required: false
       OPENAI_API_KEY:
-        description: "Mapped explicitly by the stubs (least privilege — not inherit)."
+        description: "Legacy (pre-AI-Gateway), no longer used. Declared so consumer stubs that haven't synced yet can still call this workflow without erroring; remove once every fleet stub maps AI_GATEWAY_API_KEY."
         required: false
 
 permissions:
@@ -20,10 +29,149 @@ jobs:
     # Skip for fork PRs — secrets are not available there
     if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
 
+    env:
+      # provider/model slug, routed via the Vercel AI Gateway.
+      AI_GATEWAY_MODEL: openai/gpt-4o-mini
+      # Caps on the diff sent to the model (lines first, then bytes).
+      DIFF_MAX_LINES: '1500'
+      DIFF_MAX_BYTES: '100000'
+
     steps:
-      # Pinned to a commit SHA — @master would let upstream changes run
-      # unreviewed with access to OPENAI_API_KEY across every repo.
-      - uses: platisd/openai-pr-description@5ba2cf03f9f6c0ba68356a9bda44a380f55cccdb # master 2025-08-07
+      # Checkout gives us the caller repo's synced scripts/secret-redaction.sh
+      # so the diff is redacted before it's sent to the gateway.
+      # Check out the PR *base*, not the default merge ref: this job's env
+      # holds AI_GATEWAY_API_KEY, and sourcing base-ref scripts means a PR
+      # can't alter the code this secrets-bearing job executes.
+      - name: Checkout code (PR base)
+        uses: actions/checkout@v7
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Ensure jq is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update -y
+            sudo apt-get install -y jq
+          fi
+
+      - name: Autofill PR description (AI Gateway, Responses API)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${AI_GATEWAY_API_KEY:-}" ]]; then
+            # Soft skip (not a failure): during the AI Gateway rollout, repos whose
+            # stubs haven't synced yet don't pass this secret.
+            echo "⚠️ Missing secrets.AI_GATEWAY_API_KEY (org-level secret). Skipping description autofill."
+            exit 0
+          fi
+
+          BODY="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq '.body // ""')"
+
+          # Only fill an empty description — never overwrite what a human wrote.
+          # The ai-pr-title marker comment doesn't count as content.
+          BODY_SANS_MARKER="$(printf '%s' "$BODY" \
+            | sed -E 's/<!--[[:space:]]*ai-pr-title-marker:[^>]*-->//g' \
+            | tr -d '[:space:]')"
+          if [[ -n "$BODY_SANS_MARKER" ]]; then
+            echo "ℹ️ PR already has a description; leaving it untouched."
+            exit 0
+          fi
+
+          # Same truncation idiom as git-commit.sh: `|| true` absorbs the SIGPIPE
+          # that head's byte cap can send up the pipeline under pipefail.
+          DIFF="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" \
+            -H "Accept: application/vnd.github.diff" \
+            | sed -n "1,${DIFF_MAX_LINES}p" | head -c "$DIFF_MAX_BYTES" || true)"
+
+          if [[ -z "${DIFF//[[:space:]]/}" ]]; then
+            echo "ℹ️ Empty diff; nothing to describe."
+            exit 0
+          fi
+
+          # Redact common secret patterns before the diff leaves the runner.
+          # (Same helper the local git-commit / branch-name scripts use.)
+          if [[ -f scripts/secret-redaction.sh ]]; then
+            # shellcheck source=/dev/null
+            source scripts/secret-redaction.sh
+            DIFF="$(redact_sensitive_diff "$DIFF")"
+          else
+            echo "ℹ️ scripts/secret-redaction.sh not present in this repo; sending diff unredacted."
+          fi
+
+          SYSTEM_PROMPT="You write pull request descriptions. Given a unified diff, produce a concise Markdown description: a one-paragraph summary of the change, then a '## Changes' section with a short bullet list grouping related changes. Describe only what is in the diff — never invent changes. Output only the description (no code fence around the whole output, no preamble)."
+
+          # No temperature: reasoning-family models reject the field, so omitting
+          # it keeps AI_GATEWAY_MODEL swappable without further edits.
+          JSON_PAYLOAD="$(jq -n \
+            --arg model "$AI_GATEWAY_MODEL" \
+            --arg system "$SYSTEM_PROMPT" \
+            --arg diff "$DIFF" \
+            '{
+              model: $model,
+              input: [
+                { role: "system", content: [ { type: "input_text", text: $system } ] },
+                { role: "user",   content: [ { type: "input_text", text: ("Unified diff (may be truncated):\n\n" + $diff) } ] }
+              ],
+              max_output_tokens: 800
+            }')"
+
+          set +e
+          RESPONSE="$(
+            curl -sS --fail-with-body "https://ai-gateway.vercel.sh/v1/responses" \
+              -H "Authorization: Bearer ${AI_GATEWAY_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$JSON_PAYLOAD"
+          )"
+          curl_status=$?
+          set -e
+
+          if [[ $curl_status -ne 0 ]]; then
+            echo "❌ AI Gateway request failed (curl exit code: $curl_status)."
+            echo "$RESPONSE" | head -c 400
+            echo
+            exit 1
+          fi
+
+          # Fail fast with a clear message if the API returns non-JSON (auth/proxy errors can be HTML).
+          if ! echo "$RESPONSE" | jq -e . >/dev/null 2>&1; then
+            echo "❌ AI Gateway returned a non-JSON response."
+            echo "$RESPONSE" | head -c 400
+            echo
+            exit 1
+          fi
+
+          if echo "$RESPONSE" | jq -e '.error' >/dev/null; then
+            errType="$(echo "$RESPONSE" | jq -r '.error.type // "unknown"')"
+            errMsg="$(echo "$RESPONSE" | jq -r '.error.message // ""' | head -c 200)"
+            echo "❌ AI Gateway API error ($errType): $errMsg"
+            exit 1
+          fi
+
+          DESCRIPTION="$(echo "$RESPONSE" | jq -r '
+            [(.output[]? | select(.type=="message") | .content[]? | select(.type=="output_text") | .text)] | join("")
+          ')"
+
+          if [[ -z "${DESCRIPTION//[[:space:]]/}" ]]; then
+            echo "❌ Could not extract a description from the response (no output_text)."
+            exit 1
+          fi
+
+          # Preserve the ai-pr-title marker (if present) so title refreshes keep working.
+          MARKER="$(printf '%s' "$BODY" \
+            | grep -oE '<!--[[:space:]]*ai-pr-title-marker:[[:space:]]*[A-Za-z0-9+/=]+[[:space:]]*-->' \
+            | head -n 1 || true)"
+          NEW_BODY="$DESCRIPTION"
+          if [[ -n "$MARKER" ]]; then
+            NEW_BODY="${DESCRIPTION}"$'\n\n'"${MARKER}"
+          fi
+
+          gh api -X PATCH "repos/${REPO}/pulls/${PR_NUMBER}" -f body="$NEW_BODY" >/dev/null
+          echo "✅ PR description autofilled."

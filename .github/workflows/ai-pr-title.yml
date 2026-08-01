@@ -14,4 +14,4 @@ jobs:
   generate-title:
     uses: ./.github/workflows/reusable-ai-pr-title.yml
     secrets:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
