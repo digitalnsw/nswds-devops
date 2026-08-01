@@ -208,8 +208,11 @@ private half as the `RELEASE_DEPLOY_KEY` repo secret, delete both local key
 files.
 
 `AI_GATEWAY_API_KEY` (AI PR title/description workflows; Vercel AI Gateway)
-is an org-level secret — nothing to do per repo. The sync App is installed
-org-wide — nothing to do per repo.
+is an org-level secret — nothing to do per repo. An optional Azure OpenAI
+fallback (used only when the gateway runs out of credits, HTTP 402) is also
+org-level: the `AZURE_OPENAI_API_KEY` secret plus the
+`AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_DEPLOYMENT` org variables. The sync
+App is installed org-wide — nothing to do per repo.
 
 ### 7. Branch protection
 

@@ -19,6 +19,11 @@ to a provider). The default model is set once in `scripts/openai-config.sh`
 (override per-run with `OPENAI_MODEL=…` using the gateway's `provider/model`
 form, e.g. `OPENAI_MODEL=openai/gpt-4o`; bare names are assumed OpenAI).
 
+Optionally export `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_ENDPOINT` (plus
+`AZURE_OPENAI_DEPLOYMENT`, default `gpt-5.6-sol`) to fall back to Azure
+OpenAI when the gateway account is out of credits (HTTP 402). Only 402
+triggers the fallback — other errors surface as-is.
+
 ## The shared script suite
 
 Synced into every repo's `scripts/` from this repo. The user-facing ones:

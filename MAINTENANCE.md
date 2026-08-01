@@ -108,7 +108,12 @@ nswds-email-issues' CI stops resolving entirely.
 
 The AI PR title/description workflows call the Vercel AI Gateway in-house
 with `curl` (Responses API, org-level `AI_GATEWAY_API_KEY` secret) — no
-third-party action holds the key.
+third-party action holds the key. If the gateway answers HTTP 402 (out of
+credits) the request retries against Azure OpenAI, when configured via the
+org-level `AZURE_OPENAI_API_KEY` secret + `AZURE_OPENAI_ENDPOINT` /
+`AZURE_OPENAI_DEPLOYMENT` org variables (v1 surface, deployment default
+`gpt-5.6-sol`). Other failures never fail over — misconfiguration stays
+loud.
 
 **RELEASE_DEPLOY_KEY** (per-repo, only where `main` is ruleset-protected;
 as of 2026-07-16 that is every repo on the sync — the "Protect main"
