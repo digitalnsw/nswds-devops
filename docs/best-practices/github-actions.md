@@ -14,8 +14,8 @@ What every repo runs via its synced stubs:
 | `commitlint.yml` | Lints every PR commit message (`commitlint / commitlint`, required) | `pull_request` | — |
 | `validate-branch-name.yml` | Enforces the branch naming policy from the PR base commit | `pull_request` (opened/edited/reopened) | — |
 | `commit-types-sync.yml` | Keeps the commit-type YAML mirror in lockstep with `commit-types.mjs` | PR/push touching those files | — |
-| `ai-pr-title.yml` | Rewrites the PR title to Conventional Commits form from the branch's commits | `pull_request` (incl. synchronize) | `AI_GATEWAY_API_KEY` (org-level) |
-| `openai-pr-description.yml` | Autofills the PR description from the diff | `pull_request` (opened) | `AI_GATEWAY_API_KEY` (org-level) |
+| `ai-pr-title.yml` | Rewrites the PR title to Conventional Commits form from the branch's commits | `pull_request` (incl. synchronize) | `AI_GATEWAY_API_KEY` (org-level); optional `AZURE_OPENAI_API_KEY` fallback |
+| `openai-pr-description.yml` | Autofills the PR description from the diff | `pull_request` (opened) | `AI_GATEWAY_API_KEY` (org-level); optional `AZURE_OPENAI_API_KEY` fallback |
 | `release.yml` | semantic-release on merge ([Releases](releases.md)) | `push` to `main` | `RELEASE_DEPLOY_KEY` |
 | `confluence-sync.yml` | Publishes markdown mapped in `.github/confluence-sync.yml` to Confluence — no-op in repos without that manifest (opt-in; ONBOARDING step 13) | `push` to `main` (markdown/manifest/script paths) + manual dispatch | `CONFLUENCE_USER`, `CONFLUENCE_TOKEN` |
 
