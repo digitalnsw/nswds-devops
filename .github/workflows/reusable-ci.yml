@@ -127,6 +127,69 @@ jobs:
       - name: Lint
         run: npm run lint --if-present
 
+  # Type-check gate. Added after attestation#219 (zod 3 -> 4) merged green and
+  # broke the production build: zod 4 removed the `required_error` parameter, so
+  # `tsc` and `next build` both failed, but nothing in CI compiles TypeScript.
+  # Repos that skip the build (CI_SKIP_BUILD, set wherever the build needs
+  # deploy-time env) have no type coverage at all without this, and a type error
+  # then surfaces on the deploy platform instead of the PR.
+  #
+  # Runs the repo's own script rather than a bare `tsc --noEmit`: `--noEmit` is
+  # rejected outright on composite/project-reference setups, where `tsc -b` is
+  # the correct invocation, and only the repo knows which it is. Both spellings
+  # are accepted because the fleet uses both. Detected in a step rather than an
+  # `if:` expression because workflow expressions can't read package.json
+  # (same pattern as the npm-test probe below). Opt out with
+  # CI_SKIP_TYPECHECK=true.
+  # Not required by rulesets unless a repo adds the "install / typecheck" context.
+  typecheck:
+    if: ${{ vars.CI_SKIP_TYPECHECK != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Detect type-check script
+        id: tsc
+        run: |
+          script=''
+          if [ -f package.json ]; then
+            script=$(node -e "
+              const s = require('./package.json').scripts || {};
+              process.stdout.write(s['type-check'] ? 'type-check' : (s.typecheck ? 'typecheck' : ''));
+            ")
+          fi
+          if [ -n "$script" ]; then
+            echo "script=$script" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node.js (.nvmrc)
+        if: ${{ steps.tsc.outputs.script != '' && hashFiles('.nvmrc') != '' }}
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+      - name: Setup Node.js (fallback)
+        if: ${{ steps.tsc.outputs.script != '' && hashFiles('.nvmrc') == '' }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        if: ${{ steps.tsc.outputs.script != '' }}
+        run: npm clean-install
+
+      - name: Type-check
+        if: ${{ steps.tsc.outputs.script != '' }}
+        run: npm run ${{ steps.tsc.outputs.script }}
+
+      - name: Nothing to run
+        if: ${{ steps.tsc.outputs.script == '' }}
+        run: echo "No type-check or typecheck script — nothing to check."
+
   # Format gate. The fleet's Prettier options are centralised in
   # @nswds/prettier-config, but every repo's `format` script is write-mode —
   # without a CI check the standard is convention, and drift only surfaces as
