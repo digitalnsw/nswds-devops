@@ -1,3 +1,9 @@
+## [1.17.1](https://github.com/digitalnsw/nswds-devops/compare/v1.17.0...v1.17.1) (2026-08-01)
+
+### Bug Fixes
+
+* **ci:** detect Prettier configs that match only one glob pattern ([#80](https://github.com/digitalnsw/nswds-devops/issues/80)) ([b0dadaf](https://github.com/digitalnsw/nswds-devops/commit/b0dadaf598d47bbec4f9dfe5f1f43a2b720b023e)), closes [#283](https://github.com/digitalnsw/nswds-devops/issues/283)
+
 ## [1.17.0](https://github.com/digitalnsw/nswds-devops/compare/v1.16.0...v1.17.0) (2026-08-01)
 
 ### Features
