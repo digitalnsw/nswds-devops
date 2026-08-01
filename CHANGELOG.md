@@ -1,3 +1,9 @@
+## [1.16.0](https://github.com/digitalnsw/nswds-devops/compare/v1.15.0...v1.16.0) (2026-08-01)
+
+### Features
+
+* **ci:** route AI workflows and scripts through the Vercel AI Gateway ([#76](https://github.com/digitalnsw/nswds-devops/issues/76)) ([93da2d7](https://github.com/digitalnsw/nswds-devops/commit/93da2d7bf858bcfed63c1bf1633d6702eeff2705))
+
 ## [1.15.0](https://github.com/digitalnsw/nswds-devops/compare/v1.14.0...v1.15.0) (2026-07-31)
 
 ### Features
