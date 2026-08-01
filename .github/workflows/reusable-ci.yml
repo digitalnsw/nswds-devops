@@ -148,10 +148,19 @@ jobs:
       - name: Detect Prettier config
         id: prettier
         run: |
+          # Test each candidate independently. `ls a b c` exits non-zero if ANY
+          # argument is missing, so the old single-ls probe reported "absent"
+          # unless all three patterns matched at once — i.e. always. An unmatched
+          # glob stays literal here, and `[ -e ]` on the literal is false.
           present=false
-          if ls .prettierrc .prettierrc.* prettier.config.* >/dev/null 2>&1; then
-            present=true
-          elif [ -f package.json ] && node -e "process.exit(require('./package.json').prettier ? 0 : 1)"; then
+          for f in .prettierrc .prettierrc.* prettier.config.*; do
+            if [ -e "$f" ]; then
+              present=true
+              break
+            fi
+          done
+          if [ "$present" = false ] && [ -f package.json ] &&
+            node -e "process.exit(require('./package.json').prettier ? 0 : 1)"; then
             present=true
           fi
           echo "present=$present" >> "$GITHUB_OUTPUT"
