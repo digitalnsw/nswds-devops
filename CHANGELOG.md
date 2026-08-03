@@ -1,3 +1,9 @@
+## [1.18.1](https://github.com/digitalnsw/nswds-devops/compare/v1.18.0...v1.18.1) (2026-08-03)
+
+### Bug Fixes
+
+* **security:** path-scope the nanoid ignores and align the docs with the base ([15f732b](https://github.com/digitalnsw/nswds-devops/commit/15f732ba380d621cd07a6a987a854c3c6f2c7c3e)), closes [#82](https://github.com/digitalnsw/nswds-devops/issues/82)
+
 ## [1.18.0](https://github.com/digitalnsw/nswds-devops/compare/v1.17.1...v1.18.0) (2026-08-01)
 
 ### Features
