@@ -1,3 +1,9 @@
+## [1.18.2](https://github.com/digitalnsw/nswds-devops/compare/v1.18.1...v1.18.2) (2026-08-03)
+
+### Performance Improvements
+
+* **ci:** fetch commitlint history blobless ([#83](https://github.com/digitalnsw/nswds-devops/issues/83)) ([a244014](https://github.com/digitalnsw/nswds-devops/commit/a244014e317c6ab661d7c53ecd9152773b87c3be))
+
 ## [1.18.1](https://github.com/digitalnsw/nswds-devops/compare/v1.18.0...v1.18.1) (2026-08-03)
 
 ### Bug Fixes
