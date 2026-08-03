@@ -20,9 +20,28 @@ jobs:
     steps:
       # Reusable workflows run in the caller's context: this checks out the
       # consumer repo, and its own devDependencies provide commitlint.
+      #
+      # fetch-depth: 0 is required — the base..head range linted below can
+      # reach arbitrarily far back, and a shallow clone makes the range
+      # unresolvable. But an unfiltered full fetch also drags down every
+      # historical revision of every file, which this job never reads: linting
+      # touches commit messages only. filter: blob:none makes it a blobless
+      # partial clone — the commit graph arrives complete, and file content is
+      # fetched lazily, in one batch, for the single tree that gets checked out
+      # (npm clean-install still finds its package-lock.json).
+      #
+      # The cost that removes is proportional to repo content, not commit
+      # count, so it lands hardest on the fleet's heaviest repos:
+      # nswds-email-framework tracks ~3.5k generated HTML files, and on
+      # 2026-08-03 its fetch stalled long enough to burn the whole
+      # timeout-minutes below and cancel the job mid-checkout, blocking a PR
+      # on a check that never ran. Blobless doesn't make a stalled network
+      # impossible, but it cuts the transfer this job is exposed to by orders
+      # of magnitude on exactly the repos that were closest to the limit.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          filter: blob:none
       - name: Setup Node.js (.nvmrc)
         if: ${{ hashFiles('.nvmrc') != '' }}
         uses: actions/setup-node@v7
