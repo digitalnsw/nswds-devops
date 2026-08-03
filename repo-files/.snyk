@@ -3,12 +3,13 @@ version: v1.25.0
 
 # ── Canonical base (from nswds-devops) ─────────────────────────────────────
 # Repo-specific ignores go BELOW this block, under a "# repo-specific"
-# heading. This file is NOT in .github/sync.yml: the file-sync action
+# heading. This file is deliberately NOT distributed by the nswds-devops
+# file-sync (its map is nswds-devops .github/sync.yml): the sync action
 # overwrites whole files, and several repos carry legitimate per-repo policy
 # (nswds-app's transitive postcss ignores, nswds-ui's Snyk Code exclude,
 # engagement's and nswds-email's enumerated licence lists, dtl-sandbox's
 # path-scoped entries). It is a Mechanism C file — see
-# docs/config-single-source-of-truth.md.
+# nswds-devops docs/config-single-source-of-truth.md.
 #
 # NOTE: do not add a '*:lic:*' catch-all. Snyk matches ignore keys as exact
 # issue IDs and does not support globs — the catch-all that four repos carry
