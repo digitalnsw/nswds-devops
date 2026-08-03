@@ -78,7 +78,7 @@ scope is consistent. The packages previously declared `ISC` — inherited from t
 repo's root rather than chosen for a published package. Relicensed before either
 was published, so there is no prior distribution under ISC to reconcile.
 
-## Mechanism C — base + repo-specific tail (`.gitignore`, `.prettierignore`)
+## Mechanism C — base + repo-specific tail (`.gitignore`, `.prettierignore`, `.snyk`)
 
 These have a large common core but every repo legitimately appends its own
 build-output/generated-file ignores. There is no "extends" mechanism for ignore
@@ -100,6 +100,22 @@ The canonical base for both is in `repo-files/.gitignore` and
 `repo-files/.prettierignore`. The `.gitignore` base normalizes the
 `.claude` vs `/.claude` split, folds in the AI-tooling and Snyk-output ignores
 several repos already carry, and includes `*.err`.
+
+### `.snyk` — same shape, same reason
+
+`repo-files/.snyk` is a Mechanism C file too, and for the same reason: eight
+repos already carry policy that is genuinely theirs. nswds-app ignores two
+transitive advisories (postcss, postcss-selector-parser) that no other repo
+has, and nswds-ui has no `ignore:` block at all — its policy is a Snyk Code
+`exclude:` for the generated `mockServiceWorker.js`. A whole-file sync would
+delete both. Snyk's policy format has no `extends`, so Mechanism B is out.
+
+The base holds the fleet-wide license catch-all plus the two nanoid CWE-835
+ignores. **The nanoid entries are conditional** — they assert that the
+installed nanoid already contains the fix, which is true from 3.3.16 onward.
+A repo resolving an older 3.x is genuinely vulnerable and needs its lockfile
+refreshed; landing the ignore there suppresses a real finding. Verify with
+`npm ls nanoid` before adding the block to a repo.
 
 ## Rollout phases
 
