@@ -78,7 +78,7 @@ scope is consistent. The packages previously declared `ISC` — inherited from t
 repo's root rather than chosen for a published package. Relicensed before either
 was published, so there is no prior distribution under ISC to reconcile.
 
-## Mechanism C — base + repo-specific tail (`.gitignore`, `.prettierignore`)
+## Mechanism C — base + repo-specific tail (`.gitignore`, `.prettierignore`, `.snyk`)
 
 These have a large common core but every repo legitimately appends its own
 build-output/generated-file ignores. There is no "extends" mechanism for ignore
@@ -100,6 +100,43 @@ The canonical base for both is in `repo-files/.gitignore` and
 `repo-files/.prettierignore`. The `.gitignore` base normalizes the
 `.claude` vs `/.claude` split, folds in the AI-tooling and Snyk-output ignores
 several repos already carry, and includes `*.err`.
+
+### `.snyk` — same shape, same reason
+
+`repo-files/.snyk` is a Mechanism C file too, and for the same reason: eight
+repos already carry policy that is genuinely theirs. nswds-app ignores two
+transitive advisories (postcss, postcss-selector-parser) that no other repo
+has, and nswds-ui has no `ignore:` block at all — its policy is a Snyk Code
+`exclude:` for the generated `mockServiceWorker.js`. A whole-file sync would
+delete both. Snyk's policy format has no `extends`, so Mechanism B is out.
+
+The base holds the two nanoid CWE-835 ignores and nothing else. It carries
+**no** licence catch-all: Snyk matches ignore keys as exact issue IDs and does
+not support globs, so the `'*:lic:*'` entry that four repos inherited is dead
+config — nswds-app has it and `snyk test` still reports all 13 licence
+findings as active. Licence findings must be enumerated, as nswds-email and
+engagement do.
+
+The two nanoid entries rest on **different** grounds, and the distinction
+matters when either is revisited:
+
+- `SNYK-JS-NANOID-18506894` is a **false positive** — the fix was backported
+  to the 3.x line in 3.3.16, and Snyk's `<5.1.16` range misses it. This one
+  is conditional on the resolved version: a repo on an older 3.x is genuinely
+  vulnerable and needs its lockfile refreshed, not this ignore. Check with
+  `npm ls nanoid` first.
+- `SNYK-JS-NANOID-18506897` is **not fixed on the 3.x line at all** and is
+  accepted on **reachability**: `customRandom` is exported only from nanoid's
+  main entry, while postcss imports `nanoid/non-secure`. It stops being valid
+  the moment anything imports nanoid's main entry.
+
+Because both rationales are conditional, the entries are scoped to the
+postcss dependency path rather than a bare `'*'`, so they fail closed. Snyk
+matches paths from the root: `'postcss > nanoid'` matches only a direct
+postcss, `'* > postcss > nanoid'` matches any non-empty prefix, and repos
+where postcss is both need both. Enumerate a repo's real paths with
+`npx snyk test --ignore-policy --json` before editing the block — an
+incomplete path set does not error, the advisory just returns.
 
 ## Rollout phases
 
