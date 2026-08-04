@@ -1,3 +1,9 @@
+## [1.19.0](https://github.com/digitalnsw/nswds-devops/compare/v1.18.3...v1.19.0) (2026-08-04)
+
+### Features
+
+* **renovate:** automerge devDependency patches and lock file maintenance ([#85](https://github.com/digitalnsw/nswds-devops/issues/85)) ([8b5a2cb](https://github.com/digitalnsw/nswds-devops/commit/8b5a2cb448163cd203777fe59bde41396826c983))
+
 ## [1.18.3](https://github.com/digitalnsw/nswds-devops/compare/v1.18.2...v1.18.3) (2026-08-04)
 
 ### Performance Improvements
