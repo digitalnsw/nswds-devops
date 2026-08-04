@@ -22,15 +22,21 @@ actors.
 
 - **One concern per PR** — it squash-merges to a single conventional commit;
   the title is the commit message ([Commit Messages](commit-messages.md)).
-- **Squash merge only.** Merge commits and rebase-merges break the
-  one-PR-one-commit-one-changelog-line model.
+- **Squash merge only**, enforced by repository settings — "Squash and
+  merge" is the only method offered on every repo in the fleet. Merge
+  commits and rebase-merges break the one-PR-one-commit-one-changelog-line
+  model. This has a consequence for stacked branches; see
+  [Stacked pull requests](#stacked-pull-requests).
 - **Never hand-resolve lockfile conflicts in the web editor.** Update the
   branch; if the lockfile genuinely conflicts, regenerate it locally
   (`npm install`) or let the bot recreate the PR. The gate will catch a
   botched resolution, but not creating one is cheaper.
 - **Bot PRs (Renovate, Snyk, repo-sync) are reviewed like any other PR** —
-  the checks make them safe to merge, not safe to ignore. No auto-merge on
-  bot PRs until drift has been boring for a good while.
+  the checks make them safe to merge, not safe to ignore. Two low-risk
+  Renovate categories are exempt and merge themselves once every required
+  check is green: devDependency patches and lock file maintenance
+  ([Renovate → Automerge](renovate.md#automerge)). Everything else waits for
+  a human.
 - Draft PRs for work-in-progress; the AI title/description workflows fill in
   scaffolding on open, but **you own the final result** — review and edit the
   generated description so it summarises the change clearly, links related
@@ -39,6 +45,54 @@ actors.
   and the changelog line.
 - Admin bypass is for emergencies, and every bypass should be explainable
   after the fact.
+
+## Stacked pull requests
+
+A stacked PR is one whose base is another open PR's branch rather than
+`main` — the second change depends on the first, so it is opened against it
+and retargeted to `main` when the first merges.
+
+Squash merging makes this need one manual step. Squashing replaces the base
+PR's commits with a single **new** commit on `main`; the original commits
+never appear there. The stacked branch is still built on those originals, so
+after the base merges its history has no common ancestor with `main` beyond
+the point both branches diverged. GitHub retargets the stacked PR to `main`
+and reports it as conflicting, even when the two changes do not overlap
+textually.
+
+The fix is to replay only the stacked commits onto the new `main`:
+
+```sh
+git fetch origin
+git rebase --onto origin/main <base-branch-tip> <stacked-branch>
+git push --force-with-lease
+```
+
+`<base-branch-tip>` is the commit the stacked branch was created from — the
+head of the base PR's branch before it merged. Everything after it is
+replayed; the base PR's own commits are dropped, because their content is
+already on `main` in squashed form.
+
+This normally applies without conflicts. Conflicts here mean the two changes
+genuinely overlap, and should be resolved on their merits.
+
+Do **not** merge `main` into the stacked branch instead. That reconciles two
+whole-branch diffs rather than replaying the incremental commits, and
+produces spurious conflicts across every file the base PR touched.
+
+Confirm the rebase preserved the content that was reviewed:
+
+```sh
+git diff <pre-rebase-sha> HEAD -- <paths changed by the stacked PR>
+```
+
+Empty output means only the base has moved. Record the pre-rebase SHA before
+starting; it is also the rollback point.
+
+Because merging the base triggers a release on repositories that run
+semantic-release, `main` often moves a second time moments later. Under
+strict up-to-date checks the stacked PR then reports as behind and needs
+**Update branch** — or a second rebase — before it can merge.
 
 ## Before you merge
 
