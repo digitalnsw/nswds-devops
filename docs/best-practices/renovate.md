@@ -17,22 +17,33 @@ data, and a rendered diff of what changed.
 
 Concretely, every repo gets:
 
-- **One grouped PR per week** (Monday before 7am Sydney) containing all
-  pending **non-major** updates — patch and minor bumps travel together so
-  the review load is one PR, not twenty.
+- **One grouped PR per week** (Monday before 7am Sydney) containing the
+  pending **non-major** updates that need a human: production patches,
+  production minors and devDependency minors travel together so the review
+  load is one PR, not twenty.
+- **A self-merging "dev dependencies (patch)" PR**, also weekly — devDependency
+  patch bumps are split into their own group and **automerged** once the
+  checks pass. Usually you'll never see it; it shows up in the commit log,
+  not your review queue ([Automerge](#automerge)).
 - **Individual PRs for majors** — each major arrives alone, whenever it's
   released, because majors need individual judgement.
 - **A monthly "Lock file maintenance" PR** (first day of the month) that
   regenerates `package-lock.json` from scratch with real npm, keeping
-  transitive pins fresh even when no direct dependency moved.
+  transitive pins fresh even when no direct dependency moved. Also
+  automerged, when green.
 - **A Dependency Dashboard issue** — an always-open issue in each repo
   listing every pending, rate-limited, blocked, and errored update. This is
   the control panel; see [Using the Dependency Dashboard](#using-the-dependency-dashboard).
 
-Renovate PRs are labelled `dependencies`, commit as `chore(deps): …`
-(so merging one never forces a release — see
-[Releases](releases.md)), and their `renovate/…` branches are exempt from
-the branch-naming policy in `scripts/branch-name-config.sh`.
+Renovate PRs are labelled `dependencies`, and their `renovate/…` branches
+are exempt from the branch-naming policy in
+`scripts/branch-name-config.sh`. The commit type follows the **dependency**,
+not the update size: production dependencies commit as `fix(deps): …` and
+devDependencies as `chore(deps): …`. That distinction decides whether
+merging one cuts a release — `fix` does under the `conventionalcommits`
+preset, `chore` doesn't ([Releases](releases.md)) — and it is also where the
+automerge boundary is drawn
+([Why devDependencies only](#why-devdependencies-only)).
 
 ## Why we use it
 
@@ -65,11 +76,12 @@ The preset itself extends Renovate's
 and
 [`group:allNonMajor`](https://docs.renovatebot.com/presets-group/#groupallnonmajor),
 then sets: `timezone` Australia/Sydney, weekly schedule, `prConcurrentLimit`
-5 (so a repo is never flooded), `rebaseWhen` `conflicted`
+5 (so a repo is never flooded), `rebaseWhen: "conflicted"`
 ([Rebasing and staying up to date](#rebasing-and-staying-up-to-date)), the
 `dependencies` label, and `gitIgnoredAuthors` for the github-actions bot (so
 release commits don't make Renovate think a human edited its branch and stop
-rebasing).
+rebasing). Two categories are automerged — devDependency patches and lock
+file maintenance ([Automerge](#automerge)).
 
 ## Dashboards and links
 
@@ -146,6 +158,86 @@ Revisit this setting if strict required status checks are ever relaxed — with
 `strict` off, `"auto"` stops meaning `behind-base-branch` and the amplifier
 disappears.
 
+## Automerge
+
+Two categories merge themselves once every required check is green. Nothing
+else does.
+
+| Automerged | Group | Why it's safe |
+| --- | --- | --- |
+| **devDependency patches** | `dev dependencies (patch)` | Patch is bug-fix-by-convention, and devDependencies can't reach production. **Every required check** still has to pass first — `commitlint`, the required `install / …` jobs and both Snyk contexts included |
+| **Lock file maintenance** | `Lock file maintenance` | Touches `package-lock.json` only — no manifest, no source. `install / install` is precisely the gate that proves a regenerated lockfile is coherent |
+
+Automerge waits on whatever that repo's ruleset marks **required** — it can't
+bypass a gate, and it can't merge on a subset. The exact context list varies
+per repo (see [ONBOARDING](../../ONBOARDING.md)), which is why it isn't
+enumerated here.
+
+devDependency patches are additionally held by **`minimumReleaseAge`: 3
+days** — automerge means nobody reads these, so a release that gets yanked or
+hot-patched within hours of publishing never becomes a merge in the first
+place. Lock file maintenance carries no such hold and needs none: it
+regenerates against whatever the registry resolves at the time rather than
+adopting one specific new release.
+
+### Why devDependencies only
+
+`config:recommended` pulls in
+[`:semanticPrefixFixDepsChoreOthers`](https://docs.renovatebot.com/presets-default/#semanticprefixfixdepschoreothers),
+so Renovate commits **production** dependency updates as `fix(deps)` and
+**dev** dependencies as `chore(deps)`. The shared `release.config.mjs` runs
+the `conventionalcommits` preset, where `fix` cuts a **patch release** — and
+five repos publish on release (`nswds-ui`, `nswds-tokens`, `nswds-app`,
+`nswds-eslint-config`, `nswds-prettier-config`).
+
+So automerging a production patch would publish to npm with nobody in the
+loop. `chore(deps)` releases nothing, which is why the line is drawn at
+devDependencies rather than at "all patches". Production patches keep
+arriving in the weekly grouped PR for a human to merge.
+
+### What this does and doesn't change
+
+- **It doesn't weaken any gate.** Automerge waits for the same required
+  checks as a human merge, and it can never merge a red PR. A dev-patch PR
+  that fails `test` just sits there, exactly as it would today.
+- **It doesn't touch majors or minors.** Those are unchanged — grouped
+  weekly for non-majors, individually for majors.
+- **It does close the stale-PR loop.** Combined with
+  `rebaseWhen: "conflicted"` above, the highest-volume, lowest-risk category
+  no longer sits open collecting "Update branch" re-runs; it opens, runs its
+  checks once, and merges.
+- **These PRs are exempt from the fleet rebase policy.** Both carry
+  `rebaseWhen: "behind-base-branch"`, because an automerge PR that falls behind
+  `main` can't merge under strict checks and would otherwise never be
+  refreshed — it would sit unmergeable forever. They're short-lived by
+  construction, so the re-runs that buys are bounded and each one ends in a
+  merge.
+
+### Prerequisite: `allow_auto_merge`
+
+Renovate prefers GitHub's **native** auto-merge (`platformAutomerge`, on by
+default), which merges the instant the last required check turns green. That
+needs "Allow auto-merge" on the repo, which is **enabled fleet-wide** (all 26
+repos, 2026-08-04) and is part of [step 1 of onboarding](../../ONBOARDING.md)
+for new ones:
+
+```sh
+gh api repos/digitalnsw/<repo> --jq '.allow_auto_merge'     # check
+gh api -X PATCH repos/digitalnsw/<repo> -F allow_auto_merge=true
+```
+
+If it were off nothing would break — Renovate falls back to merging the PR
+itself on its next run, a delay of up to about an hour rather than seconds.
+Either way the weekly `schedule` does **not** hold automerges back to Monday:
+`automergeSchedule` defaults to "at any time".
+
+### Turning it off
+
+Per repo, set the `renovate.json` override locally, or park the whole thing
+by removing `automerge` from the dev-patch rule and the `lockFileMaintenance`
+block in [`default.json`](../../default.json). As with any preset change it
+applies fleet-wide on the next run.
+
 ## Reviewing and merging Renovate PRs
 
 Renovate PRs go through the same gates as human PRs — `commitlint /
@@ -153,6 +245,10 @@ commitlint` and `install / install` are required, and the install gate
 (`npm clean-install` on the test merge) is the backstop that proves the
 lockfile is coherent. House rules:
 
+- **`dev dependencies (patch)` and `Lock file maintenance`**: nothing to do —
+  they merge themselves when green ([Automerge](#automerge)). If one is
+  sitting open, it's red, and the fix is the same as any other red bot PR
+  (below).
 - **Green grouped weekly PR**: skim the release notes, merge. That's the
   system working. If the branch is behind `main`, press **Update branch**
   first and merge once the checks come back
@@ -160,7 +256,7 @@ lockfile is coherent. House rules:
 - **Major PRs**: read the linked changelog/migration guide; if now isn't
   the time, leave it open or close it — it remains retryable from the
   dashboard. A parked PR is **not** kept up to date with `main` (that's the
-  point of `rebaseWhen: conflicted`); it'll need an **Update branch** and a
+  point of `rebaseWhen: "conflicted"`); it'll need an **Update branch** and a
   fresh check run whenever you come back to it. Park deliberately, and work
   the backlog at least quarterly
   ([Dependency Management](dependency-management.md)).
@@ -173,8 +269,9 @@ lockfile is coherent. House rules:
   Renovate from rebasing that branch (it assumes you've taken over). If a
   bump needs accompanying code changes, that's a signal to do the upgrade
   as a normal human PR and close Renovate's.
-- Merging a `chore(deps)` PR doesn't cut a release. If consumers need the
-  bump shipped, follow with a deliberate release
+- Merging a `chore(deps)` PR — any devDependency bump — doesn't cut a
+  release. A `fix(deps)` PR (production dependency) does. If a devDependency
+  bump needs shipping to consumers anyway, follow with a deliberate release
   ([Releases](releases.md)).
 
 ## Blocked updates (packageRules) — and why
@@ -232,7 +329,9 @@ scheduled window.
 | "Lock file maintenance" PR red on `install / install` with `npm ci … not in sync` | from-scratch regeneration can hit npm's peer-nesting bug (conventional-commits-filter 5 vs 6 — full write-up in nswds-email#454). Close the PR; retry from the dashboard once the stacks re-align |
 | Renovate opened nothing this week | check the [Mend portal](https://developer.mend.io/) job log — commonly there was simply nothing pending, or `prConcurrentLimit` (5) is saturated by open Renovate PRs; merge or close some |
 | An expected update never appears as a PR | check the Dependency Dashboard "blocked"/rate-limited sections and the [blocked-updates table](#blocked-updates-packagerules--and-why) — it may be deliberately disabled |
-| Renovate PR is green but "branch is out of date" blocks the merge | expected — `rebaseWhen: conflicted` deliberately leaves behind-but-clean branches alone ([Rebasing and staying up to date](#rebasing-and-staying-up-to-date)). Press **Update branch** / `gh pr update-branch <n>` and merge when the run finishes |
+| Renovate PR is green but "branch is out of date" blocks the merge | expected — `rebaseWhen: "conflicted"` deliberately leaves behind-but-clean branches alone ([Rebasing and staying up to date](#rebasing-and-staying-up-to-date)). Press **Update branch** / `gh pr update-branch <n>` and merge when the run finishes |
+| A `dev dependencies (patch)` or `Lock file maintenance` PR isn't automerging | it's not green. Check every **required** context, including the two Snyk ones — Snyk occasionally never posts on a force-updated or reopened bot branch, and automerge waits forever on a status that never arrives ([Dependency Management](dependency-management.md)). Close and let the bot recreate the PR |
+| A devDependency patch didn't appear this week | `minimumReleaseAge` holds **devDependency patches** until the release is 3 days old ([Automerge](#automerge)) — a package published over the weekend waits for the following Monday. Lock file maintenance has no such hold |
 | Renovate stopped rebasing a PR | a human (or non-ignored bot) commit landed on the branch — tick the rebase checkbox to have it recreated, or take the upgrade over as a human PR. Note that a branch that is merely *behind* `main` is not a fault: see the row above |
 | Snyk check red on a Renovate lockfile change | usually Snyk re-baselining, not the bump — see [Dependency Management](dependency-management.md) |
 | Config change seems ignored | preset edits must be **merged to `main`** here (Renovate doesn't read branches); validate with `renovate-config-validator`, then check the repo's job log in the Mend portal for config-parse errors |
