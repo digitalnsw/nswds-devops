@@ -14,9 +14,19 @@ Full operating manual: [Renovate](renovate.md). The strategy in brief:
 - Cadence: grouped non-major PR weekly (Monday before 7am Sydney); majors
   arrive as individual PRs; monthly lock-file maintenance regenerates
   lockfiles with real npm.
-- Commits as `chore(deps):` — merging an update doesn't force a release;
-  cut one deliberately when it matters (`fix(deps):` retitle if the bump
-  itself is the fix consumers need).
+- **devDependency patches and lock-file maintenance automerge** when green;
+  everything else waits for a human
+  ([Automerge](renovate.md#automerge)).
+- Commit type follows the dependency, not the update size: `config:recommended`
+  brings `:semanticPrefixFixDepsChoreOthers`, so **production** deps commit as
+  `fix(deps):` and **devDependencies** as `chore(deps):`. That matters because
+  `fix` cuts a patch release under the `conventionalcommits` preset — a
+  production bump merged to `main` ships on the next release run, a
+  devDependency bump doesn't. It is also exactly why automerge stops at
+  devDependencies: five repos publish to npm on release.
+- Renovate PRs are **not** rebased just because `main` moved — press
+  **Update branch** when you're ready to merge one
+  ([Rebasing](renovate.md#rebasing-and-staying-up-to-date)).
 - The Dependency Dashboard issue in each repo is the control panel — tick a
   checkbox to force a PR outside the schedule.
 
