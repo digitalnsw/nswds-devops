@@ -348,7 +348,6 @@ scheduled window.
 
 | Symptom | Cause / fix |
 | --- | --- |
-| "Lock file maintenance" PR red on `install / install` with `npm ci … not in sync` | from-scratch regeneration can hit npm's peer-nesting bug (conventional-commits-filter 5 vs 6 — full write-up in nswds-email#454). Close the PR; retry from the dashboard once the stacks re-align |
 | The weekly grouped PR closed itself, title now ending with `- autoclosed` | usually Lock file maintenance merged first, and that regeneration already applied every in-range update the group carried, leaving the grouped PR nothing to do ([Lock file maintenance can close the weekly grouped PR](#lock-file-maintenance-can-close-the-weekly-grouped-pr)). Verify against the resolved versions in `package-lock.json` on `main` before assuming an update was dropped |
 | Renovate opened nothing this week | check the [Mend portal](https://developer.mend.io/) job log — commonly there was simply nothing pending, or `prConcurrentLimit` (5) is saturated by open Renovate PRs; merge or close some |
 | An expected update never appears as a PR | check the Dependency Dashboard "blocked"/rate-limited sections and the [blocked-updates table](#blocked-updates-packagerules--and-why) — it may be deliberately disabled |
