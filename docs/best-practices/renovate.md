@@ -213,6 +213,27 @@ arriving in the weekly grouped PR for a human to merge.
   construction, so the re-runs that buys are bounded and each one ends in a
   merge.
 
+### Lock file maintenance can close the weekly grouped PR
+
+Lock file maintenance regenerates `package-lock.json` from scratch against
+the ranges already in `package.json`, so it resolves every dependency to the
+newest version those ranges allow. Any pending update that is **in range** —
+one Renovate would have delivered as a lockfile-only change, with no
+`package.json` edit — is therefore already applied once it merges.
+
+When every update in the weekly `all non-major` group is in range, that group
+has nothing left to do. Renovate closes it on its next run and appends
+`- autoclosed` to the title. The updates are not lost; they landed through
+the lockfile instead. Confirm by reading the resolved versions in
+`package-lock.json` on `main`.
+
+Updates that need a `package.json` range change are unaffected and stay in
+the grouped PR, as do majors.
+
+Because lock file maintenance is automerged, this now happens without
+anyone merging anything by hand. A grouped PR disappearing on the first of
+the month is expected behaviour, not a fault.
+
 ### Prerequisite: `allow_auto_merge`
 
 Renovate prefers GitHub's **native** auto-merge (`platformAutomerge`, on by
@@ -327,6 +348,7 @@ scheduled window.
 | Symptom | Cause / fix |
 | --- | --- |
 | "Lock file maintenance" PR red on `install / install` with `npm ci … not in sync` | from-scratch regeneration can hit npm's peer-nesting bug (conventional-commits-filter 5 vs 6 — full write-up in nswds-email#454). Close the PR; retry from the dashboard once the stacks re-align |
+| The weekly grouped PR closed itself, title now ends `- autoclosed` | usually lock file maintenance merged first and its regeneration already applied every in-range update the group carried, leaving it nothing to do ([Lock file maintenance can close the weekly grouped PR](#lock-file-maintenance-can-close-the-weekly-grouped-pr)). Verify against the resolved versions in `package-lock.json` on `main` before assuming an update was dropped |
 | Renovate opened nothing this week | check the [Mend portal](https://developer.mend.io/) job log — commonly there was simply nothing pending, or `prConcurrentLimit` (5) is saturated by open Renovate PRs; merge or close some |
 | An expected update never appears as a PR | check the Dependency Dashboard "blocked"/rate-limited sections and the [blocked-updates table](#blocked-updates-packagerules--and-why) — it may be deliberately disabled |
 | Renovate PR is green but "branch is out of date" blocks the merge | expected — `rebaseWhen: "conflicted"` deliberately leaves behind-but-clean branches alone ([Rebasing and staying up to date](#rebasing-and-staying-up-to-date)). Press **Update branch** / `gh pr update-branch <n>` and merge when the run finishes |
