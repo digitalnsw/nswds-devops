@@ -64,17 +64,30 @@ The fix is to replay only the stacked commits onto the new `main`:
 
 ```sh
 git fetch origin
-git rebase --onto origin/main <base-branch-tip> <stacked-branch>
+git rebase --onto origin/main <branch-point> <stacked-branch>
 git push --force-with-lease
 ```
 
-`<base-branch-tip>` is the commit the stacked branch was created from — the
-head of the base PR's branch before it merged. Everything after it is
-replayed; the base PR's own commits are dropped, because their content is
-already on `main` in squashed form.
+`<branch-point>` is the commit the stacked branch was created from.
+Everything after it is replayed; the base PR's own commits are dropped,
+because their content is already on `main` in squashed form.
 
-This normally applies without conflicts. Conflicts here mean the two changes
-genuinely overlap, and should be resolved on their merits.
+Note that commit when the stacked branch is created, or recover it from the
+reflog afterwards — the entry reading `branch: Created from …` holds it:
+
+```sh
+git reflog show <stacked-branch>
+```
+
+Do not substitute the base branch's final head. If the base branch was
+force-pushed after the stacked branch was created — routine on Renovate
+branches — the two are different commits, and rebasing from the final head
+replays the base PR's superseded commits and conflicts. `git merge-base`
+does not recover the branch point in that situation either.
+
+Given the correct branch point, the rebase normally applies cleanly. A
+conflict at this stage means the two changes genuinely overlap, and should
+be resolved on its merits.
 
 Do **not** merge `main` into the stacked branch instead. That reconciles two
 whole-branch diffs rather than replaying the incremental commits, and
@@ -89,10 +102,16 @@ git diff <pre-rebase-sha> HEAD -- <paths changed by the stacked PR>
 Empty output means only the base has moved. Record the pre-rebase SHA before
 starting; it is also the rollback point.
 
-Because merging the base triggers a release on repositories that run
-semantic-release, `main` often moves a second time moments later. Under
-strict up-to-date checks the stacked PR then reports as behind and needs
-**Update branch** — or a second rebase — before it can merge.
+Once the rebase has put the branch back on top of `main`, ordinary branch
+maintenance resumes. The prohibition above applies only to repairing the
+post-squash orphaning; it does not apply to keeping an already relanded
+branch current.
+
+That distinction comes up immediately, because merging the base triggers a
+release on repositories that run semantic-release, so `main` often moves a
+second time moments later. Under strict up-to-date checks the stacked PR
+then reports as behind, and **Update branch** — or a second rebase — is the
+normal fix.
 
 ## Before you merge
 
