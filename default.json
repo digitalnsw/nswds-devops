@@ -1,10 +1,14 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Shared Renovate preset for digitalnsw repos. Consumer repos extend this via the synced renovate.json (source: repo-files/renovate.json). Edit HERE; Renovate reads it from main at run time, so changes apply everywhere without a sync.",
+  "description": [
+    "Shared Renovate preset for digitalnsw repos. Consumer repos extend this via the synced renovate.json (source: repo-files/renovate.json). Edit HERE; Renovate reads it from main at run time, so changes apply everywhere without a sync.",
+    "rebaseWhen is pinned to 'conflicted' rather than left at its 'auto' default, because 'auto' silently becomes 'behind-base-branch' on any repo whose branch protection requires branches to be up to date before merging — which is every consumer repo (the Protect main ruleset sets strict_required_status_checks_policy: true, see ONBOARDING.md). Under that default every merge to main rebases EVERY open Renovate PR in the repo, and each rebase re-triggers the full check suite: install, lint, typecheck, format, test, commitlint, ai-pr-title. With prConcurrentLimit 5 that is up to 5 full re-runs per repo per merge, none of which gates the merge that triggered them — the cost is quadratic in merge count, and GitHub bills each job rounded up to the nearest minute. 'conflicted' rebases only when the branch genuinely conflicts (a real lockfile collision Renovate must resolve), so CI runs once per PR you actually merge instead of once per PR per unrelated merge. The trade-off is deliberate: a PR that has fallen behind main now needs an explicit 'Update branch' before it can merge, which spends those minutes at merge time on the one PR that needs them. Revisit if strict_required_status_checks_policy is ever turned off, at which point 'auto' becomes harmless."
+  ],
   "extends": ["config:recommended", ":semanticCommits", "group:allNonMajor"],
   "timezone": "Australia/Sydney",
   "schedule": ["before 7am on monday"],
   "prConcurrentLimit": 5,
+  "rebaseWhen": "conflicted",
   "labels": ["dependencies"],
   "gitIgnoredAuthors": ["41898282+github-actions[bot]@users.noreply.github.com"],
   "vulnerabilityAlerts": {

@@ -65,9 +65,11 @@ The preset itself extends Renovate's
 and
 [`group:allNonMajor`](https://docs.renovatebot.com/presets-group/#groupallnonmajor),
 then sets: `timezone` Australia/Sydney, weekly schedule, `prConcurrentLimit`
-5 (so a repo is never flooded), the `dependencies` label, and
-`gitIgnoredAuthors` for the github-actions bot (so release commits don't
-make Renovate think a human edited its branch and stop rebasing).
+5 (so a repo is never flooded), `rebaseWhen` `conflicted`
+([Rebasing and staying up to date](#rebasing-and-staying-up-to-date)), the
+`dependencies` label, and `gitIgnoredAuthors` for the github-actions bot (so
+release commits don't make Renovate think a human edited its branch and stop
+rebasing).
 
 ## Dashboards and links
 
@@ -107,6 +109,43 @@ makes Renovate recreate the branch from scratch — the correct fix for
 almost any broken Renovate branch, and always preferable to pushing manual
 commits onto it.
 
+## Rebasing and staying up to date
+
+The preset sets **`rebaseWhen: "conflicted"`**. Renovate recreates one of its
+branches only when that branch genuinely conflicts with `main` — normally a
+lockfile collision it has to resolve itself. It does **not** rebase a branch
+merely because `main` has moved on.
+
+This is a deliberate override of Renovate's `"auto"` default, and the reason
+is our own branch protection. Every consumer repo's "Protect main" ruleset
+sets `strict_required_status_checks_policy: true` ("require branches to be up
+to date before merging"), and Renovate treats `"auto"` on such a repo as
+`"behind-base-branch"`. That combination means **every merge to `main`
+rebases every open Renovate PR in the repo**, and every rebase re-runs the
+full check suite — `install`, `lint`, `typecheck`, `format`, `test`,
+`commitlint`, `ai-pr-title`. At `prConcurrentLimit` 5 that is up to five
+complete re-runs per repo per merge, none of which gate the merge that caused
+them. Actions minutes then scale with *merges × open PRs* rather than with
+merges, and GitHub rounds every job up to the nearest minute when billing.
+
+What this changes day to day:
+
+- **A Renovate PR that has fallen behind `main` will not update itself.** It
+  sits there, green but stale, and the merge box says the branch is out of
+  date. Press **Update branch** (or `gh pr update-branch <n>`) when you're
+  ready to merge it — that spends one check run, on the one PR you're
+  actually merging.
+- **Merge the weekly grouped PR first** when several are open. It's the
+  largest and the most likely to conflict with the rest; the others will be
+  rebased automatically if it collides with them.
+- **A genuinely conflicted branch still self-heals.** That's what
+  `conflicted` covers, so the old advice holds: don't hand-resolve a
+  `package-lock.json` conflict, let Renovate redo the branch.
+
+Revisit this setting if strict required status checks are ever relaxed — with
+`strict` off, `"auto"` stops meaning `behind-base-branch` and the amplifier
+disappears.
+
 ## Reviewing and merging Renovate PRs
 
 Renovate PRs go through the same gates as human PRs — `commitlint /
@@ -115,11 +154,16 @@ commitlint` and `install / install` are required, and the install gate
 lockfile is coherent. House rules:
 
 - **Green grouped weekly PR**: skim the release notes, merge. That's the
-  system working.
+  system working. If the branch is behind `main`, press **Update branch**
+  first and merge once the checks come back
+  ([Rebasing and staying up to date](#rebasing-and-staying-up-to-date)).
 - **Major PRs**: read the linked changelog/migration guide; if now isn't
-  the time, leave it open (it stays rebased) or close it — it remains
-  retryable from the dashboard. Park deliberately, and work the backlog at
-  least quarterly ([Dependency Management](dependency-management.md)).
+  the time, leave it open or close it — it remains retryable from the
+  dashboard. A parked PR is **not** kept up to date with `main` (that's the
+  point of `rebaseWhen: conflicted`); it'll need an **Update branch** and a
+  fresh check run whenever you come back to it. Park deliberately, and work
+  the backlog at least quarterly
+  ([Dependency Management](dependency-management.md)).
 - **Red `install / install` on a bot PR**: close and let the bot recreate
   it (dashboard checkbox). **Never resolve a lockfile conflict in the web
   editor** — only npm may write `package-lock.json`
@@ -188,6 +232,7 @@ scheduled window.
 | "Lock file maintenance" PR red on `install / install` with `npm ci … not in sync` | from-scratch regeneration can hit npm's peer-nesting bug (conventional-commits-filter 5 vs 6 — full write-up in nswds-email#454). Close the PR; retry from the dashboard once the stacks re-align |
 | Renovate opened nothing this week | check the [Mend portal](https://developer.mend.io/) job log — commonly there was simply nothing pending, or `prConcurrentLimit` (5) is saturated by open Renovate PRs; merge or close some |
 | An expected update never appears as a PR | check the Dependency Dashboard "blocked"/rate-limited sections and the [blocked-updates table](#blocked-updates-packagerules--and-why) — it may be deliberately disabled |
-| Renovate stopped rebasing a PR | a human (or non-ignored bot) commit landed on the branch — tick the rebase checkbox to have it recreated, or take the upgrade over as a human PR |
+| Renovate PR is green but "branch is out of date" blocks the merge | expected — `rebaseWhen: conflicted` deliberately leaves behind-but-clean branches alone ([Rebasing and staying up to date](#rebasing-and-staying-up-to-date)). Press **Update branch** / `gh pr update-branch <n>` and merge when the run finishes |
+| Renovate stopped rebasing a PR | a human (or non-ignored bot) commit landed on the branch — tick the rebase checkbox to have it recreated, or take the upgrade over as a human PR. Note that a branch that is merely *behind* `main` is not a fault: see the row above |
 | Snyk check red on a Renovate lockfile change | usually Snyk re-baselining, not the bump — see [Dependency Management](dependency-management.md) |
 | Config change seems ignored | preset edits must be **merged to `main`** here (Renovate doesn't read branches); validate with `renovate-config-validator`, then check the repo's job log in the Mend portal for config-parse errors |
