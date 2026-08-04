@@ -1,10 +1,14 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Shared Renovate preset for digitalnsw repos. Consumer repos extend this via the synced renovate.json (source: repo-files/renovate.json). Edit HERE; Renovate reads it from main at run time, so changes apply everywhere without a sync.",
+  "description": [
+    "Shared Renovate preset for digitalnsw repos. Consumer repos extend this via the synced renovate.json (source: repo-files/renovate.json). Edit HERE; Renovate reads it from main at run time, so changes apply everywhere without a sync.",
+    "rebaseWhen is pinned to 'conflicted' rather than left at its 'auto' default, because 'auto' silently becomes 'behind-base-branch' on any repo whose branch protection requires branches to be up to date before merging — which is every consumer repo (the Protect main ruleset sets strict_required_status_checks_policy: true, see ONBOARDING.md). Under that default every merge to main rebases EVERY open Renovate PR in the repo, and each rebase re-triggers the full check suite: install, lint, typecheck, format, test, commitlint, ai-pr-title. With prConcurrentLimit 5 that is up to 5 full re-runs per repo per merge, none of which gates the merge that triggered them — the cost is quadratic in merge count, and GitHub bills each job rounded up to the nearest minute. 'conflicted' rebases only when the branch genuinely conflicts (a real lockfile collision Renovate must resolve), so CI runs once per PR you actually merge instead of once per PR per unrelated merge. The trade-off is deliberate: a PR that has fallen behind main now needs an explicit 'Update branch' before it can merge, which spends those minutes at merge time on the one PR that needs them. Revisit if strict_required_status_checks_policy is ever turned off, at which point 'auto' becomes harmless."
+  ],
   "extends": ["config:recommended", ":semanticCommits", "group:allNonMajor"],
   "timezone": "Australia/Sydney",
   "schedule": ["before 7am on monday"],
   "prConcurrentLimit": 5,
+  "rebaseWhen": "conflicted",
   "labels": ["dependencies"],
   "gitIgnoredAuthors": ["41898282+github-actions[bot]@users.noreply.github.com"],
   "vulnerabilityAlerts": {
@@ -13,8 +17,11 @@
   },
   "lockFileMaintenance": {
     "enabled": true,
+    "automerge": true,
+    "automergeStrategy": "squash",
+    "rebaseWhen": "behind-base-branch",
     "schedule": ["before 7am on the first day of the month"],
-    "description": "Monthly full lockfile regeneration with real npm — keeps lockfiles fresh and valid."
+    "description": "Monthly full lockfile regeneration with real npm — keeps lockfiles fresh and valid. Automerged: the PR touches package-lock.json only, no manifest and no source, and install / install is exactly the gate that proves a regenerated lockfile is coherent — if it passes there is nothing for a human to add by reading a 4000-line lockfile diff. Automerge can never merge a red PR, so the regenerations that hit npm's peer-nesting bug (conventional-commits-filter 5 vs 6, nswds-email#454) still fail install / install and still sit open for you to close, exactly as before. rebaseWhen is overridden to behind-base-branch here for the same reason as the dev-patch rule below: the top-level 'conflicted' would strand an automerge PR that falls behind main, because strict required status checks block the merge and nothing would ever refresh the branch."
   },
   "packageRules": [
     {
@@ -53,6 +60,17 @@
       "matchUpdateTypes": ["minor"],
       "groupName": null,
       "groupSlug": null
+    },
+    {
+      "description": "devDependency PATCH updates get their own group and automerge. Scope is deliberate on both axes. devDependencies only, because config:recommended pulls in :semanticPrefixFixDepsChoreOthers — Renovate commits production-dependency updates as `fix(deps)` and devDependencies as `chore(deps)`, and the shared release.config.mjs runs the conventionalcommits preset where `fix` cuts a patch release. Automerging a production patch would therefore publish to npm unreviewed on the five repos with @semantic-release/npm enabled (nswds-ui, nswds-tokens, nswds-app, nswds-eslint-config, nswds-prettier-config); `chore(deps)` releases nothing, so a devDependency patch lands on main and stops there. PATCH only, because patch is the one update type that is bug-fix-by-convention across both SemVer and the 0.x packages this fleet depends on. Own group rather than riding in group:allNonMajor, because automerge config merges across a group — leaving these in the all-non-major PR would hand automerge to every minor and every production bump batched alongside them. minimumReleaseAge holds each update until it is 3 days old: automerge means nobody reads these, so a release that is yanked or hot-patched within hours never becomes a merge. rebaseWhen is overridden to behind-base-branch because the top-level 'conflicted' would strand these — strict required status checks block a behind-but-clean branch from merging, and under 'conflicted' nothing would ever refresh it, so the PR would sit unmergeable forever. The bounded re-run cost that reintroduces is the point of the trade: these PRs are short-lived by construction, and the rebase leads to a merge rather than to another rebase. Everything else in the fleet keeps 'conflicted'.",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["patch"],
+      "groupName": "dev dependencies (patch)",
+      "groupSlug": "dev-patch",
+      "automerge": true,
+      "automergeStrategy": "squash",
+      "rebaseWhen": "behind-base-branch",
+      "minimumReleaseAge": "3 days"
     }
   ]
 }
