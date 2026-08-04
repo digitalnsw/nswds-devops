@@ -205,19 +205,19 @@ arriving in the weekly grouped PR for a human to merge.
 
 Renovate prefers GitHub's **native** auto-merge (`platformAutomerge`, on by
 default), which merges the instant the last required check turns green. That
-needs "Allow auto-merge" enabled on the repo — and it is **off** across the
-fleet:
+needs "Allow auto-merge" on the repo, which is **enabled fleet-wide** (all 26
+repos, 2026-08-04) and is part of [step 1 of onboarding](../../ONBOARDING.md)
+for new ones:
 
 ```sh
-gh api repos/digitalnsw/<repo> --jq '.allow_auto_merge'
+gh api repos/digitalnsw/<repo> --jq '.allow_auto_merge'     # check
 gh api -X PATCH repos/digitalnsw/<repo> -F allow_auto_merge=true
 ```
 
-Without it nothing breaks: Renovate falls back to merging the PR itself on
-its next run, which is a delay of up to about an hour rather than seconds
-(`automergeSchedule` defaults to "at any time", so the weekly `schedule` does
-**not** hold automerges back to Monday). Enabling it is worth doing, but it's
-a per-repo settings change, not part of the preset.
+If it were off nothing would break — Renovate falls back to merging the PR
+itself on its next run, a delay of up to about an hour rather than seconds.
+Either way the weekly `schedule` does **not** hold automerges back to Monday:
+`automergeSchedule` defaults to "at any time".
 
 ### Turning it off
 

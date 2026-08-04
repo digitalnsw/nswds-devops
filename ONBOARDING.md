@@ -28,11 +28,15 @@ Start at **Path A** for a brand-new repo. For an existing repo, run the
 gh repo create digitalnsw/<repo> --private --clone
 ```
 
-Immediately enable automatic branch deletion after PR merge (the fleet
-standard — merged PR branches never linger):
+Immediately set the two fleet-standard repo flags — automatic branch
+deletion after PR merge (merged PR branches never linger) and auto-merge
+(Renovate's automerged categories rely on it; see
+[Renovate → Automerge](docs/best-practices/renovate.md#automerge)):
 
 ```sh
-gh api -X PATCH repos/digitalnsw/<repo> -F delete_branch_on_merge=true
+gh api -X PATCH repos/digitalnsw/<repo> \
+  -F delete_branch_on_merge=true \
+  -F allow_auto_merge=true
 ```
 
 Note the GitHub slug is what goes in `sync.yml` later, and it is not always
