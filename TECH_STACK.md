@@ -30,8 +30,8 @@ annotations note where something is only used in a subset.
   nswds-app.
 - ✅ [shadcn/ui](https://ui.shadcn.com/) — component pattern and CLI;
   nswds-ui distributes `@nswds/ui` components through its own shadcn
-  registry (`apps/registry`). Also ictds-risk, and the cva/lucide pattern
-  in awards, nswds-app, nswds-email
+  registry (`apps/registry`). Also the cva/lucide pattern in awards,
+  nswds-app, nswds-email
 - ✅ [Radix UI](https://www.radix-ui.com/) — awards, nswds-app, nswds-email.
   Legacy-generation primitives: being superseded by Base UI as nswds-ui
   replaces nswds-app
