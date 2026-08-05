@@ -19,7 +19,6 @@ group:
       digitalnsw/nswds-email
       digitalnsw/awards
       digitalnsw/engagement
-      digitalnsw/ictds-risk
       digitalnsw/images
       digitalnsw/nswds-public-sans
       digitalnsw/nswds-email-framework
@@ -32,6 +31,7 @@ group:
       digitalnsw/nswds-email-issues
       digitalnsw/dtl-sandbox
       digitalnsw/share
+      digitalnsw/risk-guidance
     files:
       - source: scripts/
         dest: scripts/
