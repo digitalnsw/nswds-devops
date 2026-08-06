@@ -15,6 +15,18 @@ on:
       - release.config.mjs
       - .github/sync.yml
   workflow_dispatch:
+    inputs:
+      automerge:
+        description: >-
+          Auto-merge the fan-out PRs. "auto" (the default) arms them only when
+          the sync carries no workflow-stubs/ change; a stub change waits for
+          Promote v1, which arms them itself. "always" overrides that — only
+          correct when you know the stubs need no promotion. "never" leaves
+          every PR to be merged by hand.
+        required: false
+        default: auto
+        type: choice
+        options: [auto, always, never]
 
 permissions:
   contents: read
@@ -29,7 +41,11 @@ jobs:
       cancel-in-progress: false
     steps:
       # The action reads CONFIG_PATH (and the source files) from the workspace.
+      # Full history + tags: the automerge gate below diffs HEAD against the
+      # promoted v1 tag.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Mint GitHub App token
         id: app
@@ -44,6 +60,7 @@ jobs:
       # Pinned to the v1.21.1 commit — upstream maintenance has slowed, and an
       # unreviewed update here would have write access to every consumer repo.
       - name: Sync files to consumer repos
+        id: sync
         uses: BetaHuhn/repo-file-sync-action@8b92be3375cf1d1b0cd579af488a9255572e4619 # v1.21.1
         with:
           # App installation tokens go here (GH_PAT is for personal tokens).
@@ -58,3 +75,66 @@ jobs:
           BRANCH_PREFIX: chore/repo-sync
           PR_LABELS: repo-sync
           SKIP_PR: false
+
+      # The fan-out is a mechanical copy of files already reviewed on the PR
+      # into this repo, so a second read of the same diff in 24 tabs adds
+      # nothing — but there is exactly one ordering hazard, and it is the
+      # reason this is gated rather than unconditional.
+      #
+      # Stubs pin @v1. A fan-out that delivers a stub differing from the one
+      # v1 was promoted with lands "new stub + old reusable" on every
+      # consumer, which is a hard error (an undeclared secret, or a dangling
+      # workflow ref), not a soft skip. So the safe condition is not "this
+      # push didn't touch stubs" — a later non-stub sync amends the same
+      # branch and would drag an unpromoted stub in with it — but "the stubs
+      # this repo is shipping are the stubs v1 already carries".
+      #
+      # When they differ, arming is left to Promote v1: promotion is the
+      # moment the pairing becomes correct, and it runs the same script.
+      - name: Decide whether the fan-out can arm auto-merge
+        id: gate
+        env:
+          MODE: ${{ inputs.automerge || 'auto' }}
+        run: |
+          set -euo pipefail
+          case "$MODE" in
+            never)
+              echo "arm=false" >>"$GITHUB_OUTPUT"
+              echo "ℹ️ automerge=never — leaving the fan-out to be merged by hand"
+              ;;
+            always)
+              echo "arm=true" >>"$GITHUB_OUTPUT"
+              echo "⚠️ automerge=always — skipping the v1 stub check on request"
+              ;;
+            *)
+              if ! git rev-parse --verify --quiet refs/tags/v1 >/dev/null; then
+                echo "arm=false" >>"$GITHUB_OUTPUT"
+                echo "ℹ️ no v1 tag to compare against — deferring to Promote v1"
+              elif git diff --quiet refs/tags/v1 HEAD -- workflow-stubs/; then
+                echo "arm=true" >>"$GITHUB_OUTPUT"
+                echo "✅ stubs match the promoted v1 — safe to arm auto-merge"
+              else
+                echo "arm=false" >>"$GITHUB_OUTPUT"
+                echo "⏸️ workflow-stubs/ differs from the promoted v1 — this fan-out waits for Promote v1, which will arm it"
+                git diff --name-only refs/tags/v1 HEAD -- workflow-stubs/
+              fi
+              ;;
+          esac
+
+      # The action reports exactly the PRs it created or updated, which is
+      # both narrower and fresher than a search — the search index lags PR
+      # creation by a few seconds.
+      - name: Arm auto-merge on the fan-out PRs
+        if: steps.gate.outputs.arm == 'true' && steps.sync.outputs.pull_request_urls != ''
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          PR_URLS: ${{ steps.sync.outputs.pull_request_urls }}
+        run: |
+          set -euo pipefail
+          # core.setOutput serialises the action's array output as JSON.
+          mapfile -t urls < <(jq -r '.[]' <<<"$PR_URLS")
+          if [ "${#urls[@]}" -eq 0 ]; then
+            echo "No PRs were opened or updated by this run"
+            exit 0
+          fi
+          .github/scripts/enable-sync-automerge.sh "${urls[@]}"

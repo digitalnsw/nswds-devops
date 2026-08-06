@@ -22,6 +22,8 @@ jobs:
           # -x follows `source` statements; SC1091 stays off because husky
           # hooks source files that only exist in consumer repos.
           shellcheck -x -e SC1091 scripts/*.sh
+          # Repo-local helpers (not synced), linted to the same standard.
+          shellcheck -e SC1091 .github/scripts/*.sh
           shellcheck -e SC1091 scripts/husky/pre-commit scripts/husky/commit-msg scripts/husky/prepare-commit-msg
 
   workflow-lint:

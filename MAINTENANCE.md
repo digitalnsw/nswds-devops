@@ -14,10 +14,20 @@ they broke.
 1. Edit here, on a branch, PR into `main`. CI shellchecks the scripts and
    actionlints the workflows; the commit-types-sync check keeps the YAML in
    lockstep with `commit-types.mjs`.
-2. On merge, the sync opens a `chore(ci): …` PR in all 24 consumer repos. They merge
-   on their own schedule; until they do they just run the previous version.
+2. On merge, the sync opens a `chore(ci): …` PR in all 24 consumer repos and
+   turns on GitHub **auto-merge** for each one, so they merge themselves as
+   their checks go green. Nothing is bypassed: auto-merge waits on the same
+   "Protect main" ruleset a human merge waits on, and a repo whose checks go
+   red keeps its PR open for you to look at. The review that matters already
+   happened on the PR into *this* repo — the fan-out is a mechanical copy of
+   that same diff.
 3. That's it. Never edit these files in a consumer repo — the next sync
    overwrites it silently.
+
+The one case the fan-out does **not** arm itself is a change to
+`workflow-stubs/`; see the ordering rule under "Changing CI logic" below.
+`Actions → Sync shared files to repos` also takes an `automerge` input
+(`auto` / `always` / `never`) if you need to override either way for one run.
 
 One formatting constraint on the `.mjs` configs: the whole fleet now formats
 with `@nswds/prettier-config` (printWidth 100, no semicolons) — including
@@ -43,6 +53,19 @@ machine-enforces what used to be convention here: the target must be on
 summary, and the push happens over the release deploy key because
 `refs/tags/v*` is ruleset-protected against manual force-push. Rollback =
 re-run the workflow with the previous SHA from the last promotion's summary.
+
+**The promote-before-fan-out rule is now enforced, not remembered.** A stub
+that differs from the one `v1` was promoted with would land "new stub + old
+reusable" on every consumer — a hard error, not a soft skip. So the sync
+compares `workflow-stubs/` at `main` against `workflow-stubs/` at the `v1`
+tag: identical, and it arms auto-merge immediately; different, and it leaves
+the fan-out sitting for you, and **Promote v1 arms it as its last step**. The
+condition is deliberately "the stubs we're shipping are the stubs v1
+carries", not "this push touched stubs" — the sync amends one long-lived
+branch per repo, so a later unrelated sync would otherwise drag an unpromoted
+stub in behind it. Order of operations is unchanged; you just no longer have
+to hold it in your head: merge → wait for the sync run → Promote v1 → the
+fan-out merges itself.
 
 Don't wait for a release commit to promote: Renovate's `chore(deps)` bumps
 to the reusables never cut a release, so any green commit on `main`
