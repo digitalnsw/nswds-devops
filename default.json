@@ -69,6 +69,23 @@
       "groupSlug": null
     },
     {
+      "description": "Lint and format tooling automerges at minor as well as patch, in its own group. This is the other fleet-wide fan-out alongside the file sync: every release of @nswds/eslint-config or @nswds/prettier-config opens a PR in ~20 repos at once, and they are minors (1.1.0 -> 1.2.0), so the dev-patch rule below never catches them. The reason minor is safe *here specifically* and nowhere else is that these four packages are the only dependencies in the fleet whose entire effect is measured by required checks that already gate the merge: a formatting change from prettier or @nswds/prettier-config makes the committed tree fail `install / format` (prettier --check), and a rule change from eslint or @nswds/eslint-config fails `install / lint`. A bump that would change what the fleet does therefore cannot merge — it goes red and waits for a human, which is the same outcome as review, reached without 20 people-minutes of clicking. Scoped to devDependencies for the same reason as the dev-patch rule: config:recommended brings :semanticPrefixFixDepsChoreOthers, so devDeps commit chore(deps) and release nothing, while a prod dep would commit fix(deps) and publish unreviewed on the five npm repos. Majors are excluded and stay hand-reviewed — the eslint 10 block above is exactly why. Own group rather than riding in group:allNonMajor because automerge config merges across a group, which would hand automerge to every unrelated bump batched alongside. minimumReleaseAge and the rebaseWhen override carry the same rationale as the dev-patch rule: nobody reads an automerged PR, and 'conflicted' would strand one that falls behind main under strict required checks. Note the two in-house packages are not special-cased on age — a bad @nswds/eslint-config release should sit for three days like any other.",
+      "matchDepTypes": ["devDependencies"],
+      "matchPackageNames": [
+        "@nswds/eslint-config",
+        "@nswds/prettier-config",
+        "eslint",
+        "prettier"
+      ],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "lint and format tooling",
+      "groupSlug": "lint-format",
+      "automerge": true,
+      "automergeStrategy": "squash",
+      "rebaseWhen": "behind-base-branch",
+      "minimumReleaseAge": "3 days"
+    },
+    {
       "description": "devDependency PATCH updates get their own group and automerge. Scope is deliberate on both axes. devDependencies only, because config:recommended pulls in :semanticPrefixFixDepsChoreOthers — Renovate commits production-dependency updates as `fix(deps)` and devDependencies as `chore(deps)`, and the shared release.config.mjs runs the conventionalcommits preset where `fix` cuts a patch release. Automerging a production patch would therefore publish to npm unreviewed on the five repos with @semantic-release/npm enabled (nswds-ui, nswds-tokens, nswds-app, nswds-eslint-config, nswds-prettier-config); `chore(deps)` releases nothing, so a devDependency patch lands on main and stops there. PATCH only, because patch is the one update type that is bug-fix-by-convention across both SemVer and the 0.x packages this fleet depends on. Own group rather than riding in group:allNonMajor, because automerge config merges across a group — leaving these in the all-non-major PR would hand automerge to every minor and every production bump batched alongside them. minimumReleaseAge holds each update until it is 3 days old: automerge means nobody reads these, so a release that is yanked or hot-patched within hours never becomes a merge. rebaseWhen is overridden to behind-base-branch because the top-level 'conflicted' would strand these — strict required status checks block a behind-but-clean branch from merging, and under 'conflicted' nothing would ever refresh it, so the PR would sit unmergeable forever. The bounded re-run cost that reintroduces is the point of the trade: these PRs are short-lived by construction, and the rebase leads to a merge rather than to another rebase. Everything else in the fleet keeps 'conflicted'.",
       "matchDepTypes": ["devDependencies"],
       "matchUpdateTypes": ["patch"],

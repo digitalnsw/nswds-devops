@@ -124,3 +124,29 @@ jobs:
           } >>"$GITHUB_STEP_SUMMARY"
           git tag -f v1 "$SHA"
           git push --force origin refs/tags/v1
+
+      # Promotion is the point at which a stub-carrying fan-out becomes safe
+      # to merge: the consumers' @v1 stubs and the reusables they call are now
+      # the same generation. sync.yml deliberately leaves those PRs unarmed
+      # (see the gate there), so arm them here — this is the second half of
+      # the "promote first, then merge the fan-out" rule that used to be a
+      # manual step in MAINTENANCE.md.
+      #
+      # The App token is minted here rather than reused from sync.yml because
+      # the two workflows never share a run; GITHUB_TOKEN cannot reach the
+      # consumer repos.
+      - name: Mint GitHub App token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.SYNC_APP_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          owner: digitalnsw
+
+      # No arguments: sweep every open repo-sync PR in the org. PRs already
+      # armed by sync.yml are a no-op, and the fan-out here is minutes old at
+      # minimum, so the search index has long caught up.
+      - name: Arm auto-merge on the waiting fan-out PRs
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: .github/scripts/enable-sync-automerge.sh

@@ -25,6 +25,12 @@ Concretely, every repo gets:
   patch bumps are split into their own group and **automerged** once the
   checks pass. Usually you'll never see it; it shows up in the commit log,
   not your review queue ([Automerge](#automerge)).
+- **A self-merging "lint and format tooling" PR** whenever
+  `@nswds/eslint-config`, `@nswds/prettier-config`, `eslint` or `prettier`
+  releases a minor or patch. This is the fleet's other twenty-repo fan-out,
+  and it merges itself for the same reason the dev-patch group does: the
+  required `install / lint` and `install / format` jobs already measure the
+  whole of what these packages do ([Automerge](#automerge)).
 - **Individual PRs for majors** — each major arrives alone, whenever it's
   released, because majors need individual judgement.
 - **A monthly "Lock file maintenance" PR** (first day of the month) that
@@ -80,8 +86,9 @@ then sets: `timezone` Australia/Sydney, weekly schedule, `prConcurrentLimit`
 ([Rebasing and staying up to date](#rebasing-and-staying-up-to-date)), the
 `dependencies` label, and `gitIgnoredAuthors` for the github-actions bot (so
 release commits don't make Renovate think a human edited its branch and stop
-rebasing). Two categories are automerged — devDependency patches and lock
-file maintenance ([Automerge](#automerge)).
+rebasing). Three categories are automerged — devDependency patches, lock
+file maintenance, and lint/format tooling minors and patches
+([Automerge](#automerge)).
 
 ## Dashboards and links
 
@@ -160,25 +167,40 @@ disappears.
 
 ## Automerge
 
-Two categories merge themselves once every required check is green. Nothing
+Three categories merge themselves once every required check is green. Nothing
 else does.
 
 | Automerged | Group | Why it's safe |
 | --- | --- | --- |
 | **devDependency patches** | `dev dependencies (patch)` | Patch is bug-fix-by-convention, and devDependencies can't reach production. **Every required check** still has to pass first — `commitlint`, the required `install / …` jobs and both Snyk contexts included |
 | **Lock file maintenance** | `Lock file maintenance` | Touches `package-lock.json` only — no manifest, no source. `install / install` is precisely the gate that proves a regenerated lockfile is coherent |
+| **Lint and format tooling**, minor and patch — `@nswds/eslint-config`, `@nswds/prettier-config`, `eslint`, `prettier` | `lint and format tooling` | These four are the only dependencies whose whole effect is measured by a check that already gates the merge: a formatting change fails `install / format`, a rule change fails `install / lint`. A bump that would change what the repo does **cannot** merge |
 
 Automerge waits on whatever that repo's ruleset marks **required** — it can't
 bypass a gate, and it can't merge on a subset. The exact context list varies
 per repo (see [ONBOARDING](../../ONBOARDING.md)), which is why it isn't
 enumerated here.
 
-devDependency patches are additionally held by **`minimumReleaseAge`: 3
-days** — automerge means nobody reads these, so a release that gets yanked or
-hot-patched within hours of publishing never becomes a merge in the first
-place. Lock file maintenance carries no such hold and needs none: it
-regenerates against whatever the registry resolves at the time rather than
-adopting one specific new release.
+devDependency patches and the lint/format group are additionally held by
+**`minimumReleaseAge`: 3 days** — automerge means nobody reads these, so a
+release that gets yanked or hot-patched within hours of publishing never
+becomes a merge in the first place. That hold applies to the two in-house
+packages too: an `@nswds/eslint-config` release is not special-cased just
+because we published it. Lock file maintenance carries no such hold and needs
+none: it regenerates against whatever the registry resolves at the time
+rather than adopting one specific new release.
+
+**Why minor is allowed for lint and format tooling and nowhere else.** Every
+release of `@nswds/eslint-config` or `@nswds/prettier-config` opens a PR in
+about twenty repos at once, and those are minors — `1.1.0 → 1.2.0` — so the
+dev-patch rule never catches them. Normally a minor earns review because its
+effect is unknown until someone reads it. Here it isn't: `install / format`
+runs `prettier --check` over the committed tree and `install / lint` runs the
+config's own rules, so a bump that reformats anything or changes any severity
+turns the PR red before it can merge. Review adds nothing that the check
+hasn't already proved. **Majors are excluded** and stay hand-reviewed — the
+`eslint` 10 block in [Blocked updates](#blocked-updates-packagerules--and-why)
+is exactly the class of breakage that judgement is for.
 
 ### Why devDependencies only
 
@@ -200,8 +222,10 @@ arriving in the weekly grouped PR for a human to merge.
 - **It doesn't weaken any gate.** Automerge waits for the same required
   checks as a human merge, and it can never merge a red PR. A dev-patch PR
   that fails `test` just sits there, exactly as it would today.
-- **It doesn't touch majors or minors.** Those are unchanged — grouped
-  weekly for non-majors, individually for majors.
+- **It doesn't touch majors.** Every major is still opened individually and
+  merged by a human. Minors are automerged only for the four lint and format
+  packages above, where a required check measures the whole of the change;
+  every other minor still arrives in the weekly grouped PR.
 - **It does close the stale-PR loop.** Combined with
   `rebaseWhen: "conflicted"` above, the highest-volume, lowest-risk category
   no longer sits open collecting "Update branch" re-runs; it opens, runs its
@@ -256,9 +280,9 @@ Either way the weekly `schedule` does **not** hold automerges back to Monday:
 ### Turning it off
 
 Per repo, set the `renovate.json` override locally, or park the whole thing
-by removing `automerge` from the dev-patch rule and the `lockFileMaintenance`
-block in [`default.json`](../../default.json). As with any preset change it
-applies fleet-wide on the next run.
+by removing `automerge` from the dev-patch rule, the lint/format rule and
+the `lockFileMaintenance` block in [`default.json`](../../default.json). As
+with any preset change it applies fleet-wide on the next run.
 
 ## Reviewing and merging Renovate PRs
 
@@ -267,10 +291,10 @@ commitlint` and `install / install` are required, and the install gate
 (`npm clean-install` on the test merge) is the backstop that proves the
 lockfile is coherent. House rules:
 
-- **`dev dependencies (patch)` and `Lock file maintenance`**: nothing to do —
-  they merge themselves when green ([Automerge](#automerge)). If one is
-  sitting open, it's red, and the fix is the same as any other red bot PR
-  (below).
+- **`dev dependencies (patch)`, `Lock file maintenance` and `lint and format
+  tooling`**: nothing to do — they merge themselves when green
+  ([Automerge](#automerge)). If one is sitting open, it's red, and the fix is
+  the same as any other red bot PR (below).
 - **Green grouped weekly PR**: skim the release notes, merge. That's the
   system working. If the branch is behind `main`, press **Update branch**
   first and merge once the checks come back
@@ -352,7 +376,7 @@ scheduled window.
 | Renovate opened nothing this week | check the [Mend portal](https://developer.mend.io/) job log — commonly there was simply nothing pending, or `prConcurrentLimit` (5) is saturated by open Renovate PRs; merge or close some |
 | An expected update never appears as a PR | check the Dependency Dashboard "blocked"/rate-limited sections and the [blocked-updates table](#blocked-updates-packagerules--and-why) — it may be deliberately disabled |
 | Renovate PR is green but "branch is out of date" blocks the merge | expected — `rebaseWhen: "conflicted"` deliberately leaves behind-but-clean branches alone ([Rebasing and staying up to date](#rebasing-and-staying-up-to-date)). Press **Update branch** / `gh pr update-branch <n>` and merge when the run finishes |
-| A `dev dependencies (patch)` or `Lock file maintenance` PR isn't automerging | it's not green. Check every **required** context, including the two Snyk ones — Snyk occasionally never posts on a force-updated or reopened bot branch, and automerge waits forever on a status that never arrives ([Dependency Management](dependency-management.md)). Close and let the bot recreate the PR |
+| A `dev dependencies (patch)`, `Lock file maintenance` or `lint and format tooling` PR isn't automerging | it's not green. Check every **required** context, including the two Snyk ones — Snyk occasionally never posts on a force-updated or reopened bot branch, and automerge waits forever on a status that never arrives ([Dependency Management](dependency-management.md)). Close and let the bot recreate the PR |
 | A devDependency patch didn't appear this week | `minimumReleaseAge` holds **devDependency patches** until the release is 3 days old ([Automerge](#automerge)) — a package published over the weekend waits for the following Monday. Lock file maintenance has no such hold |
 | Renovate stopped rebasing a PR | a human (or non-ignored bot) commit landed on the branch — tick the rebase checkbox to have it recreated, or take the upgrade over as a human PR. Note that a branch that is merely *behind* `main` is not a fault: see the row above |
 | Snyk check red on a Renovate lockfile change | usually Snyk re-baselining, not the bump — see [Dependency Management](dependency-management.md) |
