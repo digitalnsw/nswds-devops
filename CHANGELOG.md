@@ -1,3 +1,9 @@
+## [1.20.0](https://github.com/digitalnsw/nswds-devops/compare/v1.19.1...v1.20.0) (2026-08-06)
+
+### Features
+
+* **ci:** automerge the file-sync and lint-tooling fan-out PRs ([#94](https://github.com/digitalnsw/nswds-devops/issues/94)) ([be782bd](https://github.com/digitalnsw/nswds-devops/commit/be782bd28926ca750cc9d1e91f7a59cc9809e0ec))
+
 ## [1.19.1](https://github.com/digitalnsw/nswds-devops/compare/v1.19.0...v1.19.1) (2026-08-06)
 
 ### Bug Fixes
