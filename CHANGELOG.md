@@ -1,3 +1,9 @@
+## [1.19.1](https://github.com/digitalnsw/nswds-devops/compare/v1.19.0...v1.19.1) (2026-08-06)
+
+### Bug Fixes
+
+* **renovate:** block maizzle and tailwindcss majors in the Maizzle 5 repos ([#92](https://github.com/digitalnsw/nswds-devops/issues/92)) ([f6f3357](https://github.com/digitalnsw/nswds-devops/commit/f6f33575c245f5b5548fe27642c9f90ab422411c))
+
 ## [1.19.0](https://github.com/digitalnsw/nswds-devops/compare/v1.18.3...v1.19.0) (2026-08-04)
 
 ### Features
