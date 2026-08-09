@@ -13,11 +13,28 @@ The shared scripts assume these are installed:
 | `jq` | JSON handling for AI Gateway requests/responses | `brew install jq` |
 | `curl` | HTTP requests to the AI Gateway | pre-installed |
 
-The AI-assisted scripts also need `AI_GATEWAY_API_KEY` in the environment (a
-Vercel AI Gateway key — requests are routed through the gateway, not straight
-to a provider). The default model is set once in `scripts/openai-config.sh`
-(override per-run with `OPENAI_MODEL=…` using the gateway's `provider/model`
-form, e.g. `OPENAI_MODEL=openai/gpt-4o`; bare names are assumed OpenAI).
+The AI-assisted scripts also need `AI_GATEWAY_API_KEY` (a Vercel AI Gateway
+key — requests are routed through the gateway, not straight to a provider).
+Settings can be exported in your shell **or** put in the repo's `.env`, which
+the scripts read on startup (`.env` is gitignored; real environment variables
+win over the file):
+
+```dotenv
+AI_GATEWAY_API_KEY=vck_…
+AI_MODEL="openai/gpt-5.6-sol"
+AI_PROVIDER="azure"
+```
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `AI_MODEL` | `openai/gpt-5.6-sol` | Gateway `provider/model` slug. Bare names are assumed OpenAI's, so `AI_MODEL=gpt-4o` still works. `OPENAI_MODEL` is a deprecated alias. |
+| `AI_PROVIDER` | `azure` | Pins the gateway to one provider (`providerOptions.gateway.only`). A **hard** pin — no failover to another provider. Set it empty to restore the gateway's own routing. |
+
+> The default model is deliberate: several `openai/*` models currently fail
+> through the gateway with an Azure "deployment does not exist" 404 (both
+> `gpt-4o-mini` and `gpt-5.5` reproduce it), while `gpt-5.6-sol` resolves. In
+> CI the same two settings come from the `AI_MODEL` / `AI_PROVIDER` **org
+> variables**, so the fleet can be retuned without a code change.
 
 Optionally export `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_ENDPOINT` (plus
 `AZURE_OPENAI_DEPLOYMENT`, default `gpt-5.6-sol`) to fall back to Azure
@@ -40,6 +57,7 @@ Supporting pieces you rarely invoke directly: `branch-name-config.sh`
 (policy source of truth), `conventional-commit-config.sh` +
 `check-commit-types-sync.sh` (commit-type plumbing), `openai-config.sh` /
 `openai-request.sh` (shared model defaults + AI Gateway request helper),
+`load-dotenv.sh` (parses — never sources — the repo's `.env`),
 `secret-redaction.sh` (detects and redacts secret-looking content **before
 any diff leaves the machine** for the AI Gateway), `wrap-commit-body.sh`
 (reflows AI prose to pass commitlint's line-length rule), and the husky

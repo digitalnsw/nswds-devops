@@ -30,8 +30,17 @@ jobs:
     if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
 
     env:
-      # provider/model slug, routed via the Vercel AI Gateway.
-      AI_GATEWAY_MODEL: openai/gpt-4o-mini
+      # provider/model slug, routed via the Vercel AI Gateway. Org variables
+      # override without a code change (same mechanism as CI_SKIP_*).
+      #
+      # gpt-5.6-sol, not gpt-4o-mini: several openai/* models currently fail
+      # through the gateway with an Azure "deployment does not exist" 404
+      # (gpt-4o-mini and gpt-5.5 both reproduce it). Re-check before changing.
+      AI_MODEL: ${{ vars.AI_MODEL || 'openai/gpt-5.6-sol' }}
+      # Hard provider pin (providerOptions.gateway.only) — no failover to
+      # another provider. Set the org variable to an empty string to restore
+      # the gateway's own routing.
+      AI_PROVIDER: ${{ vars.AI_PROVIDER || 'azure' }}
       # Caps on the diff sent to the model (lines first, then bytes).
       DIFF_MAX_LINES: '1500'
       DIFF_MAX_BYTES: '100000'
@@ -115,9 +124,10 @@ jobs:
           SYSTEM_PROMPT="You write pull request descriptions. Given a unified diff, produce a concise Markdown description: a one-paragraph summary of the change, then a '## Changes' section with a short bullet list grouping related changes. Describe only what is in the diff — never invent changes. Output only the description (no code fence around the whole output, no preamble)."
 
           # No temperature: reasoning-family models reject the field, so omitting
-          # it keeps AI_GATEWAY_MODEL swappable without further edits.
+          # it keeps AI_MODEL swappable without further edits.
           JSON_PAYLOAD="$(jq -n \
-            --arg model "$AI_GATEWAY_MODEL" \
+            --arg model "$AI_MODEL" \
+            --arg provider "${AI_PROVIDER:-}" \
             --arg system "$SYSTEM_PROMPT" \
             --arg diff "$DIFF" \
             '{
@@ -127,7 +137,8 @@ jobs:
                 { role: "user",   content: [ { type: "input_text", text: ("Unified diff (may be truncated):\n\n" + $diff) } ] }
               ],
               max_output_tokens: 800
-            }')"
+            }
+            + (if $provider != "" then { providerOptions: { gateway: { only: [$provider] } } } else {} end)')"
 
           # POSTs a Responses API payload; body on stdout. Returns 42 on
           # HTTP 402 (out of credits — caller may fail over), 1 otherwise.
@@ -170,7 +181,7 @@ jobs:
           if [[ $rc -eq 42 && -n "${AZURE_OPENAI_API_KEY:-}" && -n "${AZURE_OPENAI_ENDPOINT:-}" ]]; then
             echo "↪️ Falling back to Azure OpenAI (deployment: ${AZURE_OPENAI_DEPLOYMENT})."
             AZURE_PAYLOAD="$(printf '%s' "$JSON_PAYLOAD" \
-              | jq --arg m "$AZURE_OPENAI_DEPLOYMENT" '.model = $m | del(.temperature)')"
+              | jq --arg m "$AZURE_OPENAI_DEPLOYMENT" '.model = $m | del(.temperature) | del(.providerOptions)')"
             rc=0
             RESPONSE="$(call_responses_api "${AZURE_OPENAI_ENDPOINT%/}/openai/v1/responses" \
               "api-key: ${AZURE_OPENAI_API_KEY}" "$AZURE_PAYLOAD" "Azure OpenAI")" || rc=$?
