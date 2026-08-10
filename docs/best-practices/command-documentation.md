@@ -28,7 +28,7 @@ AI_PROVIDER="azure"
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `AI_MODEL` | `openai/gpt-5.6-sol` | Gateway `provider/model` slug. Bare names are assumed OpenAI's, so `AI_MODEL=gpt-4o` still works. `OPENAI_MODEL` is a deprecated alias. |
-| `AI_PROVIDER` | `azure` | Pins the gateway to one provider (`providerOptions.gateway.only`). A **hard** pin — no failover to another provider. Set it empty to restore the gateway's own routing. |
+| `AI_PROVIDER` | `azure` | Pins the gateway to one provider (`providerOptions.gateway.only`). A **hard** pin — no failover to another provider. Set it to an empty string or the literal `none` to restore the gateway's own routing. In CI use `none`: Actions renders an unset and an empty org variable identically, so an empty value can't mean "no pin" there. |
 
 > The default model is deliberate: several `openai/*` models currently fail
 > through the gateway with an Azure "deployment does not exist" 404 (both
