@@ -1,3 +1,9 @@
+## [1.22.0](https://github.com/digitalnsw/nswds-devops/compare/v1.21.1...v1.22.0) (2026-08-10)
+
+### Features
+
+* **ci:** add a ccc pin drift canary and stop asserting fleet compliance ([#97](https://github.com/digitalnsw/nswds-devops/issues/97)) ([4d56fa9](https://github.com/digitalnsw/nswds-devops/commit/4d56fa9ab5c5f5a55b5de21a16acfd28ba6627eb))
+
 ## [1.21.1](https://github.com/digitalnsw/nswds-devops/compare/v1.21.0...v1.21.1) (2026-08-10)
 
 ### Bug Fixes
