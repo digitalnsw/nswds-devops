@@ -1,3 +1,9 @@
+## [1.21.0](https://github.com/digitalnsw/nswds-devops/compare/v1.20.0...v1.21.0) (2026-08-10)
+
+### Features
+
+* **ci:** default to openai/gpt-5.6-sol on azure, configurable via AI_MODEL/AI_PROVIDER ([#95](https://github.com/digitalnsw/nswds-devops/issues/95)) ([d0ac188](https://github.com/digitalnsw/nswds-devops/commit/d0ac1885bb6fa298270fb2a3d4320e3acf51893f))
+
 ## [1.20.0](https://github.com/digitalnsw/nswds-devops/compare/v1.19.1...v1.20.0) (2026-08-06)
 
 ### Features
