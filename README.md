@@ -74,7 +74,7 @@ be overwritten. `.github/sync.yml` encodes this as four groups:
 | Group | Repos | What's different |
 |---|---|---|
 | 1 | everything not listed below | full set: scripts, all four configs, all eight stubs |
-| 2 | nswds-ui, nswds-tokens, nswds-eslint-config, nswds-prettier-config | keep their own `release.yml` AND release config (all publish to npm with bespoke verification); where the repo keeps its own `ci.yml`, the shared CI stub lands as `shared-ci.yml` |
+| 2 | nswds-ui, nswds-tokens, nswds-eslint-config, nswds-metadata, nswds-prettier-config | keep their own `release.yml` AND release config (all publish to npm with bespoke verification); where the repo keeps its own `ci.yml`, the shared CI stub lands as `shared-ci.yml` |
 | 3 | nswds-app | keeps its own `release.config.mjs` (publishes `@nswds/app`); stock release stub is fine |
 | 4 | ictds-portal-flows | its `release.yml` is a **Power Platform production deploy** that happens to share the filename — never overwrite it. The release stub maps to `semantic-release.yml` instead |
 
