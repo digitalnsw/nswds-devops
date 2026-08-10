@@ -1,3 +1,9 @@
+## [1.21.1](https://github.com/digitalnsw/nswds-devops/compare/v1.21.0...v1.21.1) (2026-08-10)
+
+### Bug Fixes
+
+* **ci:** restore the sync fan-out and make the provider pin disableable ([#96](https://github.com/digitalnsw/nswds-devops/issues/96)) ([cef727d](https://github.com/digitalnsw/nswds-devops/commit/cef727dd6d071996263ee057bd853fbe460039e2)), closes [#94](https://github.com/digitalnsw/nswds-devops/issues/94)
+
 ## [1.21.0](https://github.com/digitalnsw/nswds-devops/compare/v1.20.0...v1.21.0) (2026-08-10)
 
 ### Features
