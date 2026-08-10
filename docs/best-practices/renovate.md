@@ -209,8 +209,8 @@ is exactly the class of breakage that judgement is for.
 so Renovate commits **production** dependency updates as `fix(deps)` and
 **dev** dependencies as `chore(deps)`. The shared `release.config.mjs` runs
 the `conventionalcommits` preset, where `fix` cuts a **patch release** — and
-five repos publish on release (`nswds-ui`, `nswds-tokens`, `nswds-app`,
-`nswds-eslint-config`, `nswds-prettier-config`).
+six repos publish on release (`nswds-ui`, `nswds-tokens`, `nswds-app`,
+`nswds-eslint-config`, `nswds-metadata`, `nswds-prettier-config`).
 
 So automerging a production patch would publish to npm with nobody in the
 loop. `chore(deps)` releases nothing, which is why the line is drawn at
