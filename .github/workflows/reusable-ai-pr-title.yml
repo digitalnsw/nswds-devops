@@ -27,8 +27,17 @@ jobs:
       pull-requests: write
 
     env:
-      # provider/model slug, routed via the Vercel AI Gateway.
-      AI_GATEWAY_MODEL: openai/gpt-4o-mini
+      # provider/model slug, routed via the Vercel AI Gateway. Org variables
+      # override without a code change (same mechanism as CI_SKIP_*).
+      #
+      # gpt-5.6-sol, not gpt-4o-mini: several openai/* models currently fail
+      # through the gateway with an Azure "deployment does not exist" 404
+      # (gpt-4o-mini and gpt-5.5 both reproduce it). Re-check before changing.
+      AI_MODEL: ${{ vars.AI_MODEL || 'openai/gpt-5.6-sol' }}
+      # Hard provider pin (providerOptions.gateway.only) — no failover to
+      # another provider. Set the org variable to an empty string to restore
+      # the gateway's own routing.
+      AI_PROVIDER: ${{ vars.AI_PROVIDER || 'azure' }}
       CONVENTIONAL_COMMIT_REGEX_DEFAULT: '^(feat|fix|refactor|perf|style|test|build|ops|docs|chore|merge|revert)(\([^)]*\))?!?: .+'
       CONVENTIONAL_COMMIT_TYPES_CSV_DEFAULT: 'feat, fix, refactor, perf, style, test, build, ops, docs, chore, merge, revert'
       CONVENTIONAL_COMMIT_DEFAULT_TYPE_DEFAULT: chore
@@ -268,7 +277,7 @@ jobs:
           COMMIT_COUNT="$(printf '%s\n' "$COMMIT_LIST" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')"
           echo "📝 Commit subjects provided to the model: $COMMIT_COUNT"
 
-          JSON_PAYLOAD="$(jq -n --arg commits "$COMMIT_LIST" --arg model "$AI_GATEWAY_MODEL" --arg allowedTypes "$CONVENTIONAL_COMMIT_TYPES_CSV" '{
+          JSON_PAYLOAD="$(jq -n --arg commits "$COMMIT_LIST" --arg model "$AI_MODEL" --arg provider "${AI_PROVIDER:-}" --arg allowedTypes "$CONVENTIONAL_COMMIT_TYPES_CSV" '{
             model: $model,
             input: [
               {
@@ -292,7 +301,8 @@ jobs:
             ],
             temperature: 0.4,
             max_output_tokens: 80
-          }')"
+          }
+          + (if $provider != "" then { providerOptions: { gateway: { only: [$provider] } } } else {} end)')"
 
           API_KEY="${AI_GATEWAY_API_KEY-}"
           if [[ -z "${API_KEY:-}" ]]; then
@@ -345,7 +355,7 @@ jobs:
           if [[ $rc -eq 42 && -n "${AZURE_OPENAI_API_KEY:-}" && -n "${AZURE_OPENAI_ENDPOINT:-}" ]]; then
             echo "↪️ Falling back to Azure OpenAI (deployment: ${AZURE_OPENAI_DEPLOYMENT})."
             AZURE_PAYLOAD="$(printf '%s' "$JSON_PAYLOAD" \
-              | jq --arg m "$AZURE_OPENAI_DEPLOYMENT" '.model = $m | del(.temperature)')"
+              | jq --arg m "$AZURE_OPENAI_DEPLOYMENT" '.model = $m | del(.temperature) | del(.providerOptions)')"
             rc=0
             RESPONSE="$(call_responses_api "${AZURE_OPENAI_ENDPOINT%/}/openai/v1/responses" \
               "api-key: ${AZURE_OPENAI_API_KEY}" "$AZURE_PAYLOAD" "Azure OpenAI")" || rc=$?
