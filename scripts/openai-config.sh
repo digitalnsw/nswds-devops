@@ -28,9 +28,19 @@ fi
 
 # Pin the gateway to a single provider (e.g. azure) rather than letting it pick.
 # Sent as providerOptions.gateway.only — a hard pin, so there is no failover to
-# another provider if this one is unavailable. Set AI_PROVIDER="" to restore the
-# gateway's own routing.
-AI_PROVIDER="${AI_PROVIDER:-azure}"
+# another provider if this one is unavailable.
+#
+# To restore the gateway's own routing, set AI_PROVIDER to an empty string or to
+# the literal `none`. Both work here; `none` also works in CI, where an empty
+# value is impossible to express (GitHub Actions renders an unset and an empty
+# org variable identically as ""), so the two surfaces share one mental model.
+#
+# `-` rather than `:-`: only an *unset* variable takes the default, so an
+# explicit empty value survives instead of being forced back to azure.
+AI_PROVIDER="${AI_PROVIDER-azure}"
+if [[ "$AI_PROVIDER" == "none" ]]; then
+  AI_PROVIDER=""
+fi
 
 # Deprecated alias, kept so existing overrides and any local scripts that read
 # OPENAI_MODEL still see the resolved value.

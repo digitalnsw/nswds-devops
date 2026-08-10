@@ -35,8 +35,10 @@ jobs:
       # (gpt-4o-mini and gpt-5.5 both reproduce it). Re-check before changing.
       AI_MODEL: ${{ vars.AI_MODEL || 'openai/gpt-5.6-sol' }}
       # Hard provider pin (providerOptions.gateway.only) — no failover to
-      # another provider. Set the org variable to an empty string to restore
-      # the gateway's own routing.
+      # another provider. Set the org variable to the literal "none" to restore
+      # the gateway's own routing: Actions renders an unset and an empty org
+      # variable identically as "", so an empty value cannot mean "no pin" here.
+      # The sentinel is normalised to empty in the step below.
       AI_PROVIDER: ${{ vars.AI_PROVIDER || 'azure' }}
       CONVENTIONAL_COMMIT_REGEX_DEFAULT: '^(feat|fix|refactor|perf|style|test|build|ops|docs|chore|merge|revert)(\([^)]*\))?!?: .+'
       CONVENTIONAL_COMMIT_TYPES_CSV_DEFAULT: 'feat, fix, refactor, perf, style, test, build, ops, docs, chore, merge, revert'
@@ -276,6 +278,13 @@ jobs:
           # Don't echo commit messages. Keep a small breadcrumb.
           COMMIT_COUNT="$(printf '%s\n' "$COMMIT_LIST" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')"
           echo "📝 Commit subjects provided to the model: $COMMIT_COUNT"
+
+          # "none" is the disable sentinel — an empty org variable is
+          # indistinguishable from an unset one in Actions, so it can't be used
+          # to mean "no provider pin". Normalise it to empty here.
+          if [[ "${AI_PROVIDER:-}" == "none" ]]; then
+            AI_PROVIDER=""
+          fi
 
           JSON_PAYLOAD="$(jq -n --arg commits "$COMMIT_LIST" --arg model "$AI_MODEL" --arg provider "${AI_PROVIDER:-}" --arg allowedTypes "$CONVENTIONAL_COMMIT_TYPES_CSV" '{
             model: $model,

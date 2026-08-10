@@ -38,8 +38,10 @@ jobs:
       # (gpt-4o-mini and gpt-5.5 both reproduce it). Re-check before changing.
       AI_MODEL: ${{ vars.AI_MODEL || 'openai/gpt-5.6-sol' }}
       # Hard provider pin (providerOptions.gateway.only) — no failover to
-      # another provider. Set the org variable to an empty string to restore
-      # the gateway's own routing.
+      # another provider. Set the org variable to the literal "none" to restore
+      # the gateway's own routing: Actions renders an unset and an empty org
+      # variable identically as "", so an empty value cannot mean "no pin" here.
+      # The sentinel is normalised to empty in the step below.
       AI_PROVIDER: ${{ vars.AI_PROVIDER || 'azure' }}
       # Caps on the diff sent to the model (lines first, then bytes).
       DIFF_MAX_LINES: '1500'
@@ -122,6 +124,13 @@ jobs:
           fi
 
           SYSTEM_PROMPT="You write pull request descriptions. Given a unified diff, produce a concise Markdown description: a one-paragraph summary of the change, then a '## Changes' section with a short bullet list grouping related changes. Describe only what is in the diff — never invent changes. Output only the description (no code fence around the whole output, no preamble)."
+
+          # "none" is the disable sentinel — an empty org variable is
+          # indistinguishable from an unset one in Actions, so it can't be used
+          # to mean "no provider pin". Normalise it to empty here.
+          if [[ "${AI_PROVIDER:-}" == "none" ]]; then
+            AI_PROVIDER=""
+          fi
 
           # No temperature: reasoning-family models reject the field, so omitting
           # it keeps AI_MODEL swappable without further edits.
