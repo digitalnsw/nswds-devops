@@ -18,10 +18,12 @@
 //           preset loader at the repo root actually finds. A package.json
 //           check would have passed that repo.
 //
-//   OUTCOME Read each repo's latest GitHub release and flag a header-only body
-//           when the commits behind it include a type the preset renders. This
-//           catches the class rather than the cause — any future reason notes
-//           go blank, not just a ccc major.
+//   OUTCOME Read each repo's latest published GitHub release and flag a
+//           header-only body when the commits behind it include a type the
+//           preset renders. This catches the class rather than the cause —
+//           any future reason notes go blank, not just a ccc major. Drafts
+//           and prereleases are excluded: a draft's body is empty by nature,
+//           and its null published_at would defeat the staleness check below.
 //
 // The OUTCOME probe deliberately requires a visible commit type. A release
 // containing only chore/docs/style/etc. legitimately renders a bare header,
@@ -44,6 +46,17 @@ const ROOT_LOCK_KEY = `node_modules/${PKG}`
 // (chore, docs, style, refactor, test, build, ci) is hidden by design, so a
 // release built only from those is expected to have a header-only body.
 const VISIBLE_TYPES = /^(feat|fix|perf|revert)(\(|!|:)/
+
+// Pages of 100 commits to walk when a first release has no previous tag to
+// compare against. Five is far above any first release in the fleet (the
+// largest, images v1.0.0, was 91 commits) while still bounding the job.
+const FIRST_RELEASE_PAGE_CAP = 5
+
+// Subject lines the conventionalcommits preset would have rendered.
+const subjectsOfInterest = (commits) =>
+  (commits ?? [])
+    .map((c) => c.commit.message.split('\n')[0])
+    .filter((subject) => VISIBLE_TYPES.test(subject))
 
 const token = process.env.GH_TOKEN
 if (!token) {
@@ -97,6 +110,7 @@ console.log(`Scanning ${repos.length} non-archived ${ORG} repos`)
 const configDrift = []
 const outcomeDrift = []
 const unreadable = []
+const notes = []
 let inScope = 0
 
 for (const repo of repos) {
@@ -128,8 +142,15 @@ for (const repo of repos) {
   }
 
   // --- OUTCOME probe ------------------------------------------------------
-  const releases = await api(`/repos/${ORG}/${name}/releases?per_page=2`)
-  const latest = releases?.[0]
+  // Drafts and prereleases are excluded before picking `latest`/`previous`.
+  // A draft is the dangerous case: an empty body is its normal state, and
+  // GitHub reports `published_at: null` for one, so `Date.parse(null)` is NaN
+  // and the staleness comparison below silently evaluates false — a draft
+  // would slip past the very suppression that keeps this job quiet. Over-fetch
+  // so two published entries still survive the filter.
+  const releases = (await api(`/repos/${ORG}/${name}/releases?per_page=10`)) ?? []
+  const published = releases.filter((r) => !r.draft && !r.prerelease)
+  const latest = published[0]
   if (!latest || bodyWithoutHeader(latest.body)) continue
 
   // A blank release that predates the last lockfile change on a repo whose
@@ -138,7 +159,11 @@ for (const repo of repos) {
   // this, nswds-ui's 4.1.4-4.3.0 would reopen an unactionable issue every
   // week forever. If the config is NOT healthy, fall through and report:
   // the blank release is then still live evidence of a live problem.
-  const healthy = !configDrift.some((d) => d.name === name)
+  //
+  // A repo whose lockfile could not be read is NOT healthy — its config is
+  // unverified, not verified-good — so it must not earn this suppression.
+  const healthy =
+    !configDrift.some((d) => d.name === name) && !unreadable.some((d) => d.name === name)
   if (healthy) {
     const lockCommit = await api(
       `/repos/${ORG}/${name}/commits?path=package-lock.json&per_page=1`,
@@ -151,19 +176,41 @@ for (const repo of repos) {
   // would have rendered. `previous` is absent for a repo's first release —
   // which is exactly how share v1.0.0 shipped blank — so fall back to the
   // commits reachable from the tag rather than skipping the repo.
-  const previous = releases?.[1]?.tag_name
-  const commits = previous
-    ? (
-        await api(
-          `/repos/${ORG}/${name}/compare/${encodeURIComponent(previous)}...${encodeURIComponent(latest.tag_name)}`,
-        )
-      )?.commits
-    : await api(
-        `/repos/${ORG}/${name}/commits?sha=${encodeURIComponent(latest.tag_name)}&per_page=100`,
+  const previous = published[1]?.tag_name
+  let visible = []
+  let truncated = false
+
+  if (previous) {
+    const cmp = await api(
+      `/repos/${ORG}/${name}/compare/${encodeURIComponent(previous)}...${encodeURIComponent(latest.tag_name)}`,
+    )
+    visible = subjectsOfInterest(cmp?.commits)
+  } else {
+    // A first release covers the repo's whole history, which can exceed one
+    // page — images shipped v1.0.0 with 91 commits, nine short of the limit.
+    // Without paging, renderable commits past the first page are invisible and
+    // real drift is silently suppressed. Stop at the first hit; bound the walk
+    // so a long history cannot stall the job.
+    for (let page = 1; page <= FIRST_RELEASE_PAGE_CAP; page++) {
+      const batch = await api(
+        `/repos/${ORG}/${name}/commits?sha=${encodeURIComponent(latest.tag_name)}&per_page=100&page=${page}`,
       )
-  const visible = (commits ?? [])
-    .map((c) => c.commit.message.split('\n')[0])
-    .filter((subject) => VISIBLE_TYPES.test(subject))
+      if (!batch?.length) break
+      visible = subjectsOfInterest(batch)
+      if (visible.length) break
+      if (batch.length < 100) break
+      if (page === FIRST_RELEASE_PAGE_CAP) truncated = true
+    }
+  }
+
+  // Never let a bounded scan read as a clean one.
+  if (truncated && !visible.length) {
+    notes.push(
+      `${name}: first-release scan stopped at ${FIRST_RELEASE_PAGE_CAP} pages ` +
+        `(${FIRST_RELEASE_PAGE_CAP * 100} commits) without finding a renderable commit`,
+    )
+  }
+
   if (visible.length) {
     outcomeDrift.push({
       name,
@@ -188,6 +235,9 @@ for (const d of outcomeDrift) {
 }
 for (const d of unreadable) {
   console.log(`  [unknown]  ${d.name}: ${d.reason}`)
+}
+for (const n of notes) {
+  console.log(`  [note]     ${n}`)
 }
 
 if (process.env.GITHUB_OUTPUT) {
