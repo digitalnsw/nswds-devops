@@ -106,7 +106,7 @@ That means the v10 block documented in \`default.json\` can be lifted.
 ## Exit steps
 
 1. Remove the \`conventional-changelog-conventionalcommits\` major-block rule in \`default.json\`.
-2. Bump the direct \`^9.3.1\` devDependency pin to the new major across all 16 semantic-release repos.
+2. Bump the direct \`^9.3.1\` devDependency pin to the new major across every semantic-release repo. Take the list from the latest \`ccc-pin-drift-canary\` run rather than a hardcoded count — the fleet grows.
 3. Verify a release on one repo renders a real changelog body before fanning out.
 
 ## Rendered sample

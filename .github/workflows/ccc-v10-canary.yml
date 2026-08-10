@@ -5,7 +5,11 @@
 # in release.config.mjs; tracked upstream as release-notes-generator#992). This
 # job installs the LATEST release-notes-generator + ccc and checks whether they
 # render real notes again. The day they do, it opens a single tracking issue to
-# lift the Renovate block and bump the 16 pins together. No-op until then.
+# lift the Renovate block and bump every pin together. No-op until then.
+#
+# Sibling: ccc-pin-drift-canary.yml checks the inverse — that the pins are
+# actually in place. Do not infer fleet compliance from this job staying quiet;
+# it probes the upstream toolchain, never the repos.
 #
 # Repo-local to nswds-devops — NOT synced to consumers.
 name: ccc v10 canary

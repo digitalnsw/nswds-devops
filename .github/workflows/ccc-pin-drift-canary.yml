@@ -1,0 +1,72 @@
+# Weekly canary for conventional-changelog-conventionalcommits (ccc) pin drift.
+#
+# Sibling of ccc-v10-canary.yml, pointing the other way. That job asks whether
+# v10 is safe to adopt yet; this one asks whether every semantic-release repo is
+# still protected from it. Nothing checked the second question until 2026-08-10,
+# which is why nswds-ui shipped blank release notes for 4.1.4-4.3.0 and share
+# for v1.0.0 — the failure is silent, so only a deliberate probe finds it.
+#
+# Also covers repos created after a rollout: share was created 2026-07-31, after
+# the 2026-07-19 fleet pin rollout, so no rollout could have caught it. A
+# recurring scan does not care how a repo came to be missing the pin.
+#
+# Needs the sync GitHub App because secrets.GITHUB_TOKEN is scoped to this repo
+# and cannot read sibling repos' lockfiles.
+#
+# Repo-local to nswds-devops — NOT synced to consumers.
+name: ccc pin drift canary
+
+on:
+  schedule:
+    - cron: '29 8 * * 1' # Mondays 08:29 UTC, after the v1 drift canary
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Mint GitHub App token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.SYNC_APP_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          owner: digitalnsw
+
+      - name: Probe fleet for ccc pin drift
+        id: probe
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: node .github/scripts/ccc-pin-drift-canary.mjs
+
+      - name: Open tracking issue when drift is found
+        if: steps.probe.outputs.drifted == 'true'
+        env:
+          # Deliberately the repo-scoped token: the issue is filed here, and
+          # this step needs no cross-repo access.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BODY_FILE: ${{ steps.probe.outputs.body_file }}
+        run: |
+          set -euo pipefail
+          # Idempotent: one open tracking issue at a time, keyed on the label.
+          gh label create ccc-pin-drift \
+            --description 'ccc ^9 pin drift across the fleet' --color d93f0b --force
+          if [ "$(gh issue list --state open --label ccc-pin-drift --json number --jq 'length')" -gt 0 ]; then
+            echo 'Tracking issue already open; nothing to do.'
+            exit 0
+          fi
+          gh issue create \
+            --title 'ccc ^9 pin drift detected — a semantic-release repo is unprotected' \
+            --label ccc-pin-drift \
+            --body-file "$BODY_FILE"
