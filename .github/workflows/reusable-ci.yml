@@ -64,6 +64,61 @@ jobs:
             exit 1
           fi
 
+      # A package declared BOTH as a direct dependency and as a literal-pinned
+      # `overrides` entry is one upstream release away from silently losing
+      # Renovate for this entire repo. The shared preset disables updates to
+      # depType `overrides` (see default.json), so that half stays pinned on the
+      # outgoing spec while the direct dependency keeps moving; the next bump
+      # runs `npm install <pkg>@<new>`, npm refuses with EOVERRIDE, and Renovate
+      # throws lockfile-error — which aborts the whole repository run before it
+      # reaches ensureDependencyDashboard(). Nothing goes red anywhere: no
+      # branch, no PR, no error comment, and a Dependency Dashboard that stops
+      # being rewritten, so a ticked checkbox stays ticked and reads as ignored.
+      # reviewers, engagement and awards sat like that for a week from
+      # 2026-08-06 (postcss 8.5.26) before anyone diagnosed it. The npm
+      # self-override canary in nswds-devops catches this weekly; this gate
+      # stops the shape reaching main in the first place.
+      #
+      # The fix is always npm's $-reference form (`"postcss": "$postcss"`),
+      # which resolves to the direct dependency's own spec, so the two cannot
+      # diverge — hence the startswith("$") exemption rather than a package
+      # allowlist. There is no legitimate literal form, so this is a hard fail.
+      #
+      # Only top-level string values are checked. A nested override
+      # (`{"@tailwindcss/typography": {"postcss-selector-parser": "^6.1.3"}}`)
+      # gives the PARENT key no version spec and applies only inside that
+      # subtree, so it cannot collide with a root direct dependency — flagging
+      # one would be a false positive. All four dependency blocks are folded in
+      # because npm's EOVERRIDE check does not care which one the direct
+      # dependency came from.
+      #
+      # jq's exit status is captured for the same reason git grep's is above: an
+      # unparseable manifest would otherwise produce empty output and sail
+      # through as clean without having scanned anything.
+      - name: Check for literal npm self-overrides
+        if: ${{ hashFiles('package.json') != '' }}
+        run: |
+          status=0
+          offenders=$(jq -r '
+            ((.dependencies // {}) + (.devDependencies // {})
+              + (.optionalDependencies // {}) + (.peerDependencies // {})) as $deps
+            | (.overrides // {})
+            | to_entries[]
+            | select((.value | type) == "string")
+            | select((.value | startswith("$")) | not)
+            | select(.key | in($deps))
+            | "  \(.key) — override \(.value), direct dependency \($deps[.key])"
+          ' package.json) || status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "::error::jq exited $status, so package.json was never scanned. Failing instead of reporting a clean manifest."
+            exit 1
+          fi
+          if [ -n "$offenders" ]; then
+            echo "$offenders"
+            echo "::error::Literal npm self-override(s) above. Each is also a direct dependency, so the next release of that package will abort Renovate for this repo with no visible error. Use npm's reference form instead, e.g. \"postcss\": \"\$postcss\"."
+            exit 1
+          fi
+
       - name: Setup Node.js (.nvmrc)
         if: ${{ hashFiles('.nvmrc') != '' }}
         uses: actions/setup-node@v7
