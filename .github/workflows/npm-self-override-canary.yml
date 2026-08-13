@@ -1,0 +1,76 @@
+# Weekly canary for literal npm self-overrides.
+#
+# Catches a package declared both as a direct dependency and as a literal-pinned
+# `overrides` entry. That shape makes the next upstream release of that package
+# abort Renovate's entire run for the repo (EOVERRIDE -> lockfile-error), with
+# no branch, no PR, no error comment and no red check — the Dependency Dashboard
+# simply stops being rewritten, so a ticked checkbox stays ticked and reads as
+# ignored. reviewers, engagement and awards sat like that for a week from
+# 2026-08-06 before anyone diagnosed it.
+#
+# The preset cannot catch this itself: Renovate evaluates one dependency at a
+# time and no matcher can ask whether the same package also appears in
+# overrides. The invariant is structural, so it is enforced here instead — see
+# the `matchDepTypes: ["overrides"]` rule in default.json.
+#
+# Needs the sync GitHub App because secrets.GITHUB_TOKEN is scoped to this repo
+# and cannot read sibling repos' manifests.
+#
+# Repo-local to nswds-devops — NOT synced to consumers.
+name: npm self-override canary
+
+on:
+  schedule:
+    - cron: '35 8 * * 1' # Mondays 08:35 UTC, after the ccc pin drift canary
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Mint GitHub App token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.SYNC_APP_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          owner: digitalnsw
+
+      - name: Probe fleet for literal self-overrides
+        id: probe
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: node .github/scripts/npm-self-override-canary.mjs
+
+      - name: Open tracking issue when drift is found
+        if: steps.probe.outputs.drifted == 'true'
+        env:
+          # Deliberately the repo-scoped token: the issue is filed here, and
+          # this step needs no cross-repo access.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BODY_FILE: ${{ steps.probe.outputs.body_file }}
+        run: |
+          set -euo pipefail
+          # Idempotent: one open tracking issue at a time, keyed on the label.
+          gh label create npm-self-override \
+            --description 'Literal npm override on a package that is also a direct dependency' \
+            --color d93f0b --force
+          if [ "$(gh issue list --state open --label npm-self-override --json number --jq 'length')" -gt 0 ]; then
+            echo 'Tracking issue already open; nothing to do.'
+            exit 0
+          fi
+          gh issue create \
+            --title 'Literal npm self-override detected — Renovate will abort on the next bump' \
+            --label npm-self-override \
+            --body-file "$BODY_FILE"
