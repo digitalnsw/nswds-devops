@@ -32,6 +32,7 @@ group:
       digitalnsw/dtl-sandbox
       digitalnsw/share
       digitalnsw/risk-guidance
+      digitalnsw/agile
     files:
       - source: scripts/
         dest: scripts/
