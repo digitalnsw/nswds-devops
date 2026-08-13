@@ -1,3 +1,9 @@
+## [1.23.0](https://github.com/digitalnsw/nswds-devops/compare/v1.22.0...v1.23.0) (2026-08-13)
+
+### Features
+
+* **ci:** detect and block literal npm self-overrides ([6c3b697](https://github.com/digitalnsw/nswds-devops/commit/6c3b697df0dcff8fc6f2a530b451d0e4c2a748e9))
+
 ## [1.22.0](https://github.com/digitalnsw/nswds-devops/compare/v1.21.1...v1.22.0) (2026-08-10)
 
 ### Features
