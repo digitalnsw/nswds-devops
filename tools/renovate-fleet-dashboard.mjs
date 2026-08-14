@@ -80,6 +80,19 @@ const SECTIONS = [
 const SECTION_SEVERITY = new Map(SECTIONS.map((s) => [s.name, s.severity]));
 
 /**
+ * Sections in which an ignored item is surfaced anyway, derived from SECTIONS so
+ * the help text and the footer cannot drift from what shouldIgnore actually does.
+ * They did drift once: Rate-Limited was reclassified from warn to info and three
+ * prose sites kept claiming it still overrode the filter.
+ *
+ * "Repository problems" is alert-severity but excluded — it is parsed as plain
+ * bullets, never as checkboxes, so it never reaches shouldIgnore.
+ */
+const IGNORE_OVERRIDE_SECTIONS = SECTIONS.filter(
+  (s) => (s.severity === 'alert' || s.severity === 'warn') && s.name !== 'Repository problems',
+).map((s) => s.name);
+
+/**
  * Checkbox markers that trigger a bulk action rather than representing a single
  * pending update. They are controls, not work, and must not inflate counts.
  */
@@ -96,44 +109,83 @@ const STALE_WARN_DAYS = 21;
 const STALE_ALERT_DAYS = 8;
 const OLD_PR_WARN_DAYS = 14;
 
+function helpText() {
+  return [
+    'Usage: renovate-fleet-dashboard.mjs [options]',
+    '',
+    '  --org <org>          GitHub org to scan (default: digitalnsw)',
+    '  --out <file.html>    HTML output path (default: renovate-fleet-dashboard.html)',
+    '  --json <file.json>   also write the parsed data as JSON',
+    '  --concurrency <n>    parallel gh calls, positive integer (default: 6)',
+    '  --ignore <text>      hide dashboard items containing <text>, case-insensitive.',
+    '                       Repeatable. The first use replaces the default',
+    `                       (${DEFAULTS.ignore.map((p) => `"${p}"`).join(', ')}).`,
+    '                       Ignored items are still shown when ticked, or when they',
+    `                       appear in a ${IGNORE_OVERRIDE_SECTIONS.join(' / ')} section.`,
+    '  --no-ignore          hide nothing; list every item',
+    '',
+  ].join('\n');
+}
+
+/**
+ * Parse argv, rejecting malformed input rather than limping on with it.
+ *
+ * Every one of these used to be accepted silently, and the quiet ones were the
+ * dangerous ones:
+ *
+ *   --ignore --out out.html   consumed "--out" as the ignore pattern, so the
+ *                             output path was dropped and the run wrote to the
+ *                             default file, exit code 0, no warning.
+ *   --concurrency foo         NaN workers, so Array.from({length: NaN}) built an
+ *                             empty pool and the run died later on an unrelated
+ *                             "Cannot read properties of undefined" .
+ *   --out                     undefined path, thrown deep inside writeFile.
+ *
+ * A value starting with "--" is therefore treated as a missing value. No Renovate
+ * item title begins with a double dash, so nothing legitimate is refused.
+ *
+ * Throws on bad input; main() turns that into exit 1. --help still exits 0 here.
+ */
 function parseArgs(argv) {
   const opts = { ...DEFAULTS };
   let ignoreOverridden = false;
 
+  const valueFor = (flag, raw) => {
+    if (raw === undefined || raw.startsWith('--')) {
+      throw new Error(`${flag} requires a value`);
+    }
+    return raw;
+  };
+
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--org') opts.org = argv[++i];
-    else if (arg === '--out') opts.out = argv[++i];
-    else if (arg === '--json') opts.json = argv[++i];
-    else if (arg === '--concurrency') opts.concurrency = Number(argv[++i]);
-    else if (arg === '--ignore') {
+    if (arg === '--org') opts.org = valueFor(arg, argv[++i]);
+    else if (arg === '--out') opts.out = valueFor(arg, argv[++i]);
+    else if (arg === '--json') opts.json = valueFor(arg, argv[++i]);
+    else if (arg === '--concurrency') {
+      const raw = valueFor(arg, argv[++i]);
+      const parsed = Number(raw);
+      if (!Number.isInteger(parsed) || parsed < 1) {
+        throw new Error(`--concurrency must be a positive integer, got "${raw}"`);
+      }
+      opts.concurrency = parsed;
+    } else if (arg === '--ignore') {
       // First --ignore replaces the default; later ones add to it.
       if (!ignoreOverridden) {
         opts.ignore = [];
         ignoreOverridden = true;
       }
-      opts.ignore.push(argv[++i]);
+      opts.ignore.push(valueFor(arg, argv[++i]));
     } else if (arg === '--no-ignore') {
       opts.ignore = [];
       ignoreOverridden = true;
     } else if (arg === '--help' || arg === '-h') {
-      process.stdout.write(
-        [
-          'Usage: renovate-fleet-dashboard.mjs [options]',
-          '',
-          '  --org <org>          GitHub org to scan (default: digitalnsw)',
-          '  --out <file.html>    HTML output path (default: renovate-fleet-dashboard.html)',
-          '  --json <file.json>   also write the parsed data as JSON',
-          '  --ignore <text>      hide dashboard items containing <text>, case-insensitive.',
-          '                       Repeatable. The first use replaces the default',
-          `                       (${DEFAULTS.ignore.map((p) => `"${p}"`).join(', ')}).`,
-          '                       Ignored items are still shown when ticked or when they',
-          '                       appear in an Errored / Rate-Limited / Edited-Blocked section.',
-          '  --no-ignore          hide nothing; list every item',
-          '',
-        ].join('\n'),
-      );
+      process.stdout.write(helpText());
       process.exit(0);
+    } else {
+      // Silently ignoring an unrecognised flag means a typo like `--ignor x`
+      // changes nothing and reports success — the same failure class as above.
+      throw new Error(`unknown option: ${arg}`);
     }
   }
   return opts;
@@ -230,8 +282,11 @@ function parseCheckboxes(sectionBody) {
  * stopped being routine:
  *
  *   - the checkbox is ticked, which means a run was asked to act and has not;
- *   - the item sits in a section that is itself a problem (Errored,
- *     Rate-Limited, Edited/Blocked, Config Migration Needed).
+ *   - the item sits in a section that is itself a problem — the alert- and
+ *     warn-severity ones, listed in IGNORE_OVERRIDE_SECTIONS.
+ *
+ * Rate-Limited is deliberately NOT one of them: it is prConcurrentLimit (5, set
+ * in default.json) queueing work as configured, not a fault.
  *
  * Lock file maintenance is the motivating case: it is automerged monthly, so it
  * is noise in Awaiting Schedule — but a lock file maintenance PR that has errored
@@ -317,6 +372,19 @@ async function loadFleet(fleetConfig) {
   // distribution list.
   fleet.add(repo);
   return fleet;
+}
+
+/**
+ * Is this the live Dependency Dashboard the search pointed at?
+ *
+ * `gh search issues` reads an eventually-consistent index, so the number it
+ * returns can name an issue that has since been closed or renamed. Verifying
+ * matters because the fallback is not neutral: a repo with no dashboard is
+ * reported as a `gap` — "Renovate is not reporting" — and inventing that alert
+ * from a stale search result would undermine the one thing this page is for.
+ */
+function isDashboardIssue(issue) {
+  return Boolean(issue) && issue.state === 'open' && issue.title === 'Dependency Dashboard';
 }
 
 function daysSince(iso) {
@@ -628,7 +696,16 @@ function renderHtml(allRepos, meta) {
     })
     .join('\n');
 
-  return `<title>Renovate fleet dashboard — ${escapeHtml(meta.org)}</title>
+  // The doctype and charset are for the standalone file, which is the usual way
+  // this is read (`open renovate-fleet-dashboard.html`): without a doctype the
+  // page parses in quirks mode, and the content carries em dashes, middots and
+  // arrows that a local file with no declared encoding leaves to browser
+  // sniffing. When the same file is published as an Artifact the host supplies
+  // its own skeleton, and a second doctype inside <body> is a parse error whose
+  // token the HTML5 parser discards — harmless there, correct here.
+  return `<!doctype html>
+<meta charset="utf-8">
+<title>Renovate fleet dashboard — ${escapeHtml(meta.org)}</title>
 <style>
   :root {
     /* Neutrals carry a slight cool bias so they sit with the steel-blue accent
@@ -791,7 +868,8 @@ ${rows}
         ? `<br><span class="muted">${totals.ignored} routine item${totals.ignored === 1 ? '' : 's'}
            hidden by ignore filter${meta.ignore.length === 1 ? '' : 's'}
            ${meta.ignore.map((p) => `<code>${escapeHtml(p)}</code>`).join(', ')} —
-           shown anyway when ticked or when errored, rate-limited or blocked.
+           shown anyway when ticked, or when in
+           ${escapeHtml(IGNORE_OVERRIDE_SECTIONS.join(' / '))}.
            Re-run with <code>--no-ignore</code> to list them.</span>`
         : ''
     }
@@ -805,7 +883,15 @@ ${rows}
 }
 
 async function main() {
-  const opts = parseArgs(process.argv.slice(2));
+  let opts;
+  try {
+    opts = parseArgs(process.argv.slice(2));
+  } catch (error) {
+    // A usage error should name the flag and show the flags, not surface as a
+    // generic failure alongside real runtime errors.
+    process.stderr.write(`${error.message}\n\n${helpText()}`);
+    process.exit(1);
+  }
 
   process.stderr.write(`Reading fleet membership from ${opts.fleetConfig}…\n`);
 
@@ -831,9 +917,14 @@ async function main() {
     ]),
   ]);
 
-  const dashboardRepos = (dashboardHits ?? [])
+  // Keep the issue number the search already returned: fetching that one issue
+  // beats listing a page of issues and filtering by title, which both did more
+  // API work and would silently miss a dashboard sitting past the first page.
+  const dashboards = (dashboardHits ?? [])
     .filter((hit) => hit.title === 'Dependency Dashboard')
-    .map((hit) => hit.repository.nameWithOwner);
+    .map((hit) => ({ nameWithOwner: hit.repository.nameWithOwner, number: hit.number }));
+
+  const dashboardRepos = dashboards.map((d) => d.nameWithOwner);
 
   // Everything else in the org is out of scope by definition and is not listed.
   const allRepos = Array.from(new Set([...fleet, ...dashboardRepos])).sort();
@@ -844,14 +935,27 @@ async function main() {
 
   // The search result omits issue bodies, so fetch each dashboard in full.
   const dashboardsByRepo = new Map();
-  await pool(dashboardRepos, opts.concurrency, async (nameWithOwner) => {
-    const issues = await ghJson([
-      'api',
-      `repos/${nameWithOwner}/issues?state=open&per_page=100`,
-      '--jq',
-      '[.[] | select(.title=="Dependency Dashboard") | {number, html_url, updated_at, body}]',
-    ]);
-    if (issues?.length) dashboardsByRepo.set(nameWithOwner, issues[0]);
+  await pool(dashboards, opts.concurrency, async ({ nameWithOwner, number }) => {
+    let issue = null;
+    try {
+      issue = await ghJson([
+        'api',
+        `repos/${nameWithOwner}/issues/${number}`,
+        '--jq',
+        '{number, html_url, updated_at, body, state, title}',
+      ]);
+    } catch {
+      issue = null;
+    }
+
+    if (!isDashboardIssue(issue)) {
+      // Say so rather than letting it become a silent `gap`.
+      process.stderr.write(
+        `  warning: ${nameWithOwner}#${number} is not a readable open Dependency Dashboard — treating as absent.\n`,
+      );
+      return;
+    }
+    dashboardsByRepo.set(nameWithOwner, issue);
   });
 
   const repos = await pool(allRepos, opts.concurrency, (nameWithOwner) =>
@@ -899,6 +1003,10 @@ async function main() {
 export {
   assessHealth,
   countDetectedDependencies,
+  helpText,
+  IGNORE_OVERRIDE_SECTIONS,
+  isDashboardIssue,
+  parseArgs,
   parseCheckboxes,
   parseFleetFromSyncConfig,
   parseProblems,

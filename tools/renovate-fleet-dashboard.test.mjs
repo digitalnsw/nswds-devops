@@ -4,6 +4,10 @@ import test from 'node:test';
 import {
   assessHealth,
   countDetectedDependencies,
+  helpText,
+  IGNORE_OVERRIDE_SECTIONS,
+  isDashboardIssue,
+  parseArgs,
   parseCheckboxes,
   parseFleetFromSyncConfig,
   parseProblems,
@@ -259,6 +263,94 @@ test('no patterns means nothing is hidden', () => {
     shouldIgnore(unticked('chore(deps): lock file maintenance'), 'Awaiting Schedule', []),
     false,
   );
+});
+
+// --- argument parsing ----------------------------------------------------
+
+test('parses a well-formed argument list', () => {
+  const opts = parseArgs([
+    '--org', 'acme',
+    '--out', 'out.html',
+    '--json', 'out.json',
+    '--concurrency', '3',
+    '--ignore', 'foo',
+    '--ignore', 'bar',
+  ]);
+  assert.equal(opts.org, 'acme');
+  assert.equal(opts.out, 'out.html');
+  assert.equal(opts.json, 'out.json');
+  assert.equal(opts.concurrency, 3);
+  // First --ignore replaces the default, the second appends.
+  assert.deepEqual(opts.ignore, ['foo', 'bar']);
+});
+
+test('--no-ignore clears the default and takes no value', () => {
+  assert.deepEqual(parseArgs(['--no-ignore']).ignore, []);
+  assert.deepEqual(parseArgs(['--no-ignore', '--org', 'acme']).ignore, []);
+});
+
+test('a flag cannot swallow the following flag as its value', () => {
+  // The dangerous case: this used to set ignore:["--out"], drop the output path
+  // and write to the default file with exit code 0.
+  assert.throws(() => parseArgs(['--ignore', '--out', 'x.html']), /--ignore requires a value/);
+  assert.throws(() => parseArgs(['--out', '--json', 'x.json']), /--out requires a value/);
+});
+
+test('a trailing flag with no value is rejected', () => {
+  for (const flag of ['--org', '--out', '--json', '--concurrency', '--ignore']) {
+    assert.throws(() => parseArgs([flag]), new RegExp(`${flag} requires a value`), flag);
+  }
+});
+
+test('--concurrency must be a positive integer', () => {
+  for (const bad of ['foo', '0', '-1', '1.5', 'NaN', '']) {
+    assert.throws(() => parseArgs(['--concurrency', bad]), /--concurrency/, `rejects ${bad}`);
+  }
+  assert.equal(parseArgs(['--concurrency', '1']).concurrency, 1);
+  assert.equal(parseArgs(['--concurrency', '16']).concurrency, 16);
+});
+
+test('an unrecognised option is rejected rather than silently ignored', () => {
+  assert.throws(() => parseArgs(['--ignor', 'x']), /unknown option: --ignor/);
+  assert.throws(() => parseArgs(['stray']), /unknown option: stray/);
+});
+
+// --- documentation cannot drift from behaviour ---------------------------
+
+test('IGNORE_OVERRIDE_SECTIONS matches the sections shouldIgnore actually overrides on', () => {
+  const patterns = ['lock file maintenance'];
+  const item = { title: 'chore(deps): lock file maintenance', checked: false };
+
+  // Every listed section must surface an ignored item...
+  for (const section of IGNORE_OVERRIDE_SECTIONS) {
+    assert.equal(shouldIgnore(item, section, patterns), false, `${section} should override`);
+  }
+  // ...and the quiet ones must not.
+  for (const section of ['Awaiting Schedule', 'Pending Status Checks', 'Rate-Limited', 'Open']) {
+    assert.equal(shouldIgnore(item, section, patterns), true, `${section} should not override`);
+  }
+});
+
+test('the help text names exactly those sections, and not Rate-Limited', () => {
+  const help = helpText();
+  for (const section of IGNORE_OVERRIDE_SECTIONS) {
+    assert.ok(help.includes(section), `help should name ${section}`);
+  }
+  assert.equal(help.includes('Rate-Limited'), false);
+  assert.equal(help.includes('Edited-Blocked'), false);
+  // Repository problems is alert-severity but never reaches shouldIgnore.
+  assert.equal(help.includes('Repository problems'), false);
+});
+
+// --- dashboard issue validation ------------------------------------------
+
+test('only an open, correctly titled issue counts as a dashboard', () => {
+  const ok = { state: 'open', title: 'Dependency Dashboard' };
+  assert.equal(isDashboardIssue(ok), true);
+  assert.equal(isDashboardIssue({ ...ok, state: 'closed' }), false);
+  assert.equal(isDashboardIssue({ ...ok, title: 'Something else' }), false);
+  assert.equal(isDashboardIssue(null), false);
+  assert.equal(isDashboardIssue(undefined), false);
 });
 
 // --- fleet membership ----------------------------------------------------
