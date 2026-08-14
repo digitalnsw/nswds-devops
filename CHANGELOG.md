@@ -1,3 +1,9 @@
+## [1.23.1](https://github.com/digitalnsw/nswds-devops/compare/v1.23.0...v1.23.1) (2026-08-14)
+
+### Bug Fixes
+
+* **renovate:** stop unpublished nswds-ui workspaces cutting empty releases ([#103](https://github.com/digitalnsw/nswds-devops/issues/103)) ([0744df2](https://github.com/digitalnsw/nswds-devops/commit/0744df2ea90158cda542ac383bf94c444f0928e1))
+
 ## [1.23.0](https://github.com/digitalnsw/nswds-devops/compare/v1.22.0...v1.23.0) (2026-08-13)
 
 ### Features
