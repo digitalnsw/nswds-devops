@@ -1,3 +1,9 @@
+## [1.24.0](https://github.com/digitalnsw/nswds-devops/compare/v1.23.1...v1.24.0) (2026-08-14)
+
+### Features
+
+* add Renovate fleet dashboard generator ([#104](https://github.com/digitalnsw/nswds-devops/issues/104)) ([5cc3527](https://github.com/digitalnsw/nswds-devops/commit/5cc352728138ebca4f9faea72e7d138174a924db))
+
 ## [1.23.1](https://github.com/digitalnsw/nswds-devops/compare/v1.23.0...v1.23.1) (2026-08-14)
 
 ### Bug Fixes
