@@ -11,6 +11,15 @@ permissions:
   contents: read
 
 jobs:
+  # Dogfoods the shared gate via a local reference, the same way release.yml
+  # does. On this repo install and test do the work: there is no `lint` script,
+  # no `type-check`/`typecheck` script and no Prettier config, so those three
+  # jobs detect nothing and self-skip. `test` runs tools/*.test.mjs, which is
+  # the only thing exercising the fleet-dashboard failure paths — the fleet is
+  # green almost always, so they are never hit by real data.
+  install:
+    uses: ./.github/workflows/reusable-ci.yml
+
   shellcheck:
     runs-on: ubuntu-latest
     timeout-minutes: 10
