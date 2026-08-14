@@ -20,7 +20,9 @@
     "branch:suggest": "scripts/suggest-branch-name.sh",
     "branch:suggest:create": "scripts/suggest-branch-name.sh --create",
     "commit": "scripts/git-commit.sh",
-    "pr": "scripts/pull-request.sh"
+    "pr": "scripts/pull-request.sh",
+    "test": "node --test tools/*.test.mjs",
+    "renovate:dashboard": "node tools/renovate-fleet-dashboard.mjs"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",
