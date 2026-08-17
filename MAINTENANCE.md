@@ -168,7 +168,12 @@ rollout originally granted admins an always-on bypass; it was removed
 enforcement to `disabled` (repo Settings → Rules, or
 `gh api -X PUT repos/digitalnsw/<repo>/rulesets/<id>` resending the full
 definition with `"enforcement": "disabled"`), push, and re-enable — a
-deliberate, auditable two-step rather than a standing exemption. When
+deliberate, auditable two-step rather than a standing exemption.
+`scripts/push-to-protected-branch.sh` automates exactly that two-step: it
+backs up each ruleset definition first, restores from an `EXIT` trap so an
+error or `Ctrl-C` still re-enables protection, and keeps the backup and exits
+non-zero if a restore fails rather than leaving the branch quietly open. See
+"Break-glass: pushing to a protected branch" in README.md for usage. When
 adding a bypass actor for a new automation, prefer a dedicated deploy key
 over any role- or team-based grant.
 
