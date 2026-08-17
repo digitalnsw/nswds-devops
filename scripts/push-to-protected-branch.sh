@@ -159,8 +159,10 @@ echo
 # This prompt is the one place the script waits on a human. Earlier the last
 # line before it was the "Backups:" path, which reads like a completion
 # message — easy to walk away from and then push by hand, which fails because
-# nothing has been disabled yet.
-echo ">>> Nothing has been changed yet. Waiting for you. <<<"
+# nothing has been disabled yet. Scope the claim to rulesets: the backup
+# directory has just been written and its path printed directly above, so an
+# unqualified "nothing has changed" contradicts the line above it.
+echo ">>> No rulesets have been changed yet — waiting for your answer. <<<"
 read -r -p "Disable ${#IDS[@]} ruleset(s) on $REPO:$BRANCH and push $BRANCH? [y/N] " ok
 [[ "$ok" =~ ^[Yy]$ ]] || { echo "Aborted — no rulesets were changed."; exit 0; }
 
