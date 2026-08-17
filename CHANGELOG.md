@@ -1,3 +1,9 @@
+## [1.24.1](https://github.com/digitalnsw/nswds-devops/compare/v1.24.0...v1.24.1) (2026-08-17)
+
+### Bug Fixes
+
+* exit on INT/TERM instead of resuming at the prompt ([#107](https://github.com/digitalnsw/nswds-devops/issues/107)) ([f3262e8](https://github.com/digitalnsw/nswds-devops/commit/f3262e8680946f13e818c7010301b839bb818c3b))
+
 ## [1.24.0](https://github.com/digitalnsw/nswds-devops/compare/v1.23.1...v1.24.0) (2026-08-14)
 
 ### Features
