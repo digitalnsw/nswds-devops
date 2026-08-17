@@ -10,38 +10,64 @@
 # Usage:
 #   ./push-to-protected-branch.sh                 # prompts for the repo
 #   ./push-to-protected-branch.sh digitalnsw/agile
-set -uo pipefail
+set -euo pipefail
 
 BACKUP_DIR="${TMPDIR:-/tmp}/ruleset-backup-$$"
 RESTORED=0
-IDS=()
+IDS=()        # rulesets we intend to disable
+DISABLED=()   # rulesets actually disabled — only these get restored
 REPO=""
 
+# The PUT body is a deliberate projection of the six fields GitHub documents
+# as writable on a ruleset. The other eight keys a GET returns (_links, id,
+# node_id, source, source_type, created_at, updated_at,
+# current_user_can_bypass) are read-only and are rejected or ignored on
+# write. KNOWN_KEYS is all fourteen: if GitHub ever adds a key we don't know
+# about, check_schema() says so out loud rather than letting the projection
+# strip a setting silently on restore.
+WRITABLE='{name, target, enforcement, conditions, rules, bypass_actors}'
+KNOWN_KEYS='["_links","bypass_actors","conditions","created_at",
+             "current_user_can_bypass","enforcement","id","name","node_id",
+             "rules","source","source_type","target","updated_at"]'
+
+check_schema() {
+  local file="$1" id="$2" unknown
+  # Bind the key to $k first: inside `$known | index(.)` the `.` would rebind
+  # to $known, so the membership test would never match.
+  unknown=$(jq -r --argjson known "$KNOWN_KEYS" \
+    '[keys[] | . as $k | select(($known | index($k)) == null)] | join(", ")' "$file")
+  if [ -n "$unknown" ]; then
+    echo "  !! ruleset $id has unrecognised field(s): $unknown" >&2
+    echo "     This script only writes back $WRITABLE." >&2
+    echo "     If any of the above are writable they will be LOST on restore." >&2
+  fi
+}
+
 restore() {
-  [ "$RESTORED" = 1 ] && return
-  [ "${#IDS[@]}" -eq 0 ] && return
+  if [ "$RESTORED" = 1 ]; then return; fi
   RESTORED=1
-  echo
-  echo "Restoring rulesets…"
-  local failed=0
-  for id in "${IDS[@]}"; do
-    if jq '{name, target, enforcement, conditions, rules, bypass_actors}' \
-         "$BACKUP_DIR/$id.json" \
-         | gh api -X PUT "repos/$REPO/rulesets/$id" --input - >/dev/null 2>&1; then
-      echo "  restored ruleset $id ($(jq -r .name "$BACKUP_DIR/$id.json"))"
-    else
-      echo "  !! FAILED to restore ruleset $id" >&2
-      failed=1
-    fi
-  done
-  if [ "$failed" = 1 ]; then
+  if [ "${#DISABLED[@]}" -gt 0 ]; then
     echo
-    echo "!! One or more rulesets are still DISABLED. Restore by hand from:" >&2
-    echo "   $BACKUP_DIR" >&2
-    exit 1
+    echo "Restoring rulesets…"
+    local failed=0
+    for id in "${DISABLED[@]}"; do
+      if jq "$WRITABLE" "$BACKUP_DIR/$id.json" \
+           | gh api -X PUT "repos/$REPO/rulesets/$id" --input - >/dev/null 2>&1; then
+        echo "  restored ruleset $id ($(jq -r .name "$BACKUP_DIR/$id.json"))"
+      else
+        echo "  !! FAILED to restore ruleset $id" >&2
+        failed=1
+      fi
+    done
+    if [ "$failed" = 1 ]; then
+      echo
+      echo "!! One or more rulesets are still DISABLED. Restore by hand from:" >&2
+      echo "   $BACKUP_DIR" >&2
+      exit 1
+    fi
+    echo "All rulesets restored to their original enforcement."
   fi
   rm -rf "$BACKUP_DIR"
-  echo "All rulesets restored to their original enforcement."
 }
 trap restore EXIT INT TERM
 
@@ -64,13 +90,25 @@ echo "Repo:   $REPO"
 echo "Branch: $BRANCH"
 
 # --- find the rulesets that actually apply to that branch ------------------
+# A failed API call must never look like "no rulesets apply": gh writes the
+# error body to stdout, so an unchecked read would treat {"message":...} as a
+# ruleset id. Capture the response and the exit status separately.
+# stdout only: gh puts the error body on stdout and its own message on stderr,
+# so merging them (2>&1) would let a stderr warning corrupt the JSON we parse.
+rules_json=$(gh api "repos/$REPO/rules/branches/$BRANCH") || {
+  echo "Failed to read branch rules for $REPO:$BRANCH — aborting without" >&2
+  echo "touching anything. The API said:" >&2
+  printf '  %s\n' "$rules_json" | head -3 >&2
+  exit 1
+}
+ids_out=$(printf '%s' "$rules_json" | jq -r '[.[].ruleset_id] | unique | .[]')
+
 # (while-read rather than mapfile: macOS ships bash 3.2)
 candidates=()
 while IFS= read -r line; do
-  [ -n "$line" ] && candidates+=("$line")
-done < <(
-  gh api "repos/$REPO/rules/branches/$BRANCH" --jq '[.[].ruleset_id] | unique | .[]' 2>/dev/null
-)
+  if [ -n "$line" ]; then candidates+=("$line"); fi
+done <<< "$ids_out"
+
 if [ "${#candidates[@]}" -eq 0 ]; then
   echo "No rulesets apply to $BRANCH — just push normally."; exit 0
 fi
@@ -92,13 +130,14 @@ for id in "${candidates[@]}"; do
       continue
     fi
     if [ "$enf" = "active" ]; then
+      check_schema "$BACKUP_DIR/$id.json" "$id"
       IDS+=("$id"); echo "  [$id] $name ($enf) — will disable"
     else
       rm -f "$BACKUP_DIR/$id.json"; echo "  [$id] $name ($enf) — already inactive, leaving alone"
     fi
   else
     rm -f "$BACKUP_DIR/$id.json"
-    echo "  [$id] org-level or no admin access — CANNOT disable, may still block" >&2
+    echo "  [$id] cannot read this ruleset (no admin access?) — it may still block" >&2
   fi
 done
 
@@ -113,10 +152,11 @@ read -r -p "Disable ${#IDS[@]} ruleset(s) on $REPO:$BRANCH? [y/N] " ok
 
 # --- disable ---------------------------------------------------------------
 for id in "${IDS[@]}"; do
-  jq '{name, target, enforcement: "disabled", conditions, rules, bypass_actors}' \
+  jq "$WRITABLE"' | .enforcement = "disabled"' \
     "$BACKUP_DIR/$id.json" \
     | gh api -X PUT "repos/$REPO/rulesets/$id" --input - >/dev/null || {
       echo "Failed to disable ruleset $id — aborting." >&2; exit 1; }
+  DISABLED+=("$id")
   echo "  disabled $id"
 done
 
