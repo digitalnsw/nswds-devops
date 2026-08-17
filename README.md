@@ -109,6 +109,31 @@ Rule number one for consumers: **never edit the synced files in a consumer
 repo.** The next sync PR will overwrite the change without comment. Edit
 here, merge, and let the sync deliver it everywhere.
 
+### Break-glass: pushing to a protected branch
+
+`scripts/push-to-protected-branch.sh` has no npm alias because it is not part
+of the everyday loop. It covers the rare case where the default branch must
+take a push while CI is broken: it disables that repo's branch rulesets,
+pushes, then restores every ruleset from an `EXIT` trap, so protection is off
+only for the duration of the push and comes back even on error or `Ctrl-C`.
+
+```
+./scripts/push-to-protected-branch.sh                   # prompts, prefilled from the current clone
+./scripts/push-to-protected-branch.sh digitalnsw/agile  # or name the target repo
+```
+
+It lists the rulesets that apply and waits for confirmation before changing
+anything — answering `n` touches nothing. Run from inside the target clone it
+pushes for you; run from anywhere else it drops protection and waits while
+you push by hand, auto-restoring after five minutes. Organisation-level
+rulesets are reported and skipped, since they cannot be changed from repo
+scope.
+
+Read the **Ruleset bypass policy** section of MAINTENANCE.md before reaching
+for it. Adding yourself as a ruleset bypass actor is *not* the sanctioned
+alternative — this two-step is, precisely because it is temporary and shows
+up in the audit log at both ends.
+
 ## Versioning of this repo
 
 semantic-release runs on every push to `main` and cuts a version from the
