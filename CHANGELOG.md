@@ -1,3 +1,9 @@
+## [1.24.2](https://github.com/digitalnsw/nswds-devops/compare/v1.24.1...v1.24.2) (2026-08-18)
+
+### Bug Fixes
+
+* **scripts:** fail over to Azure on transient AI Gateway failures ([#108](https://github.com/digitalnsw/nswds-devops/issues/108)) ([512d7a1](https://github.com/digitalnsw/nswds-devops/commit/512d7a1636a7985de11dad8ae14bc75de995d0ec))
+
 ## [1.24.1](https://github.com/digitalnsw/nswds-devops/compare/v1.24.0...v1.24.1) (2026-08-17)
 
 ### Bug Fixes
