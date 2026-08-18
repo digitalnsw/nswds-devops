@@ -118,9 +118,15 @@ _openai_responses_post() {
 # openai_responses_text <system_prompt> <user_prompt> [max_output_tokens]
 #
 # Builds a Responses API payload, POSTs it, and echoes the model's combined
-# output text on stdout. On any failure (transport, non-JSON, or an API-level
-# .error) it prints a diagnostic to stderr and returns 1 — callers decide
-# whether to exit or fall back.
+# output text on stdout.
+#
+# Failover happens HERE, not in the caller: a transient failure is retried
+# against Azure OpenAI when AZURE_OPENAI_API_KEY + AZURE_OPENAI_ENDPOINT are
+# set (see the header for what counts as transient). The internal 42 code
+# never reaches a caller — this function returns only 0 or 1.
+#
+# Returns 1 when the request failed and no failover succeeded, after printing
+# a diagnostic to stderr; callers decide whether to exit or degrade.
 openai_responses_text() {
   local system_prompt="$1"
   local user_prompt="$2"
