@@ -779,6 +779,8 @@ function renderHtml(allRepos, meta) {
 
   .note { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: .8rem 1rem; margin-bottom: 1.5rem; font-size: .88rem; color: var(--muted); }
   .note strong { color: var(--text); }
+  .note p { margin: 0 0 .7rem; }
+  .note p:last-child { margin-bottom: 0; }
 
   .table-scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
   table { border-collapse: collapse; width: 100%; min-width: 860px; }
@@ -839,12 +841,22 @@ function renderHtml(allRepos, meta) {
   </div>
 
   <div class="note">
-    <strong>Read this before trusting a green row.</strong> Renovate writes the Dependency Dashboard at the
+    <p><strong>Read this before trusting a green row.</strong> Renovate writes the Dependency Dashboard at the
     <em>end</em> of a run, so a run that aborts early leaves the last good dashboard in place — no PR, no error
     comment, no red check. This page infers run health from two proxies: checkboxes that stay ticked, and a
     dashboard that stops changing while work is pending. Neither is authoritative, because Renovate only rewrites
     the issue when the body actually changes and a genuinely idle repo is legitimately quiet.
-    The real job log lives on the Mend portal — the <em>Mend&nbsp;↗</em> link on each row.
+    The real job log lives on the Mend portal — the <em>Mend&nbsp;↗</em> link on each row.</p>
+
+    <p><strong>What “Updated” measures.</strong> It is the age of the last edit to the Dependency Dashboard
+    <em>issue</em> — so “6d ago” means the dashboard body has not changed in six days. It does <em>not</em> mean
+    Renovate has not run: it runs on schedule regardless, and a run that finds the same picture as last time
+    rewrites nothing, leaving the timestamp where it was. Nor does it quite mean there was nothing to update — an
+    item parked in <em>Awaiting Schedule</em> renders identically run after run while the age keeps climbing.
+    Read it as “nothing about this repo's update picture has changed in that long”, which is
+    ambiguous between quiet-because-idle and quiet-because-the-run-is-dying. That is why age alone never raises a
+    status here: it only counts alongside a ticked checkbox (&gt;${STALE_ALERT_DAYS}d ⇒ alert) or pending work
+    (&gt;${STALE_WARN_DAYS}d ⇒ warn). A stale age with nothing pending and no ticks is a correctly quiet repo.</p>
   </div>
 
   <div class="table-scroll">
