@@ -1,3 +1,9 @@
+## [1.24.3](https://github.com/digitalnsw/nswds-devops/compare/v1.24.2...v1.24.3) (2026-08-25)
+
+### Bug Fixes
+
+* **renovate:** split the storybook family into its own group ([#111](https://github.com/digitalnsw/nswds-devops/issues/111)) ([1794dd7](https://github.com/digitalnsw/nswds-devops/commit/1794dd74b12640584987d9b17813692c3d64079b))
+
 ## [1.24.2](https://github.com/digitalnsw/nswds-devops/compare/v1.24.1...v1.24.2) (2026-08-18)
 
 ### Bug Fixes
