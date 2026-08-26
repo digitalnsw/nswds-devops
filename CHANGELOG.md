@@ -1,3 +1,9 @@
+## [1.24.4](https://github.com/digitalnsw/nswds-devops/compare/v1.24.3...v1.24.4) (2026-08-26)
+
+### Bug Fixes
+
+* stop the PR title generator discarding its own valid title ([#112](https://github.com/digitalnsw/nswds-devops/issues/112)) ([8f60e2f](https://github.com/digitalnsw/nswds-devops/commit/8f60e2f9065d0e5db18b05614dfc4d30f4204bed))
+
 ## [1.24.3](https://github.com/digitalnsw/nswds-devops/compare/v1.24.2...v1.24.3) (2026-08-25)
 
 ### Bug Fixes
