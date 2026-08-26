@@ -108,7 +108,10 @@ delete them all.
 Contents RW, Pull requests RW, and Workflows RW (the last one is mandatory —
 without it every sync PR fails only on the workflow-stub files, which is
 confusing to debug). Credentials live as repository secrets on this repo:
-`SYNC_APP_ID` and `SYNC_APP_PRIVATE_KEY`. Repository-level on purpose — an
+`SYNC_APP_ID` and `SYNC_APP_PRIVATE_KEY`. `SYNC_APP_ID` is read into the
+action's `client-id` input, not `app-id` — `app-id` is deprecated, and GitHub
+accepts the numeric App ID as the JWT issuer just as it does a Client ID, so
+the secret's value never had to change. Repository-level on purpose — an
 org-level secret would expose an org-wide-write key to every repo's
 workflows. The driver passes the minted token as `GH_INSTALLATION_TOKEN`
 (App tokens don't work via `GH_PAT`; that input is for personal tokens).
@@ -256,7 +259,7 @@ Every entry below is something that actually happened (2026-07-15 onward).
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Sync run: `[@octokit/auth-app] appId option is required` | `SYNC_APP_ID` secret missing/renamed | restore the repo secret |
+| Sync run: `The 'client-id' (or deprecated 'app-id') input must be set` (older action versions: `[@octokit/auth-app] appId option is required`) | `SYNC_APP_ID` secret missing/renamed | restore the repo secret |
 | Sync run: `could not read Password for 'https://***@github.com'` | App token passed as `GH_PAT` | it must go in `GH_INSTALLATION_TOKEN` |
 | Sync run: `ENOENT: .github/sync.yml` | driver has no checkout step | keep `actions/checkout` before the sync action |
 | Consumer check: "workflow was not found" | Actions access setting reset, or the `v1` tag missing/deleted | fix the access setting; re-promote via the Promote v1 workflow |
