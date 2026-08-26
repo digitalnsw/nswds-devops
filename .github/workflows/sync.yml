@@ -53,7 +53,14 @@ jobs:
         with:
           # Both stored as repository secrets (the App ID isn't sensitive, but
           # it was saved there; reading it as a secret is equally fine).
-          app-id: ${{ secrets.SYNC_APP_ID }}
+          #
+          # The input is `client-id` because `app-id` is deprecated, but the
+          # secret still holds the numeric App ID — that is not a mismatch.
+          # The action resolves `client-id || app-id` and hands whichever it
+          # gets to @octokit/auth-app as `appId`, and GitHub accepts either
+          # the App ID or the Client ID as the JWT issuer. So this was a key
+          # rename only; nothing about the secret changed.
+          client-id: ${{ secrets.SYNC_APP_ID }}
           private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
           owner: digitalnsw
 
