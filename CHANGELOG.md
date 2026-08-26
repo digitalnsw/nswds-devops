@@ -1,3 +1,9 @@
+## [1.24.5](https://github.com/digitalnsw/nswds-devops/compare/v1.24.4...v1.24.5) (2026-08-26)
+
+### Bug Fixes
+
+* **ci:** use client-id for the App token instead of deprecated app-id ([#113](https://github.com/digitalnsw/nswds-devops/issues/113)) ([85ed602](https://github.com/digitalnsw/nswds-devops/commit/85ed602252be066f425528998af297a42f186953))
+
 ## [1.24.4](https://github.com/digitalnsw/nswds-devops/compare/v1.24.3...v1.24.4) (2026-08-26)
 
 ### Bug Fixes
