@@ -417,15 +417,11 @@ jobs:
         # Gate on having a suggested title; prevents hard-fail when AI didn't run.
         if: ${{ steps.validate-title.outputs.update_needed == 'true' && steps.ai.outputs.title != '' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
         uses: actions/github-script@v9
-        env:
-          CONVENTIONAL_COMMIT_REGEX: ${{ steps.conventional-config.outputs.regex || env.CONVENTIONAL_COMMIT_REGEX_DEFAULT }}
-          REFRESH_AUTO: ${{ steps.validate-title.outputs.refresh_auto }}
         with:
           retries: 3
           script: |
             const suggestedTitle = ${{ toJson(steps.ai.outputs.title) }};
             const originalTitle = ${{ toJson(steps.validate-title.outputs.original_title) }};
-            const refreshAuto = process.env.REFRESH_AUTO === 'true';
 
             const { data: pr } = await github.rest.pulls.get({
               owner: context.repo.owner,
@@ -433,20 +429,25 @@ jobs:
               pull_number: context.issue.number
             });
 
-            const conventional = new RegExp(process.env.CONVENTIONAL_COMMIT_REGEX);
-
             if (pr.title !== originalTitle) {
               console.log(`ℹ️ PR title changed during the run. Skipping update. Current: "${pr.title}"`);
               return;
             }
 
-            // Don't clobber a valid, human-authored title. The refresh path is the
-            // sole exception: the title is valid *and* matches our stored marker,
-            // so it's our own auto-title and safe to regenerate.
-            if (conventional.test(pr.title || "") && !refreshAuto) {
-              console.log(`ℹ️ PR title is already valid (human-authored). Skipping update. Current: "${pr.title}"`);
-              return;
-            }
+            // Deliberately no second validity test. Whether a title is acceptable
+            // is decided once, by Validate PR Title, which runs the repo's full
+            // commitlint ruleset when one is configured. This step used to
+            // re-decide it with the coarse Conventional Commits regex, and the two
+            // disagree: "feat: My subject" matches the regex but violates
+            // commitlint's subject-case. On exactly those titles the generated
+            // replacement was discarded here as "already valid", and the lint step
+            // at the end of this job then failed the very title the job exists to
+            // fix — so the check could only ever fire when it was wrong.
+            //
+            // Reaching this step already means update_needed=true (see the step's
+            // if:), covering both an invalid title and the auto-title refresh. The
+            // one case still worth skipping is a human editing the title mid-run,
+            // which is the originalTitle comparison above.
 
             // Build a single update: the new title (if changed) plus a refreshed
             // base64 marker in the body so future runs recognise this auto-title.
