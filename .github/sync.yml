@@ -88,6 +88,43 @@ group:
       - source: repo-files/.npmrc-nswds-ui
         dest: .npmrc
 
+  # ── Group 2d: nswds-email-design ────────────────────────────────────────
+  # Workspace monorepo like nswds-ui: publishes @nswds/email from
+  # packages/email with its own release.yml + release config (path-scoped
+  # semantic-release, @semantic-release/npm enabled, trusted publishing), so
+  # neither is synced. Same .npmrc variant (private repo: provenance off).
+  - repos: |
+      digitalnsw/nswds-email-design
+    files:
+      - source: scripts/
+        dest: scripts/
+      - source: commit-types.mjs
+        dest: commit-types.mjs
+      - source: commitlint.config.mjs
+        dest: commitlint.config.mjs
+      - source: git-conventional-commits.yaml
+        dest: git-conventional-commits.yaml
+      - source: workflow-stubs/commitlint.yml
+        dest: .github/workflows/commitlint.yml
+      - source: workflow-stubs/validate-branch-name.yml
+        dest: .github/workflows/validate-branch-name.yml
+      - source: workflow-stubs/commit-types-sync.yml
+        dest: .github/workflows/commit-types-sync.yml
+      - source: workflow-stubs/ai-pr-title.yml
+        dest: .github/workflows/ai-pr-title.yml
+      - source: workflow-stubs/openai-pr-description.yml
+        dest: .github/workflows/openai-pr-description.yml
+      - source: workflow-stubs/ci.yml
+        dest: .github/workflows/ci.yml
+      - source: workflow-stubs/confluence-sync.yml
+        dest: .github/workflows/confluence-sync.yml
+      - source: repo-files/renovate.json
+        dest: renovate.json
+      - source: repo-files/.nvmrc
+        dest: .nvmrc
+      - source: repo-files/.npmrc-nswds-ui
+        dest: .npmrc
+
   # ── Group 2b: nswds-tokens ───────────────────────────────────────────────
   # Like nswds-ui it keeps its own release.yml + release config, but its
   # .github/workflows/ci.yml is ALSO its own (lint/typecheck/test/validate
