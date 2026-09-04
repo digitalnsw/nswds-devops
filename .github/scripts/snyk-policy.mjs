@@ -18,9 +18,10 @@
 //       # repo-specific          <- marker, last line of the block
 //     [ tail, preserved byte-for-byte ]
 //
-// Only the block is ever rewritten. The tail is never parsed, never
-// reformatted, never reordered — it is copied through verbatim, so a repo
-// cannot lose policy it owns.
+// Only the block is ever rewritten. The tail is never parsed, reformatted or
+// reordered — it is copied through verbatim, so a repo cannot lose policy it
+// owns. The single exception is a trailing newline added when the file would
+// otherwise not end in one; trailing blank lines are left exactly as found.
 //
 // The block is delivered as ONE PR per repo on a chore/repo-sync/* branch,
 // which scripts/branch-name-config.sh (REPO_SYNC_REGEX) already exempts from
@@ -33,7 +34,10 @@
 //   node .github/scripts/snyk-policy.mjs --check            report drift only
 //   node .github/scripts/snyk-policy.mjs --apply            open/refresh PRs
 //   node .github/scripts/snyk-policy.mjs --check --repo x   one repo
-//   node .github/scripts/snyk-policy.mjs --apply --dry-run  print, do not push
+//   node .github/scripts/snyk-policy.mjs --apply --dry-run  print, do not write
+//
+// GH_TOKEN is required for every mode, --dry-run included: dry-run suppresses
+// WRITES, not reads — evaluating drift means fetching each consumer's .snyk.
 
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -42,6 +46,12 @@ import { join } from 'node:path'
 const MARKER = '  # repo-specific'
 const BRANCH = 'chore/repo-sync/snyk-policy'
 const POLICY_PATH = '.snyk'
+
+// Emitted only by this script, so its presence in a consumer's file proves the
+// file was produced by a fan-out rather than written before the convention.
+// That is what lets a one-time `migrate` directive disarm itself — see
+// isConverted() and the directive handling in evaluate().
+const SENTINEL = 'Canonical base (generated from nswds-devops'
 
 const args = process.argv.slice(2)
 const has = (f) => args.includes(f)
@@ -55,6 +65,17 @@ const DRY_RUN = has('--dry-run')
 const ONLY = valueOf('--repo')
 
 const base = readFileSync(new URL('../../snyk-policy/base.snyk', import.meta.url), 'utf8')
+
+// The sentinel is what isConverted() keys on, so it is load-bearing for the
+// self-disarming migrate directives: if it were ever edited out of the base,
+// every converted repo would read as unconverted and every lingering directive
+// would re-arm at once, deleting policy across the fleet. Fail at startup.
+if (!base.includes(SENTINEL)) {
+  throw new Error(
+    `snyk-policy/base.snyk must contain the sentinel ${JSON.stringify(SENTINEL)} — ` +
+      'converted-state detection, and therefore migrate-directive disarming, depends on it',
+  )
+}
 const config = JSON.parse(
   readFileSync(new URL('../../snyk-policy/repos.json', import.meta.url), 'utf8'),
 )
@@ -70,6 +91,18 @@ export const blockOf = (baseText) => {
   const lines = baseText.split('\n')
   const at = lines.findIndex((l) => l.trimEnd() === MARKER)
   if (at === -1) throw new Error(`snyk-policy/base.snyk has no "${MARKER}" marker`)
+  // Enforced, not merely documented. findIndex takes the FIRST marker, so
+  // anything below it — a canonical ignore added in the wrong place, or a
+  // second marker — would be dropped from every rendered policy with no
+  // error. For a security policy file the failure mode is a new ignore that
+  // silently never ships, so fail loudly instead.
+  const trailing = lines.slice(at + 1).filter((l) => l.trim())
+  if (trailing.length) {
+    throw new Error(
+      `snyk-policy/base.snyk has content after the "${MARKER}" marker, which would be ` +
+        `silently dropped from every consumer: ${JSON.stringify(trailing[0])}`,
+    )
+  }
   return lines.slice(0, at + 1).join('\n')
 }
 
@@ -104,6 +137,16 @@ export const splitAtMarker = (content) => {
   return { head: content.slice(0, offset), tail: content.slice(offset) }
 }
 
+// Has this repo already received a fan-out? True only when the file carries
+// BOTH the marker and the generated-header sentinel above it, which together
+// mean the split is trustworthy and the tail is genuinely the repo's own.
+// A file that predates the convention has neither, or has a marker in the
+// wrong place under an old hand-written header.
+export const isConverted = (content) => {
+  const split = splitAtMarker(content)
+  return Boolean(split && split.head.includes(SENTINEL))
+}
+
 // One-time conversion for a file written before the convention existed.
 export const migrateTail = (content, migrate) => {
   if (!migrate || migrate === 'manual') return null
@@ -118,12 +161,19 @@ export const migrateTail = (content, migrate) => {
   throw new Error(`unrecognised migrate directive: ${JSON.stringify(migrate)}`)
 }
 
-// Exactly one newline at EOF, whatever the tail brought with it. A non-empty
-// tail must start on its own line: both producers already guarantee that, and
-// the guard keeps a hand-written directive from corrupting the marker line.
+// The tail is emitted byte-for-byte. The only bytes this function may add are
+// (a) a separating newline when a tail does not start on its own line — both
+// producers already guarantee it does, so this only guards a hand-written
+// directive from corrupting the marker line — and (b) a single trailing
+// newline when the result would otherwise lack one.
+//
+// It deliberately does NOT normalise trailing blank lines. Collapsing them
+// would rewrite bytes the repo owns, which is exactly the guarantee the whole
+// mechanism rests on; how a consumer ends its own file is its business.
 export const compose = (block, tail) => {
   const sep = tail && !tail.startsWith('\n') ? '\n' : ''
-  return `${block}${sep}${tail}`.replace(/\n*$/, '\n')
+  const out = `${block}${sep}${tail}`
+  return out.endsWith('\n') ? out : `${out}\n`
 }
 
 // ── GitHub ─────────────────────────────────────────────────────────────────
@@ -168,15 +218,25 @@ const evaluate = async (repo, settings) => {
     return { repo, state: 'create', next: compose(wanted, ''), sha: null }
   }
 
-  // An explicit migrate directive WINS over the steady-state split, even when
-  // the marker is already present. Several repos carry the marker in the wrong
-  // place: reviewers and nswds-email have it above their licence list, which
-  // the base now owns, so trusting the marker there would emit those 28 keys
-  // twice — a duplicate-key YAML file where the tail silently shadows the
-  // canonical block. Delete the directive once the repo has been converted.
+  // A migrate directive wins over the marker ONLY while the repo is still
+  // unconverted. Two failure modes have to be avoided at once:
+  //
+  //   Trusting the marker too early — reviewers and nswds-email carry it above
+  //   their licence list, which the base now owns, so the split would emit
+  //   those 28 keys twice: a duplicate-key file whose tail silently shadows
+  //   the canonical block.
+  //
+  //   Trusting the directive too long — once a repo has been converted its
+  //   marker is correct and its tail is genuinely its own. Re-running a
+  //   `tail: "none"` directive then DELETES any policy added since the first
+  //   fan-out, which is the exact loss this mechanism exists to prevent.
+  //
+  // isConverted() settles it from the file itself, so the directive disarms
+  // automatically and a forgotten entry in repos.json cannot destroy policy.
   const split = splitAtMarker(current.content)
+  const converted = isConverted(current.content)
   let tail
-  if (settings.migrate) {
+  if (settings.migrate && !converted) {
     tail = migrateTail(current.content, settings.migrate)
   } else if (split) {
     tail = split.tail
@@ -188,14 +248,19 @@ const evaluate = async (repo, settings) => {
     }
   }
 
+  // Nudge rather than fail: a spent directive is now harmless, but leaving it
+  // in repos.json makes the config lie about the repo's state.
+  const spentDirective = Boolean(settings.migrate && settings.migrate !== 'manual' && converted)
+
   const next = compose(wanted, tail)
-  if (next === current.content) return { repo, state: 'ok' }
+  if (next === current.content) return { repo, state: 'ok', spentDirective }
   return {
     repo,
-    state: settings.migrate ? 'migrate' : 'drift',
+    state: settings.migrate && !converted ? 'migrate' : 'drift',
     next,
     sha: current.sha,
     before: current.content,
+    spentDirective,
   }
 }
 
@@ -218,7 +283,9 @@ const PR_BODY = [
   'in nswds-devops.',
   '',
   'Everything below the `# repo-specific` marker is this repo\'s own policy and',
-  'is copied through byte-for-byte — the sync never parses or reorders it.',
+  'is copied through byte-for-byte — the sync never parses, reorders or',
+  'reformats it. The only byte it may add is a trailing newline when the file',
+  'would otherwise not end in one.',
   '',
   'Opened by `.github/workflows/snyk-policy-sync.yml`. Edit the base in',
   'nswds-devops, not here: a local edit to the block is overwritten on the next',
@@ -266,9 +333,12 @@ const openPr = async (repo, result) => {
 
 const main = async () => {
   // Checked here rather than at import time so the unit tests can pull the
-  // pure renderers in without a token.
-  if (!token && !DRY_RUN) {
-    console.error('::error::GH_TOKEN is required (or pass --dry-run)')
+  // pure renderers in without a token. Required in every mode: --dry-run
+  // suppresses writes, but evaluating drift still reads each consumer's .snyk,
+  // and a tokenless run would send `Bearer undefined` and report 401s as
+  // per-repo errors instead of a usable preview.
+  if (!token) {
+    console.error('::error::GH_TOKEN is required (--dry-run still reads the API)')
     process.exit(1)
   }
 
@@ -294,6 +364,11 @@ const main = async () => {
   for (const r of results) {
     const label = { ok: '✅', drift: '🔁', migrate: '🚚', create: '➕', manual: '✋', unmigrated: '⚠️', error: '❌' }[r.state]
     console.log(`${label} ${r.repo}: ${r.state}${r.reason ? ` — ${r.reason}` : ''}`)
+    if (r.spentDirective) {
+      console.log(
+        `   ℹ️  ${r.repo} is already converted, so its migrate directive is now inert — delete it from snyk-policy/repos.json`,
+      )
+    }
   }
 
   if (MODE === 'apply' && actionable.length && !DRY_RUN) {

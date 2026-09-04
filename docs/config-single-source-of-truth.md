@@ -114,7 +114,8 @@ the enumerated licence list at all.
 `  # repo-specific` marker. `.github/scripts/snyk-policy.mjs` rewrites
 everything down to and including that marker and copies the tail through
 byte-for-byte — it never parses, reorders or reformats the tail, so a repo
-cannot lose policy it owns. Delivery is one PR per repo on a
+cannot lose policy it owns. The only byte it may add is a trailing newline
+when the file would otherwise not end in one. Delivery is one PR per repo on a
 `chore/repo-sync/snyk-policy` branch, driven by
 `.github/workflows/snyk-policy-sync.yml` when the base changes, with
 `.github/workflows/snyk-policy-canary.yml` probing weekly for drift the
@@ -127,10 +128,18 @@ different mechanism, not an exception to it.
 **Consumers and one-time migrations** are declared in
 [`snyk-policy/repos.json`](../snyk-policy/repos.json). A repo written before
 the convention existed carries a `migrate` directive saying how to derive its
-tail once; the directive is inert afterwards and should be deleted. A directive
-**wins over** an existing marker, because several repos put the marker in the
-wrong place — reviewers and nswds-email had it above their licence list, and
-trusting it there emits those 28 keys twice.
+tail once. It **disarms itself**: the renderer applies a directive only while
+the repo is still unconverted, which it decides from the file itself — a
+converted file carries the generated-header sentinel above the marker.
+
+Both halves of that rule are load-bearing. A directive has to beat the marker
+early, because several repos put the marker in the wrong place: reviewers and
+nswds-email had it above their licence list, and trusting it there emits those
+28 keys twice. It must stop beating the marker once the repo is converted,
+because re-running a `tail: "none"` directive would then delete any policy the
+repo added below the marker since — the exact loss this mechanism exists to
+prevent. A forgotten entry in `repos.json` is therefore harmless; `--check`
+reports spent directives so they can be tidied up.
 
 **What the base contains, as of 2026-09-04.** Twenty-eight enumerated licence
 acceptances and no vulnerability ignores:

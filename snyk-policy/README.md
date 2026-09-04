@@ -23,6 +23,9 @@ block and copies the tail through byte-for-byte:
 [ tail, never parsed, never reordered, never reformatted ]
 ```
 
+The only byte the sync may add to the tail is a trailing newline, when the file
+would otherwise not end in one. Trailing blank lines are left exactly as found.
+
 `.github/workflows/snyk-policy-sync.yml` opens one PR per repo when this
 directory changes. `.github/workflows/snyk-policy-canary.yml` probes weekly for
 drift the fan-out would not otherwise see — a block edited directly in a
@@ -36,7 +39,8 @@ fan-out and reported by the canary in the meantime.
 
 **Add a repo.** Add a key to `repos.json`. The sync creates `.snyk` if absent.
 If the repo already has one written before this convention, give it a `migrate`
-directive; delete the directive once its first PR has merged.
+directive. It stops applying automatically once that repo's first PR has
+merged, and `--check` will remind you to delete the now-inert entry.
 
 **Check without changing anything:**
 
@@ -56,8 +60,10 @@ GH_TOKEN=$(gh auth token) node .github/scripts/snyk-policy.mjs --apply --dry-run
   issue IDs and does not support globs. A catch-all matches nothing while
   reading as protection — four repos carried one and were failing every licence
   finding anyway. Licence findings must be enumerated.
-- **A `migrate` directive wins over an existing marker.** Several repos put the
-  marker in the wrong place; trusting it there duplicates canonical keys.
+- **A `migrate` directive beats the marker only until the repo is converted.**
+  Several repos put the marker in the wrong place, so the directive has to win
+  early; once a repo carries the generated-header sentinel the directive is
+  ignored, so a forgotten entry cannot delete policy the repo added later.
 - **Scope vulnerability ignores to a dependency path, not `'*'`,** whenever the
   rationale is conditional on how the package is reached. Enumerate the real
   paths with `npx snyk test --ignore-policy --json` — an incomplete path set

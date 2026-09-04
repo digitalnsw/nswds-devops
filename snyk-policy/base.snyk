@@ -10,8 +10,10 @@ version: v1.25.0
 # this block, and is preserved verbatim by the sync. That split is the whole
 # reason this file is not carried by the ordinary file-sync in
 # .github/sync.yml: BetaHuhn/repo-file-sync-action overwrites whole files,
-# and several repos carry policy that is genuinely theirs (nswds-ui's Snyk
-# Code exclude, dtl-sandbox's path-scoped js-yaml and npm-bundled entries).
+# and several repos carry policy that is genuinely theirs (nswds-email-
+# framework's Snyk Code exclude for generated output, nswds-tokens' one
+# javascript/PT acceptance, nswds-app's transitive postcss ignores, and
+# dtl-sandbox's path-scoped js-yaml and npm-bundled entries).
 # See docs/config-single-source-of-truth.md — Mechanism C.
 #
 # NOTE: never add a '*:lic:*' catch-all. Snyk matches ignore keys as exact
@@ -30,9 +32,15 @@ ignore:
 
   # ── Licence acceptances ─────────────────────────────────────────────────
   # Weak-copyleft (MPL-2.0 / LGPL-3.0) and permissive (Artistic-2.0) licences
-  # on unmodified, transitively-installed build and runtime libraries. This app
-  # is private and is not distributed as a binary or a source package, so no
-  # copyleft distribution obligation is triggered.
+  # on unmodified, transitively-installed build, CI and dev dependencies. They
+  # are not modified and not redistributed: the private apps in this fleet are
+  # not distributed at all, and the published @nswds/* packages ship only their
+  # own build output (`files: ["dist"]`), which does not embed them. The
+  # first-party @nswds/* MPL-2.0 findings are our own licence, chosen
+  # deliberately.
+  #
+  # Do NOT reduce this to "the app is private": nswds-tokens, nswds-app and
+  # nswds-ui publish to npm, so a fleet-wide non-distribution claim is false.
   #
   # Snyk matches ignore keys as EXACT issue IDs -- it does NOT support globs
   # like '*:lic:*', which silently match nothing. Every ID must be listed.
@@ -42,99 +50,99 @@ ignore:
   # LGPL-3.0 -- sharp libvips platform binaries (via next)
   snyk:lic:npm:img:sharp-libvips-darwin-arm64:LGPL-3.0:
     - '*':
-        reason: Unmodified dynamically-linked native library; app is not distributed
+        reason: Unmodified dynamically-linked native library; not redistributed (build/runtime dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:img:sharp-libvips-darwin-x64:LGPL-3.0:
     - '*':
-        reason: Unmodified dynamically-linked native library; app is not distributed
+        reason: Unmodified dynamically-linked native library; not redistributed (build/runtime dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:img:sharp-libvips-linux-arm64:LGPL-3.0:
     - '*':
-        reason: Unmodified dynamically-linked native library; app is not distributed
+        reason: Unmodified dynamically-linked native library; not redistributed (build/runtime dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:img:sharp-libvips-linux-arm:LGPL-3.0:
     - '*':
-        reason: Unmodified dynamically-linked native library; app is not distributed
+        reason: Unmodified dynamically-linked native library; not redistributed (build/runtime dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:img:sharp-libvips-linux-ppc64:LGPL-3.0:
     - '*':
-        reason: Unmodified dynamically-linked native library; app is not distributed
+        reason: Unmodified dynamically-linked native library; not redistributed (build/runtime dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:img:sharp-libvips-linux-riscv64:LGPL-3.0:
     - '*':
-        reason: Unmodified dynamically-linked native library; app is not distributed
+        reason: Unmodified dynamically-linked native library; not redistributed (build/runtime dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:img:sharp-libvips-linux-s390x:LGPL-3.0:
     - '*':
-        reason: Unmodified dynamically-linked native library; app is not distributed
+        reason: Unmodified dynamically-linked native library; not redistributed (build/runtime dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:img:sharp-libvips-linux-x64:LGPL-3.0:
     - '*':
-        reason: Unmodified dynamically-linked native library; app is not distributed
+        reason: Unmodified dynamically-linked native library; not redistributed (build/runtime dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:img:sharp-libvips-linuxmusl-arm64:LGPL-3.0:
     - '*':
-        reason: Unmodified dynamically-linked native library; app is not distributed
+        reason: Unmodified dynamically-linked native library; not redistributed (build/runtime dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:img:sharp-libvips-linuxmusl-x64:LGPL-3.0:
     - '*':
-        reason: Unmodified dynamically-linked native library; app is not distributed
+        reason: Unmodified dynamically-linked native library; not redistributed (build/runtime dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
 
   # MPL-2.0 -- lightningcss and its platform binaries (via Tailwind)
   snyk:lic:npm:lightningcss-android-arm64:MPL-2.0:
     - '*':
-        reason: Prebuilt platform binary of lightningcss; unmodified, app is not distributed
+        reason: Prebuilt platform binary of lightningcss; unmodified, and not redistributed (build dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:lightningcss-darwin-arm64:MPL-2.0:
     - '*':
-        reason: Prebuilt platform binary of lightningcss; unmodified, app is not distributed
+        reason: Prebuilt platform binary of lightningcss; unmodified, and not redistributed (build dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:lightningcss-darwin-x64:MPL-2.0:
     - '*':
-        reason: Prebuilt platform binary of lightningcss; unmodified, app is not distributed
+        reason: Prebuilt platform binary of lightningcss; unmodified, and not redistributed (build dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:lightningcss-freebsd-x64:MPL-2.0:
     - '*':
-        reason: Prebuilt platform binary of lightningcss; unmodified, app is not distributed
+        reason: Prebuilt platform binary of lightningcss; unmodified, and not redistributed (build dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:lightningcss-linux-arm-gnueabihf:MPL-2.0:
     - '*':
-        reason: Prebuilt platform binary of lightningcss; unmodified, app is not distributed
+        reason: Prebuilt platform binary of lightningcss; unmodified, and not redistributed (build dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:lightningcss-linux-arm64-gnu:MPL-2.0:
     - '*':
-        reason: Prebuilt platform binary of lightningcss; unmodified, app is not distributed
+        reason: Prebuilt platform binary of lightningcss; unmodified, and not redistributed (build dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:lightningcss-linux-arm64-musl:MPL-2.0:
     - '*':
-        reason: Prebuilt platform binary of lightningcss; unmodified, app is not distributed
+        reason: Prebuilt platform binary of lightningcss; unmodified, and not redistributed (build dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:lightningcss-linux-x64-gnu:MPL-2.0:
     - '*':
-        reason: Prebuilt platform binary of lightningcss; unmodified, app is not distributed
+        reason: Prebuilt platform binary of lightningcss; unmodified, and not redistributed (build dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:lightningcss-linux-x64-musl:MPL-2.0:
     - '*':
-        reason: Prebuilt platform binary of lightningcss; unmodified, app is not distributed
+        reason: Prebuilt platform binary of lightningcss; unmodified, and not redistributed (build dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:lightningcss-win32-arm64-msvc:MPL-2.0:
     - '*':
-        reason: Prebuilt platform binary of lightningcss; unmodified, app is not distributed
+        reason: Prebuilt platform binary of lightningcss; unmodified, and not redistributed (build dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:lightningcss-win32-x64-msvc:MPL-2.0:
     - '*':
-        reason: Prebuilt platform binary of lightningcss; unmodified, app is not distributed
+        reason: Prebuilt platform binary of lightningcss; unmodified, and not redistributed (build dependency, absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:lightningcss:MPL-2.0:
     - '*':
-        reason: Unmodified weak-copyleft build-time dependency; app is not distributed
+        reason: Unmodified weak-copyleft build-time dependency; not redistributed (absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
 
   # MPL-2.0 -- axe-core (via eslint-config-next) and our own NSW DS packages
   snyk:lic:npm:axe-core:MPL-2.0:
     - '*':
-        reason: Unmodified weak-copyleft dev dependency; app is not distributed
+        reason: Unmodified weak-copyleft dev dependency; not redistributed (absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
   snyk:lic:npm:nswds:eslint-config:MPL-2.0:
     - '*':
@@ -156,7 +164,7 @@ ignore:
   # Artistic-2.0 -- npm, bundled inside semantic-release
   snyk:lic:npm:npm:Artistic-2.0:
     - '*':
-        reason: Permissive licence on a dev/CI-only dependency; app is not distributed
+        reason: Permissive licence on a dev/CI-only dependency; not redistributed (absent from published artifacts)
         expires: 2027-08-31T00:00:00.000Z
 
   # repo-specific

@@ -256,7 +256,8 @@ the token owner ever leaves.
   per consumer when `snyk-policy/` changes. Not part of `.github/sync.yml`:
   `.snyk` is part shared policy, part policy the repo owns, so only the block
   above the `# repo-specific` marker is rewritten and the tail is copied
-  through byte-for-byte. Consumers and one-time migrations live in
+  through byte-for-byte (bar a trailing newline when one is missing).
+  Consumers and one-time migrations live in
   `snyk-policy/repos.json`; see `snyk-policy/README.md`.
 - `snyk-policy-canary.yml` — weekly; opens a `snyk-policy-drift` issue when a
   consumer's canonical block no longer matches the base. The fan-out only runs

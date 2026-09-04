@@ -8,12 +8,16 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 
 // Set before the import: the module runs main() at load unless this is set.
 process.env.SNYK_POLICY_LIB = '1'
-const { blockOf, renderBlock, splitAtMarker, migrateTail, compose } = await import(
+const { blockOf, renderBlock, splitAtMarker, migrateTail, compose, isConverted } = await import(
   '../.github/scripts/snyk-policy.mjs'
 )
+
+// The sentinel the renderer emits; a converted file carries it above the marker.
+const SENTINEL_LINE = '# ── Canonical base (generated from nswds-devops snyk-policy/base.snyk) ─────'
 
 const BASE = ['version: v1.25.0', 'ignore:', '  snyk:lic:npm:x:MPL-2.0:', '    - \'*\':', '  # repo-specific', ''].join('\n')
 
@@ -75,9 +79,81 @@ test('migrateTail returns null for a manual repo', () => {
   assert.equal(migrateTail('a\n', 'manual'), null)
 })
 
-test('compose normalises to exactly one trailing newline', () => {
-  assert.equal(compose('BLOCK', '\nTAIL\n\n\n'), 'BLOCK\nTAIL\n')
+test('compose preserves the tail byte-for-byte, including trailing blank lines', () => {
+  // Collapsing these would rewrite bytes the consumer owns — the guarantee the
+  // whole mechanism rests on. Only a MISSING trailing newline may be added.
+  assert.equal(compose('BLOCK', '\nTAIL\n\n\n'), 'BLOCK\nTAIL\n\n\n')
+  assert.equal(compose('BLOCK', '\nTAIL'), 'BLOCK\nTAIL\n')
   assert.equal(compose('BLOCK', ''), 'BLOCK\n')
+})
+
+test('blockOf rejects content below the marker instead of dropping it', () => {
+  // findIndex takes the FIRST marker, so anything below it would vanish from
+  // every rendered policy with no error — a new canonical ignore that never
+  // ships. Must fail loudly.
+  assert.throws(
+    () => blockOf(['ignore:', '  # repo-specific', '  snyk:lic:npm:late:MPL-2.0:'].join('\n')),
+    /content after the .* marker/,
+  )
+  assert.throws(
+    () => blockOf(['ignore:', '  # repo-specific', '', '  # repo-specific'].join('\n')),
+    /content after the .* marker/,
+  )
+  // Blank lines below the marker are fine.
+  assert.ok(blockOf(['ignore:', '  # repo-specific', '', ''].join('\n')).endsWith('  # repo-specific'))
+})
+
+test('the real base.snyk carries the sentinel isConverted depends on', () => {
+  // Load-bearing invariant: without it every converted repo reads as
+  // unconverted and every lingering migrate directive re-arms at once. The
+  // module throws at import if this is violated, so reaching this line at all
+  // proves the guard held; assert the rendered block carries it too.
+  const realBase = readFileSync(new URL('../snyk-policy/base.snyk', import.meta.url), 'utf8')
+  assert.ok(blockOf(realBase).includes('Canonical base (generated from nswds-devops'))
+})
+
+test('isConverted requires BOTH the marker and the generated-header sentinel', () => {
+  const converted = [SENTINEL_LINE, 'ignore:', '  # repo-specific', ''].join('\n')
+  assert.equal(isConverted(converted), true)
+  // Marker but hand-written header: predates the convention.
+  assert.equal(isConverted(['# Snyk (https://snyk.io) policy file', 'ignore:', '  # repo-specific'].join('\n')), false)
+  // Sentinel but no marker: cannot be split, so not trustworthy.
+  assert.equal(isConverted([SENTINEL_LINE, 'ignore: {}'].join('\n')), false)
+  // A sentinel appearing only BELOW the marker must not count as converted.
+  assert.equal(isConverted(['ignore:', '  # repo-specific', `  # ${SENTINEL_LINE}`].join('\n')), false)
+})
+
+test('a spent migrate directive cannot delete policy added after conversion', () => {
+  // The directive is documented as one-time, but a comment is not a safeguard:
+  // re-running `tail: "none"` on a converted repo silently drops everything the
+  // repo added below the marker. isConverted() disarms it from the file itself.
+  const block = [SENTINEL_LINE, 'ignore:', '  # repo-specific'].join('\n')
+  const ownPolicy = '\n\n  SNYK-JS-SOMETHING-123:\n    - \'*\':\n        reason: policy this repo owns\n'
+  const converted = compose(block, ownPolicy)
+  assert.ok(converted.includes('SNYK-JS-SOMETHING-123'))
+
+  assert.equal(isConverted(converted), true)
+
+  // What evaluate() now does: directive applies only while unconverted.
+  const migrate = { tail: 'none' }
+  const tail = migrate && !isConverted(converted) ? migrateTail(converted, migrate) : splitAtMarker(converted).tail
+  assert.ok(compose(block, tail).includes('SNYK-JS-SOMETHING-123'), 'repo-owned policy was deleted')
+
+  // Guard: the old unconditional behaviour is what destroyed it.
+  assert.ok(!compose(block, migrateTail(converted, migrate)).includes('SNYK-JS-SOMETHING-123'))
+})
+
+test('an unconverted repo still takes its migrate directive', () => {
+  // reviewers/nswds-email shape: marker sits ABOVE the licence list, old header.
+  const unconverted = [
+    '# Snyk (https://snyk.io) policy file',
+    'ignore:',
+    '  # repo-specific',
+    '',
+    '  snyk:lic:npm:x:MPL-2.0:',
+  ].join('\n')
+  assert.equal(isConverted(unconverted), false)
+  assert.equal(migrateTail(unconverted, { tail: 'none' }), '')
 })
 
 test('a misplaced marker does not duplicate canonical keys (regression)', () => {
