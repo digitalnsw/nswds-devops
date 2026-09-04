@@ -190,9 +190,19 @@ advisories, and dtl-sandbox path-scopes js-yaml and the npm bundle. An earlier
 version of this document attributed the Snyk Code exclude to nswds-ui; that was
 wrong — nswds-ui carried only the obsolete nanoid entries.
 
-dtl-sandbox is marked `manual`: its path-scoping rationale is top-of-file prose
-sitting above `ignore:`, which the canonical block now owns, and re-homing it
-into the tail is a judgement call rather than a mechanical move.
+dtl-sandbox was the one repo the fan-out could not convert: its path-scoping
+rationale was top-of-file prose sitting above `ignore:`, which the canonical
+block now owns, so re-homing it into the tail was a judgement call rather than
+a mechanical move. Converted by hand in digitalnsw/dtl-sandbox#54 — the prose
+moved into the tail with the entries it explains, and its local Artistic-2.0
+acceptance was dropped in favour of the canonical one (the same key twice is a
+duplicate; `'*'` is the right scope for a licence finding, since a licence is a
+property of the package rather than of the route taken to it).
+
+**As at 2026-09-04 all 13 consumers are converted and `--check` reports
+`13 in sync · 0 to change · 0 need attention`.** No `migrate` directive remains
+in `snyk-policy/repos.json`; each one disarmed itself as its migration merged
+and the check named it for removal.
 
 ## Rollout phases
 
@@ -235,17 +245,24 @@ into the tail is a judgement call rather than a mechanical move.
 
    Renovate keeps both packages current from here.
 4. **Phase 4 — ignore files:** roll out the `.gitignore` / `.prettierignore`
-   base via the chosen Mechanism-C approach. Still open. The `.snyk` block sync
-   (Phase 5) is the worked example to copy: same base + marker + preserved tail
+   base via the chosen Mechanism-C approach. Still open — the only phase that
+   is. The completed `.snyk` block sync (Phase 5) is the worked example to copy: same base + marker + preserved tail
    shape, same fan-out and canary, and it needs no new machinery to reuse.
-5. **Phase 5 — `.snyk`: mechanism done, first fan-out pending.** `snyk-policy/`
-   holds the base and the consumer map, `.github/scripts/snyk-policy.mjs`
-   renders and delivers it, and the sync + canary workflows are wired. Twelve
-   repos are queued for their first PR (three drift-only, nine one-time
-   migrations); dtl-sandbox is marked `manual`. The superseded
-   `repo-files/.snyk` has been removed — it was never in the sync map and its
-   two nanoid ignores are obsolete, so leaving it would have offered a second,
-   stale "canonical" file.
+5. **Phase 5 — `.snyk`: done, 2026-09-04.** `snyk-policy/` holds the base and
+   the consumer map, `.github/scripts/snyk-policy.mjs` renders and delivers it,
+   and the sync + canary workflows are wired. The first fan-out opened twelve
+   PRs (three drift-only, nine one-time migrations); all twelve merged, each
+   verified byte-identical to its pre-merge render with every repo-owned entry
+   intact. dtl-sandbox, which the fan-out could not convert mechanically, was
+   converted by hand in digitalnsw/dtl-sandbox#54. Every `migrate` directive
+   disarmed itself as its migration merged and has been removed, so
+   `snyk-policy/repos.json` is now a plain consumer list.
+
+   `--check` reports `13 in sync · 0 to change · 0 need attention`.
+
+   The superseded `repo-files/.snyk` was removed — it was never in the sync map
+   and its two nanoid ignores are obsolete, so leaving it would have offered a
+   second, stale "canonical" file.
 
 ## Bespoke repos to exclude from convergence
 
