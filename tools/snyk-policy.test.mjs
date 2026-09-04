@@ -413,3 +413,21 @@ test('reconcileBranch is byte-exact, not fuzzy', () => {
   const a = 'BLOCK\n  # repo-specific\n  K:\n'
   assert.equal(reconcileBranch({ fromDefault: a, fromBranch: a + '\n' }).mode, 'refuse')
 })
+
+test('the real base declares no duplicate keys', () => {
+  // Guarded at startup too. If the base ever duplicated a key, every existing
+  // consumer would be refused while a newly opted-in repo — whose tail is
+  // empty, so the per-consumer gate never fires — would still be handed the
+  // ambiguous policy. That split-brain is the reason this is checked centrally.
+  const realBase = readFileSync(new URL('../snyk-policy/base.snyk', import.meta.url), 'utf8')
+  assert.deepEqual(findDuplicateKeys(blockOf(realBase)), [])
+})
+
+test('an empty tail cannot introduce duplicates the base does not already have', () => {
+  // The create path composes against '', so base validity is both necessary
+  // and sufficient for it.
+  const dupBase = ['ignore:', '  k:', '  k:', '  # repo-specific'].join('\n')
+  assert.deepEqual(findDuplicateKeys(compose(blockOf(dupBase), '')), ['ignore.k'])
+  const okBase = ['ignore:', '  k:', '  # repo-specific'].join('\n')
+  assert.deepEqual(findDuplicateKeys(compose(blockOf(okBase), '')), [])
+})

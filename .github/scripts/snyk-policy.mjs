@@ -60,9 +60,19 @@ const SENTINEL = 'Canonical base (generated from nswds-devops'
 
 const args = process.argv.slice(2)
 const has = (f) => args.includes(f)
+// A flag with no value must FAIL, not fall through. `--apply --repo` used to
+// leave ONLY undefined, which disabled the filter entirely and fanned out to
+// every configured repository — the opposite of what the operator asked for,
+// with the whole fleet as blast radius.
 const valueOf = (f) => {
   const i = args.indexOf(f)
-  return i === -1 ? null : args[i + 1]
+  if (i === -1) return null
+  const value = args[i + 1]
+  if (value === undefined || value.startsWith('-')) {
+    console.error(`::error::${f} requires a value`)
+    process.exit(1)
+  }
+  return value
 }
 
 const MODE = has('--apply') ? 'apply' : 'check'
@@ -479,6 +489,19 @@ const openPr = async (repo, result) => {
   // amends their own repo-specific policy on this PR would have it silently
   // reverted by the next fan-out. So re-derive the tail from the branch and
   // render against that; the branch is the file we are about to update.
+  // The default branch may have moved since evaluate() read it: every repo is
+  // evaluated before any PR is opened, so there is a real window. A sync branch
+  // that still matches the stale snapshot would sail through reconcileBranch()
+  // and its PR would delete whatever landed on the default branch meanwhile.
+  const fresh = await getPolicy(repo)
+  if ((fresh?.sha ?? null) !== (result.sha ?? null)) {
+    throw new Error(
+      `${POLICY_PATH} changed on the default branch since this run evaluated it ` +
+        `(${String(result.sha).slice(0, 12)} -> ${String(fresh?.sha).slice(0, 12)}). ` +
+        'Re-run so the render is based on current content.',
+    )
+  }
+
   const onBranch = await getPolicy(repo, BRANCH)
 
   let next = result.next
@@ -545,6 +568,18 @@ const main = async () => {
   // per-repo errors instead of a usable preview.
   if (!token) {
     console.error('::error::GH_TOKEN is required (--dry-run still reads the API)')
+    process.exit(1)
+  }
+
+  // Validate the BASE once, rather than only catching duplicates per consumer.
+  // The create path composes an empty tail and would otherwise hand a newly
+  // opted-in repo an ambiguous policy while every existing consumer was
+  // refused — a split-brain fleet from one bad edit here.
+  const baseDuplicates = findDuplicateKeys(blockOf(base))
+  if (baseDuplicates.length) {
+    console.error(
+      `::error::snyk-policy/base.snyk declares duplicate keys, so the later one silently wins: ${baseDuplicates.join(', ')}`,
+    )
     process.exit(1)
   }
 

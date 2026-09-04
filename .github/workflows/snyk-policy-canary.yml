@@ -47,8 +47,12 @@ jobs:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         run: node .github/scripts/snyk-policy.mjs --check
 
+      # `!cancelled()` rather than the default `success()`: a probe that hits an
+      # unreadable repository exits nonzero AFTER writing its outputs, and the
+      # default guard would then skip this step — losing both that error and any
+      # real drift found alongside it, in the canary's only report.
       - name: Open tracking issue when drift is found
-        if: steps.probe.outputs.drifted == 'true'
+        if: ${{ !cancelled() && steps.probe.outputs.drifted == 'true' }}
         env:
           # Repo-scoped on purpose: the issue is filed here and this step needs
           # no cross-repo access.
