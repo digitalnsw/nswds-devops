@@ -190,9 +190,19 @@ advisories, and dtl-sandbox path-scopes js-yaml and the npm bundle. An earlier
 version of this document attributed the Snyk Code exclude to nswds-ui; that was
 wrong — nswds-ui carried only the obsolete nanoid entries.
 
-dtl-sandbox is marked `manual`: its path-scoping rationale is top-of-file prose
-sitting above `ignore:`, which the canonical block now owns, and re-homing it
-into the tail is a judgement call rather than a mechanical move.
+dtl-sandbox was the one repo the fan-out could not convert: its path-scoping
+rationale was top-of-file prose sitting above `ignore:`, which the canonical
+block now owns, so re-homing it into the tail was a judgement call rather than
+a mechanical move. Converted by hand in digitalnsw/dtl-sandbox#54 — the prose
+moved into the tail with the entries it explains, and its local Artistic-2.0
+acceptance was dropped in favour of the canonical one (the same key twice is a
+duplicate; `'*'` is the right scope for a licence finding, since a licence is a
+property of the package rather than of the route taken to it).
+
+**As at 2026-09-04 all 13 consumers are converted and `--check` reports
+`13 in sync · 0 to change · 0 need attention`.** No `migrate` directive remains
+in `snyk-policy/repos.json`; each one disarmed itself as its migration merged
+and the check named it for removal.
 
 ## Rollout phases
 
