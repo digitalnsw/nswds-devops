@@ -1,0 +1,71 @@
+{
+  "$comment": [
+    "Consumers of the canonical Snyk policy in snyk-policy/base.snyk.",
+    "",
+    "Steady state: a repo's .snyk is [canonical block][# repo-specific][tail].",
+    "The sync regenerates the block and preserves the tail byte-for-byte, so a",
+    "repo only appears here to (a) opt in, (b) carry a note rendered into the",
+    "block, or (c) declare a ONE-TIME migration for a file that predates the",
+    "convention.",
+    "",
+    "migrate.tail — how to derive the tail the first time a repo is converted:",
+    "  \"none\"            the whole existing file is canonical-shaped; drop it",
+    "  { \"from\": \"...\" } tail starts at the first line containing this string",
+    "Once the marker is in place the directive is inert and can be deleted.",
+    "",
+    "migrate: \"manual\" excludes a repo from automated conversion entirely. It",
+    "is still checked, and reported, but never rewritten.",
+    "",
+    "Adding a repo: add a key here. The sync creates .snyk if it is absent."
+  ],
+
+  "owner": "digitalnsw",
+
+  "repos": {
+    "agile": {},
+    "nswds-design": {},
+    "nswds-email-starter": {},
+
+    "reviewers": {
+      "migrate": { "tail": "none" },
+      "$why": "Its licence list IS the canonical block; the marker sat above it."
+    },
+    "nswds-email": {
+      "migrate": { "tail": "none" },
+      "$why": "Same as reviewers — licence list moves into the canonical block."
+    },
+    "attestation": {
+      "migrate": { "tail": "none" },
+      "$why": "Base + licence list only; no policy of its own."
+    },
+    "nswds-ui": {
+      "migrate": { "tail": "none" },
+      "$why": "Carried only the two obsolete nanoid ignores. Note: the Snyk Code exclude that docs/config-single-source-of-truth.md attributes to this repo now lives in nswds-email-framework."
+    },
+    "awards": {
+      "migrate": { "tail": "none" },
+      "$why": "Tail was only the dead '*:lic:*' catch-all, which the enumerated licence list replaces."
+    },
+    "engagement": {
+      "migrate": { "tail": { "from": "patch: {}" } },
+      "$why": "Keeps its trailing top-level `patch: {}` key."
+    },
+    "nswds-email-framework": {
+      "migrate": { "tail": { "from": "# ── repo-specific: generated output is not scanned" } },
+      "$why": "Keeps its top-level `exclude:` block for generated docs/ and build_local/."
+    },
+    "nswds-tokens": {
+      "migrate": { "tail": { "from": "  # ── Snyk Code (SAST)" } },
+      "$why": "Keeps its javascript/PT Snyk Code ignore; drops the dead catch-all above it."
+    },
+    "nswds-app": {
+      "migrate": { "tail": { "from": "  # postcss XSS" } },
+      "$why": "Keeps its two transitive postcss ignores; drops the dead catch-all above them."
+    },
+
+    "dtl-sandbox": {
+      "migrate": "manual",
+      "$why": "Its path-scoping rationale is top-of-file prose above `ignore:`, which the canonical block now owns. Re-homing that prose into the tail is a judgement call, not a mechanical move — convert it by hand, then delete this directive."
+    }
+  }
+}

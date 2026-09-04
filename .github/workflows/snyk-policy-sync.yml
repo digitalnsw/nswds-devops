@@ -1,0 +1,68 @@
+# Fans the canonical Snyk policy block out to every consumer as a PR.
+#
+# Sibling of sync.yml, but a different mechanism for a different reason:
+# repo-file-sync-action overwrites whole files, and `.snyk` is part shared
+# policy and part policy the repo owns. This job rewrites only the canonical
+# block and copies the "# repo-specific" tail through byte-for-byte. See
+# docs/config-single-source-of-truth.md (Mechanism C) and
+# .github/scripts/snyk-policy.mjs.
+#
+# Repo-local to nswds-devops — NOT synced to consumers.
+name: Sync Snyk policy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - snyk-policy/**
+      - .github/scripts/snyk-policy.mjs
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Report what would change without opening any PR.
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # One fan-out at a time, matching repo-sync. Two concurrent runs would race
+    # on the same chore/repo-sync/snyk-policy branch in each consumer.
+    concurrency:
+      group: snyk-policy-sync
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      # secrets.GITHUB_TOKEN is scoped to this repo and cannot write to
+      # siblings; the sync App is the same one repo-file-sync-action uses.
+      - name: Mint GitHub App token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.SYNC_APP_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          owner: digitalnsw
+
+      # DRY_RUN is empty on a push event (no inputs), which takes the apply
+      # branch — the intended default for a base change merged to main.
+      - name: Fan the canonical policy out
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [ "$DRY_RUN" = 'true' ]; then
+            node .github/scripts/snyk-policy.mjs --apply --dry-run
+          else
+            node .github/scripts/snyk-policy.mjs --apply
+          fi
