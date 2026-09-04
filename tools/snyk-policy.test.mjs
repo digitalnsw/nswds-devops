@@ -314,3 +314,44 @@ test('every rendered fleet policy is duplicate-free', () => {
   assert.deepEqual(findDuplicateKeys(compose(renderBlock(realBase), tail)), [])
   assert.deepEqual(findDuplicateKeys(compose(renderBlock(realBase), '')), [])
 })
+
+// ── CRLF byte-preservation ─────────────────────────────────────────────────
+// The tail is promised byte-for-byte. Splitting after the whole marker line
+// put a CRLF file's `\r` in the head and only `\n` in the tail, so replacing
+// the head with our LF block downgraded that separator to `\n`. No fleet file
+// is CRLF today, which is exactly why this needs a test rather than luck.
+
+const CRLF_FILE = ['# hand-written header', 'ignore:', '  # repo-specific', '  SNYK-JS-OWNED-1:', "    - '*':"].join('\r\n') + '\r\n'
+
+test('splitAtMarker leaves a CRLF terminator with the tail', () => {
+  const { head, tail } = splitAtMarker(CRLF_FILE)
+  assert.equal(head + tail, CRLF_FILE, 'split must be lossless')
+  assert.ok(tail.startsWith('\r\n'), `tail lost its CR: ${JSON.stringify(tail.slice(0, 8))}`)
+  assert.ok(head.endsWith('# repo-specific'), 'head should stop at the marker text')
+})
+
+test('compose preserves a CRLF tail exactly, separator included', () => {
+  const { tail } = splitAtMarker(CRLF_FILE)
+  const out = compose('BLOCK\n  # repo-specific', tail)
+  assert.ok(out.includes('  # repo-specific\r\n'), 'marker separator was downgraded to LF')
+  assert.ok(out.endsWith(tail), 'tail bytes were altered')
+})
+
+test('migrateTail {from} slices original bytes rather than rebuilding them', () => {
+  const tail = migrateTail(CRLF_FILE, { tail: { from: 'SNYK-JS-OWNED-1' } })
+  assert.ok(tail.startsWith('\r\n'), 'leading separator was rebuilt as LF')
+  assert.ok(CRLF_FILE.endsWith(tail), 'tail is not a verbatim slice of the source')
+})
+
+test('LF files are unaffected by the CRLF handling', () => {
+  const lf = ['# hdr', 'ignore:', '  # repo-specific', '  SNYK-JS-OWNED-1:'].join('\n') + '\n'
+  const { head, tail } = splitAtMarker(lf)
+  assert.equal(head + tail, lf)
+  assert.ok(tail.startsWith('\n') && !tail.startsWith('\r'))
+  assert.ok(migrateTail(lf, { tail: { from: 'SNYK-JS-OWNED-1' } }).startsWith('\n'))
+})
+
+test('migrateTail {from} still throws when the anchor is absent', () => {
+  // The rewrite moved this check inside the scan loop; keep it covered.
+  assert.throws(() => migrateTail(CRLF_FILE, { tail: { from: 'NOT-PRESENT' } }), /migrate\.tail\.from not found/)
+})

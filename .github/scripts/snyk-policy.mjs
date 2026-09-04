@@ -134,11 +134,20 @@ export const renderBlock = (baseText, note) => {
 // the marker for any repo whose tail does not happen to start with a blank
 // line. The tail therefore always carries its own leading newline.
 export const splitAtMarker = (content) => {
-  const lines = content.split('\n')
-  const at = lines.findIndex((l) => l.trimEnd() === MARKER)
-  if (at === -1) return null
-  const offset = lines.slice(0, at + 1).join('\n').length
-  return { head: content.slice(0, offset), tail: content.slice(offset) }
+  let offset = 0
+  for (const raw of content.split('\n')) {
+    if (raw.trimEnd() === MARKER) {
+      // End the head at the marker TEXT and leave the line's own terminator at
+      // the front of the tail. Splitting after the whole line instead would put
+      // a CRLF file's `\r` in the head and only `\n` in the tail, so replacing
+      // the head with our LF block would quietly downgrade that one separator
+      // from `\r\n` to `\n` — a tail byte we promised not to touch.
+      const end = offset + raw.length - (raw.endsWith('\r') ? 1 : 0)
+      return { head: content.slice(0, end), tail: content.slice(end) }
+    }
+    offset += raw.length + 1 // + the '\n' that split() removed
+  }
+  return null
 }
 
 // Has this repo already received a fan-out? True only when the file carries
@@ -212,10 +221,23 @@ export const migrateTail = (content, migrate) => {
   const spec = migrate.tail
   if (spec === 'none') return ''
   if (spec && typeof spec.from === 'string') {
-    const lines = content.split('\n')
-    const at = lines.findIndex((l) => l.includes(spec.from))
-    if (at === -1) throw new Error(`migrate.tail.from not found: ${JSON.stringify(spec.from)}`)
-    return '\n' + lines.slice(at).join('\n')
+    // Slice the ORIGINAL content from the terminator preceding the anchor
+    // line. Rebuilding with split/join would re-emit every line ending as '\n'
+    // and hard-code the leading separator, reformatting a CRLF tail we promised
+    // to copy through untouched.
+    let offset = 0
+    for (const raw of content.split('\n')) {
+      if (raw.includes(spec.from)) {
+        let start = offset
+        if (start > 0 && content[start - 1] === '\n') {
+          start -= 1
+          if (start > 0 && content[start - 1] === '\r') start -= 1
+        }
+        return content.slice(start)
+      }
+      offset += raw.length + 1
+    }
+    throw new Error(`migrate.tail.from not found: ${JSON.stringify(spec.from)}`)
   }
   throw new Error(`unrecognised migrate directive: ${JSON.stringify(migrate)}`)
 }
@@ -230,7 +252,7 @@ export const migrateTail = (content, migrate) => {
 // would rewrite bytes the repo owns, which is exactly the guarantee the whole
 // mechanism rests on; how a consumer ends its own file is its business.
 export const compose = (block, tail) => {
-  const sep = tail && !tail.startsWith('\n') ? '\n' : ''
+  const sep = tail && !/^\r?\n/.test(tail) ? '\n' : ''
   const out = `${block}${sep}${tail}`
   return out.endsWith('\n') ? out : `${out}\n`
 }
@@ -426,10 +448,17 @@ const openPr = async (repo, result) => {
         `branch ${BRANCH} would compose to duplicate keys (${duplicates.join(', ')}); refusing to write`,
       )
     }
+    // Divergence means the branch tail and the default-branch tail are BOTH
+    // real and neither is safely discardable: the branch may carry a reviewer's
+    // edit, while the default branch may have gained policy from another PR
+    // merged while this one sat open. Taking either side silently deletes the
+    // other, and a warning is not a guarantee — so refuse and let a human
+    // reconcile (merge the open PR, or update the branch from main).
     if (next !== result.next) {
-      console.log(
-        `  ⚠️  ${repo}: the sync branch's tail differs from the default branch's — ` +
-          'kept the branch\'s, check the PR diff',
+      throw new Error(
+        `the sync branch's tail has diverged from the default branch's. Refusing to write, ` +
+          `because either side would delete the other's policy. Reconcile the branch ` +
+          `(update it from the default branch, or merge/close the open PR) and re-run.`,
       )
     }
   }
