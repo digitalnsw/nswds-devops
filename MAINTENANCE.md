@@ -252,6 +252,17 @@ the token owner ever leaves.
 - `ccc-v10-canary.yml` — weekly; probes whether the upstream
   release-notes-generator fix has landed and opens a `ccc-v10-canary` issue
   the day the Renovate ccc block can be lifted.
+- `snyk-policy-sync.yml` — fans the canonical Snyk policy block out as one PR
+  per consumer when `snyk-policy/` changes. Not part of `.github/sync.yml`:
+  `.snyk` is part shared policy, part policy the repo owns, so only the block
+  above the `# repo-specific` marker is rewritten and the tail is copied
+  through byte-for-byte (bar a trailing newline when one is missing).
+  Consumers and one-time migrations live in
+  `snyk-policy/repos.json`; see `snyk-policy/README.md`.
+- `snyk-policy-canary.yml` — weekly; opens a `snyk-policy-drift` issue when a
+  consumer's canonical block no longer matches the base. The fan-out only runs
+  when the base changes, so nothing else would catch a block edited directly in
+  a consumer or a repo added without policy.
 
 ## Troubleshooting
 
@@ -265,6 +276,12 @@ Every entry below is something that actually happened (2026-07-15 onward).
 | Consumer check: "workflow was not found" | Actions access setting reset, or the `v1` tag missing/deleted | fix the access setting; re-promote via the Promote v1 workflow |
 | Consumer PR: "Expected — waiting for status to be reported" forever | a ruleset requires a check by its old single name | rename required context to the `job / job` form (nswds-design's "Protect main" already updated) |
 | `check-branch-name` red on a repo's *first* sync PR | base branch lacks the `chore/repo-sync` exemption until that PR merges | expected once; merge past it |
+| Snyk policy sync: `the sync branch's tail has diverged` | the open sync PR and the default branch both changed the repo-owned tail | reconcile by hand — merge or close the open PR, or update its branch from the default branch — then re-run. Refused on purpose: either side would delete the other's policy |
+| Snyk policy sync: `would produce duplicate keys` | an ignore exists in both `snyk-policy/base.snyk` and that repo's `# repo-specific` tail | remove it from whichever side should not own it; YAML takes the last occurrence, so the tail would silently shadow the fleet value |
+| Snyk policy canary: `dtl-sandbox: manual` keeps the issue open | manual repos are deliberately reported until converted | convert dtl-sandbox by hand and delete its directive from `snyk-policy/repos.json` |
+| Snyk policy sync: `repository ... is not readable` | repo renamed/deleted, or outside the sync App installation | fix the entry in `snyk-policy/repos.json`, or add the repo to the App installation |
+| Snyk policy sync: `migrate.tail.from not found` | the anchor line in `snyk-policy/repos.json` no longer exists in that repo's `.snyk` | re-read the repo's file and update the anchor, or set `"tail": "none"` if it is now canonical-shaped |
+| Snyk policy canary: a repo reports `unmigrated` | its `.snyk` predates the `# repo-specific` convention and has no migrate directive | add a `migrate` directive for it in `snyk-policy/repos.json`, or mark it `manual` |
 | commitlint job: npm `EUSAGE` "can only install with an existing package-lock.json" | lockfile missing **or corrupt** — check it parses, don't trust the error text | see ONBOARDING pre-flight (a); nswds-public-sans had conflict markers committed inside it |
 | Snyk license/security red on a lockfile change | Snyk's baseline of main was unparseable, so every pre-existing issue reads as "introduced" | merge the lockfile fix; Snyk re-baselines. MPL-2.0 flags on lightningcss binaries come via @nswds/app in every repo — org license-policy call, not a repo bug |
 | `check-npm-artifacts` red (nswds-app) | committed `dist/` built before semantic-release bumped the version it inlines | `npm run build:npm` on the branch, commit dist |

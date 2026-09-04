@@ -1,0 +1,87 @@
+{
+  "$comment": [
+    "Consumers of the canonical Snyk policy in snyk-policy/base.snyk.",
+    "",
+    "Steady state: a repo's .snyk is [canonical block][# repo-specific][tail].",
+    "The sync regenerates the block and preserves the tail byte-for-byte, so a",
+    "repo only appears here to (a) opt in, (b) carry a note rendered into the",
+    "block, or (c) declare a ONE-TIME migration for a file that predates the",
+    "convention.",
+    "",
+    "A migrate directive DISARMS ITSELF: it fires only while fromSha still",
+    "matches the file on main. Once the first fan-out has merged the blob",
+    "changes, so a forgotten entry here cannot delete policy the repo added",
+    "later. The check reports spent directives so they can be tidied up.",
+    "",
+    "migrate.fromSha — the git blob SHA of the .snyk this directive was written",
+    "against. The migration runs ONLY on an exact match, which makes it",
+    "exactly-once: after the first fan-out merges, the blob changes and the",
+    "directive can never fire again. Do not derive converted-state from the",
+    "file's contents instead — a consumer that edits the canonical block would",
+    "make a spent directive look live and a \"none\" tail would delete policy",
+    "added since. Refresh fromSha (gh api /repos/digitalnsw/<repo>/contents/",
+    ".snyk --jq .sha) if the file changes on main before the migration lands.",
+    "",
+    "migrate.tail — how to derive the tail the first time a repo is converted:",
+    "  \"none\"            the whole existing file is canonical-shaped; drop it",
+    "  { \"from\": \"...\" } tail starts at the first line containing this string",
+    "Once the migration has merged the directive is inert and can be deleted.",
+    "A stale directive (fromSha no longer matches, file not in canonical shape)",
+    "is REFUSED and reported — never guessed at.",
+    "",
+    "migrate: \"manual\" excludes a repo from automated conversion entirely. It",
+    "is still checked, and reported, but never rewritten.",
+    "",
+    "Adding a repo: add a key here. The sync creates .snyk if it is absent."
+  ],
+
+  "owner": "digitalnsw",
+
+  "repos": {
+    "agile": {},
+    "nswds-design": {},
+    "nswds-email-starter": {},
+
+    "reviewers": {
+      "migrate": { "fromSha": "e6cfe1970a01e507fa174216eb4232b6114cd45c", "tail": "none" },
+      "$why": "Its licence list IS the canonical block; the marker sat above it."
+    },
+    "nswds-email": {
+      "migrate": { "fromSha": "9bb5f0435436364fa858e85f13b8de02f408f33a", "tail": "none" },
+      "$why": "Same as reviewers — licence list moves into the canonical block."
+    },
+    "attestation": {
+      "migrate": { "fromSha": "86deb2142568e793973865d25ab5095573f3bcc8", "tail": "none" },
+      "$why": "Base + licence list only; no policy of its own."
+    },
+    "nswds-ui": {
+      "migrate": { "fromSha": "b8e75a640af5b369c1fb61f93d5a071555704775", "tail": "none" },
+      "$why": "Carried only the two obsolete nanoid ignores. Note: the Snyk Code exclude that docs/config-single-source-of-truth.md attributes to this repo now lives in nswds-email-framework."
+    },
+    "awards": {
+      "migrate": { "fromSha": "1f418417392c6d6bec99970472b75efd0ebbfc19", "tail": "none" },
+      "$why": "Tail was only the dead '*:lic:*' catch-all, which the enumerated licence list replaces."
+    },
+    "engagement": {
+      "migrate": { "fromSha": "4821ef9c984aab2040514b23ae446a114e3ba215", "tail": { "from": "patch: {}" } },
+      "$why": "Keeps its trailing top-level `patch: {}` key."
+    },
+    "nswds-email-framework": {
+      "migrate": { "fromSha": "ba6d28f4fd74d0cca9f050d17dc67ebd0ac97d74", "tail": { "from": "# ── repo-specific: generated output is not scanned" } },
+      "$why": "Keeps its top-level `exclude:` block for generated docs/ and build_local/."
+    },
+    "nswds-tokens": {
+      "migrate": { "fromSha": "f56cd295050f01899af7b65a715b6027451d964e", "tail": { "from": "  # ── Snyk Code (SAST)" } },
+      "$why": "Keeps its javascript/PT Snyk Code ignore; drops the dead catch-all above it."
+    },
+    "nswds-app": {
+      "migrate": { "fromSha": "8dec1b54ab57e722ae0ad35bf3e6ef0366f67a0e", "tail": { "from": "  # postcss XSS" } },
+      "$why": "Keeps its two transitive postcss ignores; drops the dead catch-all above them."
+    },
+
+    "dtl-sandbox": {
+      "migrate": "manual",
+      "$why": "Its path-scoping rationale is top-of-file prose above `ignore:`, which the canonical block now owns. Re-homing that prose into the tail is a judgement call, not a mechanical move — convert it by hand, then delete this directive."
+    }
+  }
+}

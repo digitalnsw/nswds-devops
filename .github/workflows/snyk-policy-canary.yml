@@ -1,0 +1,79 @@
+# Weekly probe: has any consumer's canonical Snyk policy block drifted from
+# snyk-policy/base.snyk?
+#
+# The fan-out only runs when the base changes, so nothing would otherwise
+# notice a block edited directly in a consumer repo, a repo that never got
+# converted, or a new repo added to the fleet without policy. Same silent
+# failure mode as the ccc pin drift canary: the repo stays green while its
+# policy quietly stops matching what the fleet agreed.
+#
+# Reports through a tracking issue rather than a red job — a canary that fails
+# every week is a canary that gets muted.
+#
+# Repo-local to nswds-devops — NOT synced to consumers.
+name: Snyk policy drift canary
+
+on:
+  schedule:
+    - cron: '44 8 * * 1' # Mondays 08:44 UTC, after the ccc pin drift canary
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Mint GitHub App token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.SYNC_APP_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          owner: digitalnsw
+
+      - name: Probe fleet for Snyk policy drift
+        id: probe
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: node .github/scripts/snyk-policy.mjs --check
+
+      # `!cancelled()` rather than the default `success()`: a probe that hits an
+      # unreadable repository exits nonzero AFTER writing its outputs, and the
+      # default guard would then skip this step — losing both that error and any
+      # real drift found alongside it, in the canary's only report.
+      - name: Open tracking issue when drift is found
+        if: ${{ !cancelled() && steps.probe.outputs.drifted == 'true' }}
+        env:
+          # Repo-scoped on purpose: the issue is filed here and this step needs
+          # no cross-repo access.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BODY_FILE: ${{ steps.probe.outputs.body_file }}
+        run: |
+          set -euo pipefail
+          # One open tracking issue at a time, keyed on the label — but REFRESH
+          # its body rather than bailing out. Manual repos are reported until
+          # converted, so dtl-sandbox keeps this issue open indefinitely; a
+          # bail-out would freeze the body at the first run and every later
+          # consumer drift would go unreported in the canary's only output.
+          gh label create snyk-policy-drift \
+            --description 'Canonical Snyk policy drift across the fleet' --color d93f0b --force
+          existing="$(gh issue list --state open --label snyk-policy-drift --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body-file "$BODY_FILE"
+            echo "Refreshed tracking issue #${existing}"
+            exit 0
+          fi
+          gh issue create \
+            --title 'Snyk policy drift detected — a consumer no longer matches the canonical base' \
+            --label snyk-policy-drift \
+            --body-file "$BODY_FILE"

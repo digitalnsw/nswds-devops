@@ -101,42 +101,98 @@ The canonical base for both is in `repo-files/.gitignore` and
 `.claude` vs `/.claude` split, folds in the AI-tooling and Snyk-output ignores
 several repos already carry, and includes `*.err`.
 
-### `.snyk` — same shape, same reason
+### `.snyk` — Mechanism C, resolved as a block sync (C3)
 
-`repo-files/.snyk` is a Mechanism C file too, and for the same reason: eight
-repos already carry policy that is genuinely theirs. nswds-app ignores two
-transitive advisories (postcss, postcss-selector-parser) that no other repo
-has, and nswds-ui has no `ignore:` block at all — its policy is a Snyk Code
-`exclude:` for the generated `mockServiceWorker.js`. A whole-file sync would
-delete both. Snyk's policy format has no `extends`, so Mechanism B is out.
+`.snyk` is a Mechanism C file for the same reason as the ignore files, and it
+is the one where the choice has actually been made. The C1/C2 options above
+were never rolled out, and the cost showed: the same policy change had to be
+written by hand in four repos on 2026-08-31, and only three repos ever received
+the enumerated licence list at all.
 
-The base holds the two nanoid CWE-835 ignores and nothing else. It carries
-**no** licence catch-all: Snyk matches ignore keys as exact issue IDs and does
-not support globs, so the `'*:lic:*'` entry that four repos inherited is dead
-config — nswds-app has it and `snyk test` still reports all 13 licence
-findings as active. Licence findings must be enumerated, as nswds-email and
-engagement do.
+**The mechanism.** The canonical block lives in
+[`snyk-policy/base.snyk`](../snyk-policy/base.snyk) and ends with a
+`  # repo-specific` marker. `.github/scripts/snyk-policy.mjs` rewrites
+everything down to and including that marker and copies the tail through
+byte-for-byte — it never parses, reorders or reformats the tail, so a repo
+cannot lose policy it owns. The only byte it may add is a trailing newline
+when the file would otherwise not end in one. Delivery is one PR per repo on a
+`chore/repo-sync/snyk-policy` branch, driven by
+`.github/workflows/snyk-policy-sync.yml` when the base changes, with
+`.github/workflows/snyk-policy-canary.yml` probing weekly for drift the
+fan-out would not otherwise notice.
 
-The two nanoid entries rest on **different** grounds, and the distinction
-matters when either is revisited:
+This is why `.snyk` is still absent from `.github/sync.yml`: the constraint
+that ruled out a whole-file sync has not gone away. The block sync is a
+different mechanism, not an exception to it.
 
-- `SNYK-JS-NANOID-18506894` is a **false positive** — the fix was backported
-  to the 3.x line in 3.3.16, and Snyk's `<5.1.16` range misses it. This one
-  is conditional on the resolved version: a repo on an older 3.x is genuinely
-  vulnerable and needs its lockfile refreshed, not this ignore. Check with
-  `npm ls nanoid` first.
-- `SNYK-JS-NANOID-18506897` is **not fixed on the 3.x line at all** and is
-  accepted on **reachability**: `customRandom` is exported only from nanoid's
-  main entry, while postcss imports `nanoid/non-secure`. It stops being valid
-  the moment anything imports nanoid's main entry.
+**Consumers and one-time migrations** are declared in
+[`snyk-policy/repos.json`](../snyk-policy/repos.json). A repo written before
+the convention existed carries a `migrate` directive saying how to derive its
+tail once, and the `fromSha` of the blob it was written against. It
+**disarms itself**: `selectTail()` runs a directive only on an exact SHA
+match, so it can fire at most until the first fan-out merges and never again.
 
-Because both rationales are conditional, the entries are scoped to the
-postcss dependency path rather than a bare `'*'`, so they fail closed. Snyk
-matches paths from the root: `'postcss > nanoid'` matches only a direct
-postcss, `'* > postcss > nanoid'` matches any non-empty prefix, and repos
-where postcss is both need both. Enumerate a repo's real paths with
-`npx snyk test --ignore-policy --json` before editing the block — an
-incomplete path set does not error, the advisory just returns.
+Both halves of that rule are load-bearing. A directive has to beat the marker
+early, because several repos put the marker in the wrong place: reviewers and
+nswds-email had it above their licence list, and trusting it there emits those
+28 keys twice. It must stop firing once the repo is converted, because
+re-running a `tail: "none"` directive would then delete any policy the repo
+added below the marker since — the exact loss this mechanism exists to
+prevent.
+
+The gate is an immutable blob SHA rather than anything read out of the file,
+because file contents are exactly what an errant consumer edit changes:
+inferring "already converted" from a generated-header sentinel meant that
+deleting that sentinel made a spent directive look live again. A forgotten
+entry in `repos.json` is therefore harmless; `--check` reports spent
+directives so they can be tidied up, and a directive whose SHA no longer
+matches a file that is not in canonical shape is refused rather than guessed
+at.
+
+`selectTail()` is exported and used by both `evaluate()` and the fan-out, so
+there is one implementation of the rule and the tests exercise the real one.
+
+**What the base contains, as of 2026-09-04.** Twenty-eight enumerated licence
+acceptances and no vulnerability ignores:
+
+- **Licence acceptances** — weak-copyleft (MPL-2.0 / LGPL-3.0) and permissive
+  (Artistic-2.0) findings on unmodified, transitively-installed build and
+  runtime libraries: the sharp/libvips platform binaries via next, the
+  lightningcss platform binaries via Tailwind, axe-core, npm bundled inside
+  semantic-release, and our own `@nswds/*` packages. Reviewers, attestation and
+  engagement already carried this list, byte-identical; it is now the base.
+  Repos that lacked it were failing those findings — nswds-design reported 12
+  live licence findings with a policy that ignored only dead entries.
+- **No `'*:lic:*'` catch-all, ever.** Snyk matches ignore keys as exact issue
+  IDs and does not support globs, so a catch-all is dead config that reads as
+  protection. Four repos carried one; the enumerated list replaces it.
+- **The two nanoid CWE-835 ignores are gone.** They are obsolete, not expired.
+  Verified resolution across the fleet (`package-lock.json`, 2026-09-04): every
+  repo resolves the postcss-introduced nanoid to **3.3.17 or 3.3.18** — most to
+  3.3.18, with nswds-app carrying both (one nested copy each) plus a direct
+  6.0.1 of its own. Nothing anywhere is still on the 3.3.16 the advisories were
+  written against. Snyk has since corrected the affected range, and a scan of
+  nswds-design with `--ignore-policy` reports zero nanoid findings. Attestation
+  and engagement removed them on 2026-08-31 on that evidence. Do not re-add
+  them speculatively — if either advisory returns it should be re-triaged on
+  the evidence at that time.
+
+  This is the same inventory `snyk-policy/base.snyk` records ("3.3.17 and
+  3.3.18 under postcss"); state it the same way in both places. These versions
+  are the justification for deleting security ignores, so two differing fleet
+  inventories would undermine the decision.
+
+**Genuinely repo-owned policy that the tail preserves**: nswds-email-framework
+excludes its generated `docs/` and `build_local/` from Snyk Code (~7,000 files;
+without it a root scan times out), nswds-tokens accepts a `javascript/PT`
+finding in one developer script, nswds-app accepts two transitive postcss
+advisories, and dtl-sandbox path-scopes js-yaml and the npm bundle. An earlier
+version of this document attributed the Snyk Code exclude to nswds-ui; that was
+wrong — nswds-ui carried only the obsolete nanoid entries.
+
+dtl-sandbox is marked `manual`: its path-scoping rationale is top-of-file prose
+sitting above `ignore:`, which the canonical block now owns, and re-homing it
+into the tail is a judgement call rather than a mechanical move.
 
 ## Rollout phases
 
@@ -179,7 +235,17 @@ incomplete path set does not error, the advisory just returns.
 
    Renovate keeps both packages current from here.
 4. **Phase 4 — ignore files:** roll out the `.gitignore` / `.prettierignore`
-   base via the chosen Mechanism-C approach.
+   base via the chosen Mechanism-C approach. Still open. The `.snyk` block sync
+   (Phase 5) is the worked example to copy: same base + marker + preserved tail
+   shape, same fan-out and canary, and it needs no new machinery to reuse.
+5. **Phase 5 — `.snyk`: mechanism done, first fan-out pending.** `snyk-policy/`
+   holds the base and the consumer map, `.github/scripts/snyk-policy.mjs`
+   renders and delivers it, and the sync + canary workflows are wired. Twelve
+   repos are queued for their first PR (three drift-only, nine one-time
+   migrations); dtl-sandbox is marked `manual`. The superseded
+   `repo-files/.snyk` has been removed — it was never in the sync map and its
+   two nanoid ignores are obsolete, so leaving it would have offered a second,
+   stale "canonical" file.
 
 ## Bespoke repos to exclude from convergence
 
