@@ -49,8 +49,13 @@ const POLICY_PATH = '.snyk'
 
 // Emitted only by this script, so its presence in a consumer's file proves the
 // file was produced by a fan-out rather than written before the convention.
-// That is what lets a one-time `migrate` directive disarm itself — see
-// isConverted() and the directive handling in evaluate().
+//
+// It does NOT disarm migrations — `migrate.fromSha` does, and deliberately so:
+// an earlier version gated on this sentinel, which is mutable file content, so
+// a consumer editing the canonical block re-armed spent directives. Do not
+// reintroduce that. What the sentinel provides is RECOVERY: once the SHA no
+// longer matches, it is how selectTail() recognises an already-converted file
+// and preserves its tail instead of refusing.
 const SENTINEL = 'Canonical base (generated from nswds-devops'
 
 const args = process.argv.slice(2)
@@ -77,7 +82,8 @@ const base = readFileSync(new URL('../../snyk-policy/base.snyk', import.meta.url
 if (!base.includes(SENTINEL)) {
   throw new Error(
     `snyk-policy/base.snyk must contain the sentinel ${JSON.stringify(SENTINEL)} — ` +
-      'converted-state detection, and therefore migrate-directive disarming, depends on it',
+      'selectTail() needs it to recognise an already-converted file and preserve its tail once ' +
+        'migrate.fromSha no longer matches. Without it those repos are refused rather than synced.',
   )
 }
 const config = JSON.parse(
@@ -171,6 +177,7 @@ export const isConverted = (content) => {
 // Returns { mode, tail } where mode is:
 //   'migrate' — one-time conversion, gated on an EXACT pre-migration blob SHA
 //   'steady'  — normal path: keep everything below the marker, byte-for-byte
+//   'create'  — no policy file yet and none expected; start from the block
 //   'refuse'  — cannot be decided safely; caller reports and writes nothing
 //
 // The SHA gate is what makes a migration exactly-once. Deriving "has this been
@@ -187,6 +194,24 @@ export const isConverted = (content) => {
 // unrecognised shape is refused for a human to look at.
 export const selectTail = ({ content, sha, settings }) => {
   const directive = settings.migrate
+
+  // No policy file at all. Creating a canonical-only one is right for a repo
+  // simply opting in, but WRONG for a migration target: its directive exists to
+  // extract a tail from a file that is supposed to be there, so creating
+  // without it silently drops the policy the directive was written to preserve.
+  // A deleted file also defeats the fromSha gate — there is no blob to match.
+  if (content == null) {
+    if (directive && directive !== 'manual') {
+      return {
+        mode: 'refuse',
+        reason:
+          'has a migrate directive but no .snyk to migrate — the file was deleted or never existed. ' +
+          'Restore it, or drop the directive if this repo should start from the canonical block alone.',
+      }
+    }
+    return { mode: 'create', tail: '' }
+  }
+
   const converted = isConverted(content)
   const split = splitAtMarker(content)
 
@@ -354,9 +379,11 @@ const evaluate = async (repo, settings) => {
       : { repo, state: 'manual', reason: `POLICY FILE IS MISSING — ${why}`, missing: true }
   }
 
-  // Absent policy: the repo opts in by appearing in repos.json, so create it.
+  // Absent policy — selectTail() decides whether that is an opt-in or a gap.
   if (!current) {
-    return { repo, state: 'create', next: compose(wanted, ''), sha: null, settings }
+    const choice = selectTail({ content: null, sha: null, settings })
+    if (choice.mode === 'refuse') return { repo, state: 'unmigrated', reason: choice.reason }
+    return { repo, state: 'create', next: compose(wanted, choice.tail), sha: null, settings }
   }
 
   // One rule, shared with openPr(). See selectTail() for why the migration gate

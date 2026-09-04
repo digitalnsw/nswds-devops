@@ -56,11 +56,17 @@ jobs:
           BODY_FILE: ${{ steps.probe.outputs.body_file }}
         run: |
           set -euo pipefail
-          # Idempotent: one open tracking issue at a time, keyed on the label.
+          # One open tracking issue at a time, keyed on the label — but REFRESH
+          # its body rather than bailing out. Manual repos are reported until
+          # converted, so dtl-sandbox keeps this issue open indefinitely; a
+          # bail-out would freeze the body at the first run and every later
+          # consumer drift would go unreported in the canary's only output.
           gh label create snyk-policy-drift \
             --description 'Canonical Snyk policy drift across the fleet' --color d93f0b --force
-          if [ "$(gh issue list --state open --label snyk-policy-drift --json number --jq 'length')" -gt 0 ]; then
-            echo 'Tracking issue already open; nothing to do.'
+          existing="$(gh issue list --state open --label snyk-policy-drift --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body-file "$BODY_FILE"
+            echo "Refreshed tracking issue #${existing}"
             exit 0
           fi
           gh issue create \

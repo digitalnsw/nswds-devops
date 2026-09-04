@@ -355,3 +355,27 @@ test('migrateTail {from} still throws when the anchor is absent', () => {
   // The rewrite moved this check inside the scan loop; keep it covered.
   assert.throws(() => migrateTail(CRLF_FILE, { tail: { from: 'NOT-PRESENT' } }), /migrate\.tail\.from not found/)
 })
+
+// ── Missing policy file ────────────────────────────────────────────────────
+// Creating a canonical-only file is right for an opt-in, but for a migration
+// target it silently drops the tail the directive exists to preserve — and a
+// deleted file has no blob for the fromSha gate to match.
+
+test('selectTail creates for an opt-in repo with no policy yet', () => {
+  const choice = selectTail({ content: null, sha: null, settings: {} })
+  assert.equal(choice.mode, 'create')
+  assert.equal(choice.tail, '')
+})
+
+test('selectTail refuses a migration target whose policy has been deleted', () => {
+  const choice = selectTail({ content: null, sha: null, settings: { migrate: { fromSha: FROM_SHA, tail: { from: '# postcss XSS' } } } })
+  assert.equal(choice.mode, 'refuse')
+  assert.match(choice.reason, /no \.snyk to migrate/)
+  assert.equal(choice.tail, undefined, 'nothing may be written')
+})
+
+test('selectTail still creates for a manual repo with no policy', () => {
+  // evaluate() reports manual repos separately; selectTail must not claim a
+  // migration is possible for one.
+  assert.equal(selectTail({ content: null, sha: null, settings: { migrate: 'manual' } }).mode, 'create')
+})
