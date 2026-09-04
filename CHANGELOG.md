@@ -1,3 +1,9 @@
+## [1.25.0](https://github.com/digitalnsw/nswds-devops/compare/v1.24.5...v1.25.0) (2026-09-04)
+
+### Features
+
+* **snyk:** own the canonical Snyk policy in nswds-devops ([#116](https://github.com/digitalnsw/nswds-devops/issues/116)) ([de0e2a6](https://github.com/digitalnsw/nswds-devops/commit/de0e2a6fbd79b51f6f74a1341c489b3a16e55df0))
+
 ## [1.24.5](https://github.com/digitalnsw/nswds-devops/compare/v1.24.4...v1.24.5) (2026-08-26)
 
 ### Bug Fixes
