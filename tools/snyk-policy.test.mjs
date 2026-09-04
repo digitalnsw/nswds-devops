@@ -12,8 +12,10 @@ import { readFileSync } from 'node:fs'
 
 // Set before the import: the module runs main() at load unless this is set.
 process.env.SNYK_POLICY_LIB = '1'
-const { blockOf, renderBlock, splitAtMarker, migrateTail, compose, isConverted, selectTail, findDuplicateKeys } =
-  await import(
+const {
+  blockOf, renderBlock, splitAtMarker, migrateTail, compose, isConverted, selectTail,
+  findDuplicateKeys, reconcileBranch,
+} = await import(
   '../.github/scripts/snyk-policy.mjs'
 )
 
@@ -105,10 +107,12 @@ test('blockOf rejects content below the marker instead of dropping it', () => {
 })
 
 test('the real base.snyk carries the sentinel isConverted depends on', () => {
-  // Load-bearing invariant: without it every converted repo reads as
-  // unconverted and every lingering migrate directive re-arms at once. The
-  // module throws at import if this is violated, so reaching this line at all
-  // proves the guard held; assert the rendered block carries it too.
+  // Load-bearing for RECOVERY, not for disarming — `migrate.fromSha` disarms
+  // migrations. Without the sentinel, a repo whose SHA has moved is no longer
+  // recognised as converted, so selectTail() refuses it instead of preserving
+  // its tail: correct but blocking, and blocking on every converted repo at
+  // once. The module throws at import if this is violated, so reaching this
+  // line at all proves the guard held; assert the rendered block carries it.
   const realBase = readFileSync(new URL('../snyk-policy/base.snyk', import.meta.url), 'utf8')
   assert.ok(blockOf(realBase).includes('Canonical base (generated from nswds-devops'))
 })
@@ -378,4 +382,34 @@ test('selectTail still creates for a manual repo with no policy', () => {
   // evaluate() reports manual repos separately; selectTail must not claim a
   // migration is possible for one.
   assert.equal(selectTail({ content: null, sha: null, settings: { migrate: 'manual' } }).mode, 'create')
+})
+
+// ── reconcileBranch ────────────────────────────────────────────────────────
+// The branch/default divergence rule is a safety decision, so it is a helper
+// the suite can drive. Inlined as a bare `===` inside openPr() it was
+// untestable: inverting or deleting the comparison left every test green while
+// one side's repo-owned policy was discarded.
+
+test('reconcileBranch writes when the branch agrees with the default branch', () => {
+  const same = 'BLOCK\n  # repo-specific\n  SNYK-JS-OWNED-1:\n'
+  const out = reconcileBranch({ fromDefault: same, fromBranch: same })
+  assert.equal(out.mode, 'write')
+  assert.equal(out.content, same)
+})
+
+test('reconcileBranch refuses when the tails diverge', () => {
+  // Both sides are real: the branch may hold a reviewer's edit, the default
+  // branch may have gained policy from another PR merged meanwhile.
+  const fromDefault = 'BLOCK\n  # repo-specific\n  SNYK-JS-FROM-MAIN:\n'
+  const fromBranch = 'BLOCK\n  # repo-specific\n  SNYK-JS-EDITED-ON-BRANCH:\n'
+  const out = reconcileBranch({ fromDefault, fromBranch })
+  assert.equal(out.mode, 'refuse')
+  assert.match(out.reason, /diverged/)
+  assert.equal(out.content, undefined, 'nothing may be written on divergence')
+})
+
+test('reconcileBranch is byte-exact, not fuzzy', () => {
+  // A single differing byte in the repo-owned tail is a real divergence.
+  const a = 'BLOCK\n  # repo-specific\n  K:\n'
+  assert.equal(reconcileBranch({ fromDefault: a, fromBranch: a + '\n' }).mode, 'refuse')
 })

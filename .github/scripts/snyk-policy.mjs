@@ -324,6 +324,29 @@ export const findDuplicateKeys = (content) => {
   return duplicates
 }
 
+// Which bytes may be written to an existing sync branch, given what the branch
+// renders to and what the default branch renders to.
+//
+// A pure helper rather than an inline comparison so the safety rule is
+// exercised by the suite: an inverted or deleted `===` inside openPr() would
+// otherwise leave every test green while one side's repo-owned policy is
+// discarded.
+//
+// Divergence means both tails are real and neither is safely discardable — the
+// branch may carry a reviewer's edit, while the default branch may have gained
+// policy from another PR merged while this one sat open. Picking a side
+// silently deletes the other, so this refuses and leaves it to a human.
+export const reconcileBranch = ({ fromDefault, fromBranch }) => {
+  if (fromBranch === fromDefault) return { mode: 'write', content: fromBranch }
+  return {
+    mode: 'refuse',
+    reason:
+      "the sync branch's tail has diverged from the default branch's. Refusing to write, because " +
+      "either side would delete the other's policy. Reconcile the branch (update it from the " +
+      'default branch, or merge/close the open PR) and re-run.',
+  }
+}
+
 // ── GitHub ─────────────────────────────────────────────────────────────────
 
 const token = process.env.GH_TOKEN
@@ -475,19 +498,9 @@ const openPr = async (repo, result) => {
         `branch ${BRANCH} would compose to duplicate keys (${duplicates.join(', ')}); refusing to write`,
       )
     }
-    // Divergence means the branch tail and the default-branch tail are BOTH
-    // real and neither is safely discardable: the branch may carry a reviewer's
-    // edit, while the default branch may have gained policy from another PR
-    // merged while this one sat open. Taking either side silently deletes the
-    // other, and a warning is not a guarantee — so refuse and let a human
-    // reconcile (merge the open PR, or update the branch from main).
-    if (next !== result.next) {
-      throw new Error(
-        `the sync branch's tail has diverged from the default branch's. Refusing to write, ` +
-          `because either side would delete the other's policy. Reconcile the branch ` +
-          `(update it from the default branch, or merge/close the open PR) and re-run.`,
-      )
-    }
+    const reconciled = reconcileBranch({ fromDefault: result.next, fromBranch: next })
+    if (reconciled.mode === 'refuse') throw new Error(reconciled.reason)
+    next = reconciled.content
   }
 
   if (onBranch && onBranch.content === next) {
