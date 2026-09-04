@@ -167,12 +167,20 @@ acceptances and no vulnerability ignores:
   IDs and does not support globs, so a catch-all is dead config that reads as
   protection. Four repos carried one; the enumerated list replaces it.
 - **The two nanoid CWE-835 ignores are gone.** They are obsolete, not expired.
-  Every repo in the fleet now resolves nanoid to 3.3.18 (nswds-app also has a
-  direct 6.0.1), Snyk has corrected the affected range, and a scan of
+  Verified resolution across the fleet (`package-lock.json`, 2026-09-04): every
+  repo resolves the postcss-introduced nanoid to **3.3.17 or 3.3.18** — most to
+  3.3.18, with nswds-app carrying both (one nested copy each) plus a direct
+  6.0.1 of its own. Nothing anywhere is still on the 3.3.16 the advisories were
+  written against. Snyk has since corrected the affected range, and a scan of
   nswds-design with `--ignore-policy` reports zero nanoid findings. Attestation
   and engagement removed them on 2026-08-31 on that evidence. Do not re-add
   them speculatively — if either advisory returns it should be re-triaged on
   the evidence at that time.
+
+  This is the same inventory `snyk-policy/base.snyk` records ("3.3.17 and
+  3.3.18 under postcss"); state it the same way in both places. These versions
+  are the justification for deleting security ignores, so two differing fleet
+  inventories would undermine the decision.
 
 **Genuinely repo-owned policy that the tail preserves**: nswds-email-framework
 excludes its generated `docs/` and `build_local/` from Snyk Code (~7,000 files;

@@ -66,10 +66,14 @@ const ONLY = valueOf('--repo')
 
 const base = readFileSync(new URL('../../snyk-policy/base.snyk', import.meta.url), 'utf8')
 
-// The sentinel is what isConverted() keys on, so it is load-bearing for the
-// self-disarming migrate directives: if it were ever edited out of the base,
-// every converted repo would read as unconverted and every lingering directive
-// would re-arm at once, deleting policy across the fleet. Fail at startup.
+// The sentinel is what isConverted() keys on. Since the migration gate became
+// an immutable blob SHA it is no longer what prevents policy deletion — a
+// missing sentinel on a converted file yields `refuse`, not a re-armed
+// directive. What it still buys is RECOVERY: it is how a stale directive
+// recognises an already-converted file and preserves its tail instead of
+// refusing. Losing it would therefore turn every spent-directive repo from
+// "quietly correct" into "blocked until a human looks", so it is still worth
+// failing at startup.
 if (!base.includes(SENTINEL)) {
   throw new Error(
     `snyk-policy/base.snyk must contain the sentinel ${JSON.stringify(SENTINEL)} — ` +
@@ -231,6 +235,48 @@ export const compose = (block, tail) => {
   return out.endsWith('\n') ? out : `${out}\n`
 }
 
+// Duplicate mapping keys in the composed file. YAML takes the LAST occurrence,
+// so a key present in both the canonical block and a repo's tail means the
+// tail silently shadows the fleet value — the same failure the misplaced-marker
+// regression guards against, reachable by a different route: promoting an
+// ignore out of one repo's tail into base.snyk without removing it there.
+//
+// Deliberately a structural scan rather than a YAML parse: this repo has no
+// YAML dependency, and the shape is narrow — top-level keys at column 0 and
+// ignore entries at two spaces, whose keys legitimately contain colons
+// (snyk:lic:npm:...:MPL-2.0). Anything deeper is a value, not a key.
+export const findDuplicateKeys = (content) => {
+  const duplicates = []
+  const seenTop = new Set()
+  const seenIn = new Map()
+  let section = null
+
+  for (const raw of content.split('\n')) {
+    const line = raw.replace(/\s+$/, '')
+    if (!line.trim() || line.trimStart().startsWith('#')) continue
+
+    const top = line.match(/^([A-Za-z_][\w.-]*):/)
+    if (top) {
+      section = top[1]
+      if (seenTop.has(section)) duplicates.push(section)
+      else seenTop.add(section)
+      continue
+    }
+
+    // Two-space indent, ending in a colon: an ignore key. Take everything
+    // before the FINAL colon so licence ids survive intact.
+    const entry = line.match(/^ {2}(\S.*):$/)
+    if (entry && section) {
+      const key = entry[1].replace(/^['"]|['"]$/g, '')
+      if (!seenIn.has(section)) seenIn.set(section, new Set())
+      const seen = seenIn.get(section)
+      if (seen.has(key)) duplicates.push(`${section}.${key}`)
+      else seen.add(key)
+    }
+  }
+  return duplicates
+}
+
 // ── GitHub ─────────────────────────────────────────────────────────────────
 
 const token = process.env.GH_TOKEN
@@ -254,8 +300,20 @@ const api = async (path, { method = 'GET', body, allow404 = false } = {}) => {
 const getPolicy = async (repo, ref) => {
   const q = ref ? `?ref=${encodeURIComponent(ref)}` : ''
   const file = await api(`/repos/${ORG}/${repo}/contents/${POLICY_PATH}${q}`, { allow404: true })
-  if (!file) return null
-  return { sha: file.sha, content: Buffer.from(file.content, 'base64').toString('utf8') }
+  if (file) return { sha: file.sha, content: Buffer.from(file.content, 'base64').toString('utf8') }
+
+  // A missing file and an unreachable repository return the same 404 here.
+  // Treating both as "no policy yet" turns a renamed or deleted repo — or one
+  // outside the App installation — into a cheerful "create it", which is
+  // exactly the read failure --check is supposed to surface. Confirm the repo
+  // is readable before believing the absence.
+  const exists = await api(`/repos/${ORG}/${repo}`, { allow404: true })
+  if (!exists) {
+    throw new Error(
+      `repository ${ORG}/${repo} is not readable — renamed, deleted, or outside the sync App installation`,
+    )
+  }
+  return null
 }
 
 // ── Per-repo evaluation ────────────────────────────────────────────────────
@@ -264,8 +322,14 @@ const evaluate = async (repo, settings) => {
   const wanted = renderBlock(base, settings.note)
   const current = await getPolicy(repo)
 
+  // Manual means "never rewrite this repo", not "stop looking at it". The
+  // existence check still applies: a deleted .snyk on a manual repo is a real
+  // policy gap, and reporting it as a plain exclusion would hide it forever.
   if (settings.migrate === 'manual') {
-    return { repo, state: 'manual', reason: settings.$why ?? 'excluded from automated conversion' }
+    const why = settings.$why ?? 'excluded from automated conversion'
+    return current
+      ? { repo, state: 'manual', reason: why }
+      : { repo, state: 'manual', reason: `POLICY FILE IS MISSING — ${why}`, missing: true }
   }
 
   // Absent policy: the repo opts in by appearing in repos.json, so create it.
@@ -281,6 +345,17 @@ const evaluate = async (repo, settings) => {
   }
 
   const next = compose(wanted, choice.tail)
+  const duplicates = findDuplicateKeys(next)
+  if (duplicates.length) {
+    return {
+      repo,
+      state: 'unmigrated',
+      reason:
+        `composing would produce duplicate keys, so the tail would silently shadow the canonical ` +
+        `value: ${duplicates.join(', ')}. Remove them from this repo's tail, or from base.snyk.`,
+    }
+  }
+
   const spentDirective = Boolean(choice.spentDirective)
   if (next === current.content) return { repo, state: 'ok', spentDirective }
   return {
@@ -345,6 +420,12 @@ const openPr = async (repo, result) => {
       throw new Error(`branch ${BRANCH} holds an unrecognised policy: ${choice.reason}`)
     }
     next = compose(renderBlock(base, result.settings.note), choice.tail)
+    const duplicates = findDuplicateKeys(next)
+    if (duplicates.length) {
+      throw new Error(
+        `branch ${BRANCH} would compose to duplicate keys (${duplicates.join(', ')}); refusing to write`,
+      )
+    }
     if (next !== result.next) {
       console.log(
         `  ⚠️  ${repo}: the sync branch's tail differs from the default branch's — ` +
@@ -415,7 +496,11 @@ const main = async () => {
 
   const by = (s) => results.filter((r) => r.state === s)
   const actionable = [...by('drift'), ...by('migrate'), ...by('create')]
-  const attention = [...by('unmigrated'), ...by('error')]
+  // `manual` is non-actionable but IS reported: repos.json promises manual
+  // repos stay visible, and once the automated migrations land dtl-sandbox is
+  // the only entry left — excluding it would make `drifted` false and silence
+  // the weekly canary on the one repo still waiting for a human.
+  const attention = [...by('unmigrated'), ...by('error'), ...by('manual')]
 
   for (const r of results) {
     const label = { ok: '✅', drift: '🔁', migrate: '🚚', create: '➕', manual: '✋', unmigrated: '⚠️', error: '❌' }[r.state]
@@ -461,7 +546,7 @@ const main = async () => {
 
   console.log(
     `\n${by('ok').length} in sync · ${actionable.length} to change · ` +
-      `${by('manual').length} manual · ${attention.length} need attention`,
+      `${attention.length} need attention (of which ${by('manual').length} manual)`,
   )
   // A canary that fails is a canary that gets muted: drift is reported through
   // the tracking issue, not the exit code. Only a real error fails the job.

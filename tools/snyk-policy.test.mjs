@@ -12,7 +12,8 @@ import { readFileSync } from 'node:fs'
 
 // Set before the import: the module runs main() at load unless this is set.
 process.env.SNYK_POLICY_LIB = '1'
-const { blockOf, renderBlock, splitAtMarker, migrateTail, compose, isConverted, selectTail } = await import(
+const { blockOf, renderBlock, splitAtMarker, migrateTail, compose, isConverted, selectTail, findDuplicateKeys } =
+  await import(
   '../.github/scripts/snyk-policy.mjs'
 )
 
@@ -248,4 +249,68 @@ test('a repo-owned tail survives verbatim, including top-level keys', () => {
   for (const line of tail.split('\n').filter((l) => l.trim())) {
     assert.ok(out.includes(line), `lost tail line: ${line}`)
   }
+})
+
+// ── findDuplicateKeys ──────────────────────────────────────────────────────
+// YAML takes the LAST occurrence of a duplicated key, so a key present in both
+// the canonical block and a repo's tail means the tail silently shadows the
+// fleet value. Reachable by promoting an ignore out of a repo's tail into
+// base.snyk without removing it there.
+
+test('findDuplicateKeys is quiet on a well-formed policy', () => {
+  const ok = [
+    'version: v1.25.0',
+    'ignore:',
+    '  snyk:lic:npm:x:MPL-2.0:',
+    "    - '*':",
+    '        reason: fine',
+    '  # repo-specific',
+    '  SNYK-JS-OWNED-1:',
+    "    - '*':",
+    'exclude:',
+    '  global:',
+    '    - docs/**',
+  ].join('\n')
+  assert.deepEqual(findDuplicateKeys(ok), [])
+})
+
+test('findDuplicateKeys catches a canonical key shadowed by the tail', () => {
+  const shadowed = [
+    'version: v1.25.0',
+    'ignore:',
+    '  snyk:lic:npm:x:MPL-2.0:',
+    "    - '*':",
+    '        reason: canonical',
+    '  # repo-specific',
+    '  snyk:lic:npm:x:MPL-2.0:',
+    "    - '*':",
+    '        reason: repo copy that would win',
+  ].join('\n')
+  assert.deepEqual(findDuplicateKeys(shadowed), ['ignore.snyk:lic:npm:x:MPL-2.0'])
+})
+
+test('findDuplicateKeys handles keys containing colons and quotes', () => {
+  // Licence ids are full of colons; Snyk Code ids are quoted.
+  const dupes = findDuplicateKeys(
+    ['ignore:', "  'javascript/PT':", '    - a', "  'javascript/PT':", '    - b'].join('\n'),
+  )
+  assert.deepEqual(dupes, ['ignore.javascript/PT'])
+})
+
+test('findDuplicateKeys catches a repeated top-level key', () => {
+  assert.deepEqual(findDuplicateKeys(['ignore:', '  a:', 'exclude:', '  global:', 'exclude:'].join('\n')), ['exclude'])
+})
+
+test('findDuplicateKeys ignores comments and list items', () => {
+  // `  # repo-specific` is a comment, not a key, and `    - '*':` is a value.
+  const content = ['ignore:', '  # repo-specific', '  # repo-specific', '  k:', "    - '*':", "    - '*':"].join('\n')
+  assert.deepEqual(findDuplicateKeys(content), [])
+})
+
+test('every rendered fleet policy is duplicate-free', () => {
+  // The real base composed against a realistic repo-owned tail.
+  const realBase = readFileSync(new URL('../snyk-policy/base.snyk', import.meta.url), 'utf8')
+  const tail = "\n\n  SNYK-JS-POSTCSS-16189065:\n    - '*':\n        reason: repo owned\n"
+  assert.deepEqual(findDuplicateKeys(compose(renderBlock(realBase), tail)), [])
+  assert.deepEqual(findDuplicateKeys(compose(renderBlock(realBase), '')), [])
 })
