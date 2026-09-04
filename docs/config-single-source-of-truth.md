@@ -128,18 +128,29 @@ different mechanism, not an exception to it.
 **Consumers and one-time migrations** are declared in
 [`snyk-policy/repos.json`](../snyk-policy/repos.json). A repo written before
 the convention existed carries a `migrate` directive saying how to derive its
-tail once. It **disarms itself**: the renderer applies a directive only while
-the repo is still unconverted, which it decides from the file itself — a
-converted file carries the generated-header sentinel above the marker.
+tail once, and the `fromSha` of the blob it was written against. It
+**disarms itself**: `selectTail()` runs a directive only on an exact SHA
+match, so it can fire at most until the first fan-out merges and never again.
 
 Both halves of that rule are load-bearing. A directive has to beat the marker
 early, because several repos put the marker in the wrong place: reviewers and
 nswds-email had it above their licence list, and trusting it there emits those
-28 keys twice. It must stop beating the marker once the repo is converted,
-because re-running a `tail: "none"` directive would then delete any policy the
-repo added below the marker since — the exact loss this mechanism exists to
-prevent. A forgotten entry in `repos.json` is therefore harmless; `--check`
-reports spent directives so they can be tidied up.
+28 keys twice. It must stop firing once the repo is converted, because
+re-running a `tail: "none"` directive would then delete any policy the repo
+added below the marker since — the exact loss this mechanism exists to
+prevent.
+
+The gate is an immutable blob SHA rather than anything read out of the file,
+because file contents are exactly what an errant consumer edit changes:
+inferring "already converted" from a generated-header sentinel meant that
+deleting that sentinel made a spent directive look live again. A forgotten
+entry in `repos.json` is therefore harmless; `--check` reports spent
+directives so they can be tidied up, and a directive whose SHA no longer
+matches a file that is not in canonical shape is refused rather than guessed
+at.
+
+`selectTail()` is exported and used by both `evaluate()` and the fan-out, so
+there is one implementation of the rule and the tests exercise the real one.
 
 **What the base contains, as of 2026-09-04.** Twenty-eight enumerated licence
 acceptances and no vulnerability ignores:

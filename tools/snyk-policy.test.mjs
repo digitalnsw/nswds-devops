@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs'
 
 // Set before the import: the module runs main() at load unless this is set.
 process.env.SNYK_POLICY_LIB = '1'
-const { blockOf, renderBlock, splitAtMarker, migrateTail, compose, isConverted } = await import(
+const { blockOf, renderBlock, splitAtMarker, migrateTail, compose, isConverted, selectTail } = await import(
   '../.github/scripts/snyk-policy.mjs'
 )
 
@@ -123,37 +123,101 @@ test('isConverted requires BOTH the marker and the generated-header sentinel', (
   assert.equal(isConverted(['ignore:', '  # repo-specific', `  # ${SENTINEL_LINE}`].join('\n')), false)
 })
 
-test('a spent migrate directive cannot delete policy added after conversion', () => {
-  // The directive is documented as one-time, but a comment is not a safeguard:
-  // re-running `tail: "none"` on a converted repo silently drops everything the
-  // repo added below the marker. isConverted() disarms it from the file itself.
-  const block = [SENTINEL_LINE, 'ignore:', '  # repo-specific'].join('\n')
-  const ownPolicy = '\n\n  SNYK-JS-SOMETHING-123:\n    - \'*\':\n        reason: policy this repo owns\n'
-  const converted = compose(block, ownPolicy)
-  assert.ok(converted.includes('SNYK-JS-SOMETHING-123'))
+// ── selectTail: the one rule evaluate() and openPr() both use ──────────────
+// These call PRODUCTION code. An earlier version of this suite reimplemented
+// the condition, which meant it would have stayed green if the caller reverted
+// to migrating unconditionally — the exact regression it existed to prevent.
 
-  assert.equal(isConverted(converted), true)
+const BLOCK = [SENTINEL_LINE, 'ignore:', '  # repo-specific'].join('\n')
+const OWN = "\n\n  SNYK-JS-REPO-OWNED-999:\n    - '*':\n        reason: added after conversion\n"
+const FROM_SHA = 'a'.repeat(40)
 
-  // What evaluate() now does: directive applies only while unconverted.
-  const migrate = { tail: 'none' }
-  const tail = migrate && !isConverted(converted) ? migrateTail(converted, migrate) : splitAtMarker(converted).tail
-  assert.ok(compose(block, tail).includes('SNYK-JS-SOMETHING-123'), 'repo-owned policy was deleted')
+test('selectTail migrates only on an exact fromSha match', () => {
+  const unconverted = ['# Snyk (https://snyk.io) policy file', 'ignore:', '  # repo-specific', '', '  snyk:lic:npm:x:MPL-2.0:'].join('\n')
+  const settings = { migrate: { fromSha: FROM_SHA, tail: 'none' } }
 
-  // Guard: the old unconditional behaviour is what destroyed it.
-  assert.ok(!compose(block, migrateTail(converted, migrate)).includes('SNYK-JS-SOMETHING-123'))
+  const hit = selectTail({ content: unconverted, sha: FROM_SHA, settings })
+  assert.equal(hit.mode, 'migrate')
+  assert.equal(hit.tail, '')
 })
 
-test('an unconverted repo still takes its migrate directive', () => {
-  // reviewers/nswds-email shape: marker sits ABOVE the licence list, old header.
-  const unconverted = [
-    '# Snyk (https://snyk.io) policy file',
-    'ignore:',
-    '  # repo-specific',
-    '',
-    '  snyk:lic:npm:x:MPL-2.0:',
-  ].join('\n')
-  assert.equal(isConverted(unconverted), false)
-  assert.equal(migrateTail(unconverted, { tail: 'none' }), '')
+test('selectTail keeps post-conversion policy once the blob has moved', () => {
+  // The N1 scenario: the migration merged, the repo added its own ignore, and
+  // repos.json still carries the directive. It must not fire again.
+  const converted = compose(BLOCK, OWN)
+  const settings = { migrate: { fromSha: FROM_SHA, tail: 'none' } }
+
+  const choice = selectTail({ content: converted, sha: 'b'.repeat(40), settings })
+  assert.equal(choice.mode, 'steady')
+  assert.equal(choice.spentDirective, true)
+  assert.ok(compose(BLOCK, choice.tail).includes('SNYK-JS-REPO-OWNED-999'))
+})
+
+test('selectTail refuses a stale directive rather than guessing', () => {
+  // Consumer-side edits to the canonical block used to make a spent directive
+  // look live again, and a `tail: "none"` directive then deleted the repo's
+  // own policy. The SHA no longer matches, and the shape is unrecognisable, so
+  // the only safe answer is to refuse and let a human look.
+  const converted = compose(BLOCK, OWN)
+  const settings = { migrate: { fromSha: FROM_SHA, tail: 'none' } }
+  const otherSha = 'b'.repeat(40)
+
+  const mangled = {
+    'sentinel removed': converted.split('\n').filter((l) => !l.includes('Canonical base (generated from nswds-devops')).join('\n'),
+    'marker removed': converted.split('\n').filter((l) => l.trimEnd() !== '  # repo-specific').join('\n'),
+  }
+  for (const [name, content] of Object.entries(mangled)) {
+    const choice = selectTail({ content, sha: otherSha, settings })
+    assert.equal(choice.mode, 'refuse', `${name}: expected refusal, got ${choice.mode}`)
+    assert.match(choice.reason, /stale|marker/)
+    // The decisive property: nothing is written, so nothing is deleted.
+    assert.equal(choice.tail, undefined)
+  }
+})
+
+test('selectTail refuses a directive with no fromSha', () => {
+  const choice = selectTail({ content: compose(BLOCK, OWN), sha: FROM_SHA, settings: { migrate: { tail: 'none' } } })
+  assert.equal(choice.mode, 'refuse')
+  assert.match(choice.reason, /fromSha/)
+})
+
+test('selectTail takes the steady path when no directive is configured', () => {
+  const converted = compose(BLOCK, OWN)
+  const choice = selectTail({ content: converted, sha: 'c'.repeat(40), settings: {} })
+  assert.equal(choice.mode, 'steady')
+  assert.ok(!choice.spentDirective)
+  assert.ok(compose(BLOCK, choice.tail).includes('SNYK-JS-REPO-OWNED-999'))
+
+  // Marker but no sentinel and no directive is still the steady path: those
+  // repos (agile, nswds-design, nswds-email-starter) must not regress.
+  const markerOnly = ['# hand-written header', 'ignore:', '  # repo-specific', '', '  SNYK-JS-X-1:'].join('\n')
+  assert.equal(selectTail({ content: markerOnly, sha: 'd'.repeat(40), settings: {} }).mode, 'steady')
+})
+
+test('a second fan-out re-derived from the branch reproduces the same file', () => {
+  // openPr() now renders from the SYNC BRANCH's bytes rather than the default
+  // branch's, so a reviewer's edit to their own tail on the PR is not reverted.
+  // That path must be idempotent, or every run would churn the branch.
+  const settings = { migrate: { fromSha: FROM_SHA, tail: 'none' } }
+  const unconverted = ['# hand-written', 'ignore:', '  # repo-specific', '', '  snyk:lic:npm:x:MPL-2.0:'].join('\n')
+
+  const first = compose(BLOCK, selectTail({ content: unconverted, sha: FROM_SHA, settings }).tail)
+
+  // Second run: the branch holds `first`, whose blob is no longer fromSha.
+  const second = selectTail({ content: first, sha: 'f'.repeat(40), settings })
+  assert.equal(second.mode, 'steady')
+  assert.equal(compose(BLOCK, second.tail), first)
+
+  // And a tail edited on the branch survives that re-derivation.
+  const edited = compose(BLOCK, "\n\n  SNYK-JS-EDITED-ON-BRANCH:\n    - '*':\n")
+  const third = selectTail({ content: edited, sha: 'f'.repeat(40), settings })
+  assert.ok(compose(BLOCK, third.tail).includes('SNYK-JS-EDITED-ON-BRANCH'))
+})
+
+test('selectTail refuses a file with neither marker nor directive', () => {
+  const choice = selectTail({ content: 'version: v1.25.0\nignore: {}\n', sha: 'e'.repeat(40), settings: {} })
+  assert.equal(choice.mode, 'refuse')
+  assert.match(choice.reason, /no "  # repo-specific" marker/)
 })
 
 test('a misplaced marker does not duplicate canonical keys (regression)', () => {

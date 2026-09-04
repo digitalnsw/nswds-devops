@@ -39,8 +39,17 @@ fan-out and reported by the canary in the meantime.
 
 **Add a repo.** Add a key to `repos.json`. The sync creates `.snyk` if absent.
 If the repo already has one written before this convention, give it a `migrate`
-directive. It stops applying automatically once that repo's first PR has
-merged, and `--check` will remind you to delete the now-inert entry.
+directive, including the `fromSha` of the file it targets:
+
+```bash
+gh api /repos/digitalnsw/<repo>/contents/.snyk --jq .sha
+```
+
+It stops applying once that repo's first PR has merged and the blob changes,
+and `--check` will remind you to delete the now-inert entry. If the file
+changes on main *before* the migration lands, the run refuses that repo and
+tells you to refresh `fromSha` — that is the safety behaviour working, not a
+bug.
 
 **Check without changing anything:**
 
@@ -60,10 +69,13 @@ GH_TOKEN=$(gh auth token) node .github/scripts/snyk-policy.mjs --apply --dry-run
   issue IDs and does not support globs. A catch-all matches nothing while
   reading as protection — four repos carried one and were failing every licence
   finding anyway. Licence findings must be enumerated.
-- **A `migrate` directive beats the marker only until the repo is converted.**
-  Several repos put the marker in the wrong place, so the directive has to win
-  early; once a repo carries the generated-header sentinel the directive is
-  ignored, so a forgotten entry cannot delete policy the repo added later.
+- **A `migrate` directive fires only on an exact `fromSha` match.** It names
+  the one blob it was written against, so it can run at most until the first
+  fan-out merges and never again — a forgotten entry cannot delete policy the
+  repo added later. Converted-state is deliberately *not* inferred from the
+  file's contents: a consumer that edited the canonical block would make a
+  spent directive look live again. A directive whose SHA no longer matches a
+  file that is not in canonical shape is **refused**, never guessed at.
 - **Scope vulnerability ignores to a dependency path, not `'*'`,** whenever the
   rationale is conditional on how the package is reached. Enumerate the real
   paths with `npx snyk test --ignore-policy --json` — an incomplete path set

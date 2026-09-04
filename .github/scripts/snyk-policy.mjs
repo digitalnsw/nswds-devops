@@ -147,6 +147,61 @@ export const isConverted = (content) => {
   return Boolean(split && split.head.includes(SENTINEL))
 }
 
+// The single rule deciding which tail a repo's next policy file keeps.
+//
+// Exported and used by BOTH evaluate() and openPr(), so there is one
+// implementation and the tests exercise the real one. A test that reimplements
+// this branch verifies the copy, not the product: it would stay green if the
+// caller reverted to migrating unconditionally, which is the exact regression
+// worth guarding.
+//
+// Returns { mode, tail } where mode is:
+//   'migrate' — one-time conversion, gated on an EXACT pre-migration blob SHA
+//   'steady'  — normal path: keep everything below the marker, byte-for-byte
+//   'refuse'  — cannot be decided safely; caller reports and writes nothing
+//
+// The SHA gate is what makes a migration exactly-once. Deriving "has this been
+// converted?" from mutable file content is not safe: a consumer that edits the
+// canonical block (dropping the sentinel or the marker) would make a spent
+// directive look live again, and a `tail: "none"` directive would then delete
+// policy added since. `migrate.fromSha` is immutable — it names the one blob
+// the directive was written against, so it can match at most until the first
+// fan-out merges, and never again.
+//
+// When a directive is configured but the SHA does not match, we do NOT quietly
+// fall back to the marker split. For reviewers and nswds-email the marker sits
+// above their licence list, so the split would emit those 28 keys twice. An
+// unrecognised shape is refused for a human to look at.
+export const selectTail = ({ content, sha, settings }) => {
+  const directive = settings.migrate
+  const converted = isConverted(content)
+  const split = splitAtMarker(content)
+
+  if (directive && directive !== 'manual') {
+    if (!directive.fromSha) {
+      return {
+        mode: 'refuse',
+        reason: 'migrate directive has no fromSha; add the pre-migration blob SHA to snyk-policy/repos.json',
+      }
+    }
+    if (sha === directive.fromSha) return { mode: 'migrate', tail: migrateTail(content, directive) }
+    if (converted && split) return { mode: 'steady', tail: split.tail, spentDirective: true }
+    return {
+      mode: 'refuse',
+      reason:
+        `migrate directive is stale: it targets blob ${directive.fromSha.slice(0, 12)} but the file is ` +
+        `${String(sha).slice(0, 12)}, and the file is not in canonical shape. Re-check the anchor and ` +
+        'refresh fromSha, or convert this repo by hand.',
+    }
+  }
+
+  if (split) return { mode: 'steady', tail: split.tail }
+  return {
+    mode: 'refuse',
+    reason: `no "${MARKER}" marker and no migrate directive in snyk-policy/repos.json`,
+  }
+}
+
 // One-time conversion for a file written before the convention existed.
 export const migrateTail = (content, migrate) => {
   if (!migrate || migrate === 'manual') return null
@@ -215,51 +270,26 @@ const evaluate = async (repo, settings) => {
 
   // Absent policy: the repo opts in by appearing in repos.json, so create it.
   if (!current) {
-    return { repo, state: 'create', next: compose(wanted, ''), sha: null }
+    return { repo, state: 'create', next: compose(wanted, ''), sha: null, settings }
   }
 
-  // A migrate directive wins over the marker ONLY while the repo is still
-  // unconverted. Two failure modes have to be avoided at once:
-  //
-  //   Trusting the marker too early — reviewers and nswds-email carry it above
-  //   their licence list, which the base now owns, so the split would emit
-  //   those 28 keys twice: a duplicate-key file whose tail silently shadows
-  //   the canonical block.
-  //
-  //   Trusting the directive too long — once a repo has been converted its
-  //   marker is correct and its tail is genuinely its own. Re-running a
-  //   `tail: "none"` directive then DELETES any policy added since the first
-  //   fan-out, which is the exact loss this mechanism exists to prevent.
-  //
-  // isConverted() settles it from the file itself, so the directive disarms
-  // automatically and a forgotten entry in repos.json cannot destroy policy.
-  const split = splitAtMarker(current.content)
-  const converted = isConverted(current.content)
-  let tail
-  if (settings.migrate && !converted) {
-    tail = migrateTail(current.content, settings.migrate)
-  } else if (split) {
-    tail = split.tail
-  } else {
-    return {
-      repo,
-      state: 'unmigrated',
-      reason: `no "${MARKER}" marker and no migrate directive in snyk-policy/repos.json`,
-    }
+  // One rule, shared with openPr(). See selectTail() for why the migration gate
+  // is an immutable blob SHA rather than anything read out of the file.
+  const choice = selectTail({ content: current.content, sha: current.sha, settings })
+  if (choice.mode === 'refuse') {
+    return { repo, state: 'unmigrated', reason: choice.reason }
   }
 
-  // Nudge rather than fail: a spent directive is now harmless, but leaving it
-  // in repos.json makes the config lie about the repo's state.
-  const spentDirective = Boolean(settings.migrate && settings.migrate !== 'manual' && converted)
-
-  const next = compose(wanted, tail)
+  const next = compose(wanted, choice.tail)
+  const spentDirective = Boolean(choice.spentDirective)
   if (next === current.content) return { repo, state: 'ok', spentDirective }
   return {
     repo,
-    state: settings.migrate && !converted ? 'migrate' : 'drift',
+    state: choice.mode === 'migrate' ? 'migrate' : 'drift',
     next,
     sha: current.sha,
     before: current.content,
+    settings,
     spentDirective,
   }
 }
@@ -294,17 +324,43 @@ const PR_BODY = [
 
 const openPr = async (repo, result) => {
   await ensureBranch(repo)
-  // Re-read on the branch: a previous run may already have written the file
-  // there, in which case the default-branch sha would be rejected as stale.
+  // Re-read on the branch — for its sha, but more importantly for its BYTES.
+  //
+  // result.next was rendered from the DEFAULT branch. Writing it here would
+  // overwrite whatever the sync branch actually holds, and the branch is
+  // exactly where a repo's tail is most likely to have moved: a reviewer who
+  // amends their own repo-specific policy on this PR would have it silently
+  // reverted by the next fan-out. So re-derive the tail from the branch and
+  // render against that; the branch is the file we are about to update.
   const onBranch = await getPolicy(repo, BRANCH)
-  if (onBranch && onBranch.content === result.next) {
+
+  let next = result.next
+  if (onBranch && result.settings) {
+    const choice = selectTail({
+      content: onBranch.content,
+      sha: onBranch.sha,
+      settings: result.settings,
+    })
+    if (choice.mode === 'refuse') {
+      throw new Error(`branch ${BRANCH} holds an unrecognised policy: ${choice.reason}`)
+    }
+    next = compose(renderBlock(base, result.settings.note), choice.tail)
+    if (next !== result.next) {
+      console.log(
+        `  ⚠️  ${repo}: the sync branch's tail differs from the default branch's — ` +
+          'kept the branch\'s, check the PR diff',
+      )
+    }
+  }
+
+  if (onBranch && onBranch.content === next) {
     console.log(`  ${repo}: branch already carries the change`)
   } else {
     await api(`/repos/${ORG}/${repo}/contents/${POLICY_PATH}`, {
       method: 'PUT',
       body: {
         message: 'chore(ci): sync canonical Snyk policy block from nswds-devops',
-        content: Buffer.from(result.next, 'utf8').toString('base64'),
+        content: Buffer.from(next, 'utf8').toString('base64'),
         branch: BRANCH,
         ...(onBranch ? { sha: onBranch.sha } : {}),
       },
