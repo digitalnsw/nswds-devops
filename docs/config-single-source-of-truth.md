@@ -206,10 +206,17 @@ named it for removal.
 
 **2026-09-07:** ten more repos were enrolled, taking the fleet to 23 consumers.
 All ten had no `.snyk` at all, so the sync creates each file and none needed a
-migrate directive. Six repos remain unenrolled — `data`, `nswds-community`,
+migrate directive.
+
+**2026-09-07 (second round):** the last six — `data`, `nswds-community`,
 `nswds-email-builder`, `nswds-eslint-config`, `nswds-public-sans` and
-`nswds-signature` — each of which does carry a pre-convention `.snyk` and so
-will need a directive with its `fromSha`.
+`nswds-signature` — were converted with `migrate` directives carrying
+`tail: "none"`, bringing the whole 29-repo fleet under canonical policy. Each
+held only the two nanoid ignores, and scanning all six with `--ignore-policy`
+confirmed neither advisory still fires (every tree is on nanoid 3.3.18, above
+the 3.3.16 backport), so nothing was lost by dropping them. The directives
+disarm themselves once each conversion merges; `--check` then names them for
+deletion.
 
 ## Rollout phases
 

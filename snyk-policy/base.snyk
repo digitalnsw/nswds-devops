@@ -73,13 +73,13 @@ ignore:
   #    .snyk either, so an unenrolled repo receives NOTHING -- not even its
   #    root file.
   #
-  #    Snapshot 2026-09-07: 23 of the fleet's 29 repos are enrolled. The six
-  #    that are not -- data, nswds-community, nswds-email-builder,
-  #    nswds-eslint-config, nswds-public-sans and nswds-signature -- carry
-  #    these same three advisories unsuppressed. Each already has a .snyk
-  #    predating this convention, so enrolling one needs a migrate directive
-  #    carrying its fromSha (see repos.json), and wants the repo confirmed as
-  #    imported into the Snyk org first.
+  #    Snapshot 2026-09-07: all 29 repos in the fleet are enrolled, so every
+  #    repo carrying these advisories also carries this acceptance. That is a
+  #    snapshot, not an invariant -- a repo added to the fleet later receives
+  #    NOTHING until it is keyed in repos.json too, and one that already has a
+  #    .snyk needs a migrate directive carrying its fromSha to be converted
+  #    safely. Enrolling also wants the repo confirmed as imported into the
+  #    Snyk org.
   #
   # 2. DEPTH. Inside a repo that DOES receive it, the fan-out writes only the
   #    ROOT .snyk (POLICY_PATH in .github/scripts/snyk-policy.mjs) while Snyk
