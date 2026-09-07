@@ -199,10 +199,17 @@ acceptance was dropped in favour of the canonical one (the same key twice is a
 duplicate; `'*'` is the right scope for a licence finding, since a licence is a
 property of the package rather than of the route taken to it).
 
-**As at 2026-09-04 all 13 consumers are converted and `--check` reports
-`13 in sync · 0 to change · 0 need attention`.** No `migrate` directive remains
-in `snyk-policy/repos.json`; each one disarmed itself as its migration merged
-and the check named it for removal.
+**As at 2026-09-04 all 13 consumers of that round are converted and `--check`
+reports `13 in sync · 0 to change · 0 need attention`.** No `migrate` directive
+remains from it; each one disarmed itself as its migration merged and the check
+named it for removal.
+
+**2026-09-07:** ten more repos were enrolled, taking the fleet to 23 consumers.
+All ten had no `.snyk` at all, so the sync creates each file and none needed a
+migrate directive. Six repos remain unenrolled — `data`, `nswds-community`,
+`nswds-email-builder`, `nswds-eslint-config`, `nswds-public-sans` and
+`nswds-signature` — each of which does carry a pre-convention `.snyk` and so
+will need a directive with its `fromSha`.
 
 ## Rollout phases
 
