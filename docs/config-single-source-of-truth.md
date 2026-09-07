@@ -210,13 +210,20 @@ migrate directive.
 
 **2026-09-07 (second round):** the last six — `data`, `nswds-community`,
 `nswds-email-builder`, `nswds-eslint-config`, `nswds-public-sans` and
-`nswds-signature` — were converted with `migrate` directives carrying
-`tail: "none"`, bringing the whole 29-repo fleet under canonical policy. Each
-held only the two nanoid ignores, and scanning all six with `--ignore-policy`
-confirmed neither advisory still fires (every tree is on nanoid 3.3.18, above
-the 3.3.16 backport), so nothing was lost by dropping them. The directives
-disarm themselves once each conversion merges; `--check` then names them for
-deletion.
+`nswds-signature` — were enrolled as **plain keys**, bringing the whole 29-repo
+fleet under canonical policy. No `migrate` directive was needed: each already
+ends with the `  # repo-specific` marker and carries nothing after it, so
+`selectTail` returns `steady` with an empty tail. Calling `selectTail` and
+`compose` directly confirms a bare key and a `tail: "none"` directive render
+byte-identical files — and the directive would have been strictly worse, since
+these files predate the `generated from nswds-devops` sentinel, so a blob that
+moved before the fan-out evaluated it would have been REFUSED rather than
+synced.
+
+Their two nanoid ignores go with the rest of the pre-canonical block, losing
+nothing: all six resolve nanoid 3.3.18, which carries both fixes — `-894` was
+backported in 3.3.16, and `-897`'s `customRandom` size guard landed in 3.3.17.
+Scanning all six with `--ignore-policy` confirms neither advisory still fires.
 
 ## Rollout phases
 
