@@ -64,11 +64,25 @@ ignore:
   # config. A twin 'npm > * > undici' entry would be dead config today; add
   # one only if npm ever becomes a direct dependency.
   #
-  # NOT delivered to workspace sub-projects. The fan-out writes only the root
-  # .snyk, and Snyk resolves a policy per project directory. In nswds-ui and
-  # nswds-email-design these same three advisories also surface under
-  # packages/semantic-release-config, which needs its own .snyk -- the way
-  # nswds-ui already carries apps/web/.snyk. Verified 2026-09-07.
+  # WHERE THIS DOES AND DOES NOT LAND -- two separate gaps, both verified
+  # 2026-09-07. Neither is closed here.
+  #
+  # 1. REACH. This block is delivered only to the 13 repos enrolled in
+  #    snyk-policy/repos.json. The other 16 scanned in the fleet sweep -- 15
+  #    consumer repos plus nswds-devops itself -- carry these same three
+  #    advisories and receive NOTHING from it. nswds-email-design is the case
+  #    to watch: it has no .snyk at all, so neither its root nor its
+  #    workspaces are covered, and the ordinary file-sync in
+  #    .github/sync.yml deliberately does not carry .snyk either. Enrolling a
+  #    repo is a separate decision -- it also wants the repo confirmed as
+  #    imported into the Snyk org -- and is not made here.
+  #
+  # 2. DEPTH. Inside a repo that DOES receive it, the fan-out writes only the
+  #    ROOT .snyk (POLICY_PATH in .github/scripts/snyk-policy.mjs) while Snyk
+  #    resolves a policy per project directory. So in the workspace monorepo
+  #    nswds-ui the root project is covered but packages/semantic-release-
+  #    config still reports all three; clearing that needs its own .snyk, the
+  #    way apps/web/.snyk already exists there.
   SNYK-JS-UNDICI-19635210:
     - '* > npm > * > undici':
         reason: undici vendored inside the npm CLI, reached only via semantic-release; no upstream fix (npm 11.19.1 still ships undici 6.28.0) and absent from every published artifact
