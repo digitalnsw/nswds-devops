@@ -152,8 +152,10 @@ at.
 `selectTail()` is exported and used by both `evaluate()` and the fan-out, so
 there is one implementation of the rule and the tests exercise the real one.
 
-**What the base contains, as of 2026-09-04.** Twenty-eight enumerated licence
-acceptances and no vulnerability ignores:
+**What the base contains, as of 2026-09-07.** Twenty-eight enumerated licence
+acceptances and three scoped vulnerability acceptances — the npm-vendored
+undici advisories added in #119, scoped `* > npm > * > undici` and expiring
+2026-12-31:
 
 - **Licence acceptances** — weak-copyleft (MPL-2.0 / LGPL-3.0) and permissive
   (Artistic-2.0) findings on unmodified, transitively-installed build and

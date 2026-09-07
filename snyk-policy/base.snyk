@@ -109,13 +109,17 @@ ignore:
   # Weak-copyleft (MPL-2.0 / LGPL-3.0) and permissive (Artistic-2.0) licences
   # on unmodified, transitively-installed build, CI and dev dependencies. They
   # are not modified and not redistributed: the private apps in this fleet are
-  # not distributed at all, and the published @nswds/* packages ship only their
-  # own build output (`files: ["dist"]`), which does not embed them. The
-  # first-party @nswds/* MPL-2.0 findings are our own licence, chosen
-  # deliberately.
+  # not distributed at all, and every published package declares a narrow
+  # `files` allowlist that embeds none of them. The first-party @nswds/*
+  # MPL-2.0 findings are our own licence, chosen deliberately.
   #
-  # Do NOT reduce this to "the app is private": nswds-tokens, nswds-app and
-  # nswds-ui publish to npm, so a fleet-wide non-distribution claim is false.
+  # Do NOT reduce this to "the app is private". Six packages here publish to
+  # npm -- @nswds/tokens, @nswds/ui, @nswds/app, @nswds/eslint-config,
+  # @nswds/metadata and @nswds/prettier-config -- so a fleet-wide
+  # non-distribution claim is false. Nor is `files: ["dist"]` the shared
+  # shape: only @nswds/tokens uses exactly that. The others allowlist their
+  # own entry points instead, which is why the claim above is about the
+  # allowlist being narrow rather than about any one spelling of it.
   #
   # Snyk matches ignore keys as EXACT issue IDs -- it does NOT support globs
   # like '*:lic:*', which silently match nothing. Every ID must be listed.
