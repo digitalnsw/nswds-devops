@@ -152,8 +152,10 @@ at.
 `selectTail()` is exported and used by both `evaluate()` and the fan-out, so
 there is one implementation of the rule and the tests exercise the real one.
 
-**What the base contains, as of 2026-09-04.** Twenty-eight enumerated licence
-acceptances and no vulnerability ignores:
+**What the base contains, as of 2026-09-07.** Twenty-eight enumerated licence
+acceptances and three scoped vulnerability acceptances — the npm-vendored
+undici advisories added in #119, scoped `* > npm > * > undici` and expiring
+2026-12-31:
 
 - **Licence acceptances** — weak-copyleft (MPL-2.0 / LGPL-3.0) and permissive
   (Artistic-2.0) findings on unmodified, transitively-installed build and
@@ -206,10 +208,24 @@ named it for removal.
 
 **2026-09-07:** ten more repos were enrolled, taking the fleet to 23 consumers.
 All ten had no `.snyk` at all, so the sync creates each file and none needed a
-migrate directive. Six repos remain unenrolled — `data`, `nswds-community`,
+migrate directive.
+
+**2026-09-07 (second round):** the last six — `data`, `nswds-community`,
 `nswds-email-builder`, `nswds-eslint-config`, `nswds-public-sans` and
-`nswds-signature` — each of which does carry a pre-convention `.snyk` and so
-will need a directive with its `fromSha`.
+`nswds-signature` — were enrolled as **plain keys**, bringing the whole 29-repo
+fleet under canonical policy. No `migrate` directive was needed: each already
+ends with the `  # repo-specific` marker and carries nothing after it, so
+`selectTail` returns `steady` with an empty tail. Calling `selectTail` and
+`compose` directly confirms a bare key and a `tail: "none"` directive render
+byte-identical files — and the directive would have been strictly worse, since
+these files predate the `generated from nswds-devops` sentinel, so a blob that
+moved before the fan-out evaluated it would have been REFUSED rather than
+synced.
+
+Their two nanoid ignores go with the rest of the pre-canonical block, losing
+nothing: all six resolve nanoid 3.3.18, which carries both fixes — `-894` was
+backported in 3.3.16, and `-897`'s `customRandom` size guard landed in 3.3.17.
+Scanning all six with `--ignore-policy` confirms neither advisory still fires.
 
 ## Rollout phases
 
