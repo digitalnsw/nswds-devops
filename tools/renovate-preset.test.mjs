@@ -41,14 +41,38 @@ const blocks = rules
   .map((rule, index) => ({ rule, index }))
   .filter(({ rule }) => rule.enabled === false)
 
-// Renovate names packages through either matcher, and they are interchangeable
-// for our purposes. Reading only matchPackageNames silently exempted any block
-// written the other way from the scoping and exit assertions below — verified
-// by rewriting the vitest block to matchDepNames and watching both pass while
-// checking nothing.
-const NAME_MATCHERS = ['matchPackageNames', 'matchDepNames']
+// Renovate can name packages through any of four matchers, and a block is a
+// package block whichever one it uses. Reading a subset silently exempts the
+// rest from every assertion below: an earlier version read only
+// matchPackageNames, and a later one only added matchDepNames, so a block
+// written with either *Patterns form still escaped the update-type and exit
+// assertions entirely — verified by appending an unscoped pattern block and
+// watching all six tests pass.
+const EXACT_MATCHERS = ['matchPackageNames', 'matchDepNames']
+const PATTERN_MATCHERS = ['matchPackagePatterns', 'matchDepPatterns']
+const NAME_MATCHERS = [...EXACT_MATCHERS, ...PATTERN_MATCHERS]
 
-const namesOf = (rule) => NAME_MATCHERS.flatMap((key) => (Array.isArray(rule[key]) ? rule[key] : []))
+const listOf = (rule, keys) => keys.flatMap((key) => (Array.isArray(rule[key]) ? rule[key] : []))
+
+const namesOf = (rule) => listOf(rule, NAME_MATCHERS)
+
+/**
+ * Does this rule name `pkg`? Exact matchers compare literally; pattern matchers
+ * are regexes and have to be evaluated, or converting a block to the pattern
+ * form would read as "no longer blocked" while blocking exactly the same thing.
+ * An unparseable pattern is treated as non-matching — renovate-config-validator
+ * is what rejects those, and throwing here would report it as the wrong defect.
+ */
+const blocksPackage = (rule, pkg) => {
+  if (listOf(rule, EXACT_MATCHERS).includes(pkg)) return true
+  return listOf(rule, PATTERN_MATCHERS).some((pattern) => {
+    try {
+      return new RegExp(pattern).test(pkg)
+    } catch {
+      return false
+    }
+  })
+}
 
 /** A block scoped to named packages, as opposed to one scoped to a depType. */
 const packageBlocks = blocks.filter(({ rule }) => namesOf(rule).length > 0)
@@ -110,7 +134,7 @@ test('the packages the fleet has decided to block are still blocked', () => {
   ]
 
   for (const { package: name, repositories } of MUST_STAY_BLOCKED) {
-    const covering = packageBlocks.filter(({ rule }) => namesOf(rule).includes(name))
+    const covering = packageBlocks.filter(({ rule }) => blocksPackage(rule, name))
 
     assert.notEqual(
       covering.length,
@@ -119,17 +143,24 @@ test('the packages the fleet has decided to block are still blocked', () => {
         'If that is deliberate, remove it from MUST_STAY_BLOCKED in the same commit.',
     )
 
+    // A rule with no matchRepositories applies everywhere. That satisfies both
+    // claims below, and the second one is easy to get wrong: an earlier version
+    // summed matchRepositories across the covering rules, so a fleet-wide rule
+    // contributed nothing and counted as covering no repos. Widening the vitest
+    // block to the whole fleet — strictly stronger — then failed the test,
+    // which is pressure to revert a correct change to satisfy a guard.
+    const coversEveryRepo = covering.some(({ rule }) => !Array.isArray(rule.matchRepositories))
+
     if (repositories === null) {
-      // Union across every rule blocking it: a fleet-wide block is one with no
-      // repository scope at all.
-      const fleetWide = covering.some(({ rule }) => !Array.isArray(rule.matchRepositories))
       assert.ok(
-        fleetWide,
+        coversEveryRepo,
         `"${name}" is blocked fleet-wide today, but every rule blocking it now carries ` +
           'matchRepositories, which narrows the freeze to those repos only.',
       )
       continue
     }
+
+    if (coversEveryRepo) continue
 
     const covered = new Set(covering.flatMap(({ rule }) => rule.matchRepositories ?? []))
     const uncovered = repositories.filter((repo) => !covered.has(repo))
