@@ -99,6 +99,14 @@ ignore:
   #    and snyk:monitor scripts (nswds-ui#178, nswds-email-design#33) and both
   #    are clear of depth-gap findings.
   #
+  #    SCOPE OF THAT FIX, so nobody reads more into it: the flag takes effect
+  #    in those npm scripts. Verified 2026-09-08 that NO workflow in nswds-ui,
+  #    nswds-email-design or nswds-devops invokes either script, and the checks
+  #    that gate a PR there -- Snyk's SCM integration, reported as code/snyk,
+  #    security/snyk and license/snyk -- never run the CLI, so they resolve
+  #    policy per manifest directory on their own and the flag never reaches
+  #    them. Treat the gap as closed for a CLI scan, not for those checks.
+  #
   #    Do NOT instead add a .snyk per workspace. That is 8-9 near-duplicates of
   #    this block which the fan-out does not manage at that depth, so they
   #    drift the moment this file changes. Note also that --policy-path
