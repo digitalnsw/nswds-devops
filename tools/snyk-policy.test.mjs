@@ -559,42 +559,33 @@ test('the base.snyk enrolment snapshot matches repos.json and the real fleet', (
   }
 })
 
-test('the DEPTH note prescribes --policy-path and rejects a per-workspace .snyk', () => {
-  // Asserts what the note MUST say. Detecting bad prose failed silently; every
-  // bypass below was reproduced by an adversarial pass before being closed.
+test('the DEPTH note declares the per-workspace policy in a machine-checkable form', () => {
+  // Regex cannot read the intent of English prose, and three rounds proved it:
+  //   absence detection   -> defeated by rewording
+  //   presence detection  -> defeated by adding the bad advice alongside, and
+  //                          by the "NEVER USE --policy-path" prefix
+  //   negation exclusions -> defeated by "do not skip this step: add a .snyk
+  //                          per workspace", by "do not hesitate to add", and by
+  //                          placing the negation AFTER the term so a
+  //                          backwards-looking pattern misses it
+  // Every one of those passed while the note carried the advice this test
+  // exists to block, which is worse than no test because a green suite stops
+  // anyone looking.
+  //
+  // So this pins a DECLARED TOKEN rather than the prose. It cannot be satisfied
+  // by accident, and reversing the decision requires editing a line that reads
+  // REJECTED. What it does NOT do is prove the surrounding paragraph agrees
+  // with the token — that is a human review job, and pretending otherwise is
+  // what went wrong three times.
   const realBase = readFileSync(new URL('../snyk-policy/base.snyk', import.meta.url), 'utf8')
   const depth = noteBody(realBase, '# 2. DEPTH.')
   assert.ok(depth, 'base.snyk must carry a "# 2. DEPTH." note')
-  const prose = asProse(depth)
 
   assert.match(
-    prose,
-    /--policy-path=\.snyk/,
-    'the DEPTH note must name --policy-path=.snyk as the supported fix',
-  )
-  // Presence alone accepted "NEVER USE --policy-path=.snyk".
-  assert.doesNotMatch(
-    prose,
-    /\b(never|do not|don't|avoid|stop)\b[^.]{0,40}--policy-path/i,
-    'the DEPTH note must not tell readers to avoid --policy-path',
-  )
-
-  // The rejection sentence. "do not FORGET to add a .snyk per workspace" is a
-  // recommendation wearing a negation, so forget/fail-to are excluded.
-  const REJECTION = /\bdo not\b(?![^.]*\b(forget|fail|neglect|omit)\b)[^.]{0,60}\.snyk per workspace/i
-  assert.match(
-    prose,
-    REJECTION,
-    'the DEPTH note must explicitly reject adding a .snyk per workspace; without that sentence a ' +
-      'future reader re-derives the duplicating fix the fan-out cannot manage',
-  )
-
-  // A recommendation ADDED ALONGSIDE the rejection also has to fail. Strip the
-  // known rejection first so it cannot satisfy its own detector.
-  const withoutRejection = prose.replace(REJECTION, ' ')
-  assert.doesNotMatch(
-    withoutRejection,
-    /\b(add|give|create|keep)\b[^.]{0,60}(own copy|its own \.snyk|a \.snyk)[^.]{0,40}\b(workspace|package)\b/i,
-    'the DEPTH note recommends a per-workspace policy file somewhere outside its rejection sentence',
+    asProse(depth),
+    /POLICY: per-workspace \.snyk = REJECTED; use --policy-path=\.snyk/,
+    'the DEPTH note must declare, verbatim, ' +
+      '"POLICY: per-workspace .snyk = REJECTED; use --policy-path=.snyk". ' +
+      'Changing the decision means changing that line, deliberately.',
   )
 })

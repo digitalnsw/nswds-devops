@@ -107,6 +107,14 @@ ignore:
   #    policy per manifest directory on their own and the flag never reaches
   #    them. Treat the gap as closed for a CLI scan, not for those checks.
   #
+  #    POLICY: per-workspace .snyk = REJECTED; use --policy-path=.snyk
+  #
+  #    That line is asserted verbatim by tools/snyk-policy.test.mjs. It is the
+  #    machine-checkable part of this note: regex cannot read the intent of the
+  #    prose around it, so the declared policy is pinned instead. Reversing the
+  #    decision means editing a line that says REJECTED, which shows up in a
+  #    review rather than hiding in a reworded paragraph.
+  #
   #    Do NOT instead add a .snyk per workspace. That is 8-9 near-duplicates of
   #    this block which the fan-out does not manage at that depth, so they
   #    drift the moment this file changes. Note also that --policy-path
