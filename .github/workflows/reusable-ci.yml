@@ -324,6 +324,11 @@ jobs:
   # their suites were confirmed green from a clean checkout before this landed.
   # The npm-init default stub ("Error: no test specified") is treated as absent
   # so onboarding a repo that never wrote tests doesn't fail CI.
+  #
+  # Both probes look at the whole tree now, not just the root — see "Decide
+  # what to run" below. Root-only vitest detection reopened the same silent
+  # gap for monorepos (nswds-ui#171) that nswds-email#485 closed for node:test
+  # repos.
   # Not required by rulesets unless a repo adds the "install / test" context.
   test:
     if: ${{ vars.CI_SKIP_TESTS != 'true' }}
@@ -347,49 +352,130 @@ jobs:
           cache: 'npm'
           cache-dependency-path: package-lock.json
 
+      # Pick the entry point ONCE, in precedence order, so every later step
+      # keys off a single decision instead of re-deriving it from hashFiles().
+      #
+      #   root-vitest  — a vitest config at the repo root. Unchanged behaviour.
+      #   npm-test     — no root config, but the root has a real `test` script.
+      #                  Unchanged behaviour, and it stays AHEAD of nested
+      #                  configs on purpose: an aggregate script is the repo's
+      #                  own entry point and may cover more than the suites a
+      #                  config scan can see (nswds-email-design's root script
+      #                  is `turbo test`; running only packages/email would
+      #                  quietly narrow it).
+      #   nested-vitest— no root config and no root script, but a workspace has
+      #                  a config. This is the case that was broken: hashFiles()
+      #                  only ever looked at the root, so nswds-ui (config at
+      #                  apps/storybook/vitest.config.ts, no root test script)
+      #                  fell through to "Nothing to run" and reported a GREEN
+      #                  "install / test" having installed nothing and run
+      #                  nothing — the exact silent gap this job exists to
+      #                  close, one directory down. Caught on nswds-ui#171,
+      #                  where it passed against a manifest that could not
+      #                  install at all.
+      #   none         — nothing to run.
+      #
+      # git ls-files rather than hashFiles('**/vitest.config.*'): the later
+      # steps evaluate after npm clean-install, when a `**` glob would walk
+      # every node_modules copy of vitest's own fixtures. Tracked files cannot
+      # include node_modules, so the probe stays honest and cheap. Done in a
+      # step rather than an `if:` expression for the same reason as the
+      # typecheck and prettier probes above — workflow expressions cannot read
+      # the filesystem or package.json.
+      - name: Decide what to run
+        id: probe
+        run: |
+          dirs="$(git ls-files \
+            | grep -E '(^|/)vitest\.config\.[A-Za-z]+$' \
+            | xargs -r -n1 dirname \
+            | sort -u \
+            | tr '\n' ' ')"
+          has_root_script=false
+          if [ -f package.json ] && node -e "
+            const t = (require('./package.json').scripts || {}).test || '';
+            process.exit(t && !/no test specified/.test(t) ? 0 : 1);
+          "; then
+            has_root_script=true
+          fi
+
+          case " $dirs " in
+            *" . "*) mode=root-vitest ;;
+            *)
+              if [ "$has_root_script" = true ]; then
+                mode=npm-test
+              elif [ -n "$dirs" ]; then
+                mode=nested-vitest
+              else
+                mode=none
+              fi
+              ;;
+          esac
+
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "dirs=$dirs" >> "$GITHUB_OUTPUT"
+          echo "Mode: $mode${dirs:+ (vitest configs in: $dirs)}"
+
       - name: Install dependencies
-        if: ${{ hashFiles('vitest.config.*') != '' }}
+        if: ${{ steps.probe.outputs.mode != 'none' }}
         run: npm clean-install
 
+      # Browser-mode suites need a real browser. The playwright dependency can
+      # sit in the root manifest OR in the workspace that owns a config
+      # (nswds-ui declares it in apps/storybook), so check both before
+      # concluding there is nothing to install. Also runs on the npm-test path,
+      # which previously installed no browser at all — a repo whose aggregate
+      # script reaches a browser-mode suite would have failed there.
       - name: Install Playwright browser (browser-mode vitest)
-        if: ${{ hashFiles('vitest.config.*') != '' }}
+        if: ${{ steps.probe.outputs.mode != 'none' }}
         run: |
-          if node -e "const p=require('./package.json');process.exit((p.devDependencies?.playwright||p.dependencies?.playwright)?0:1)"; then
+          needs=false
+          for dir in . ${{ steps.probe.outputs.dirs }}; do
+            [ -f "$dir/package.json" ] || continue
+            if node -e "const p=require('./$dir/package.json');process.exit((p.devDependencies?.playwright||p.dependencies?.playwright)?0:1)"; then
+              needs=true
+              break
+            fi
+          done
+          if [ "$needs" = true ]; then
             npx playwright install chromium --with-deps
           else
             echo "No playwright dependency — skipping browser install."
           fi
 
-      - name: Run vitest
-        if: ${{ hashFiles('vitest.config.*') != '' }}
+      - name: Run vitest (root config)
+        if: ${{ steps.probe.outputs.mode == 'root-vitest' }}
         # --no-install: a repo with a vitest config but no vitest dependency
         # should fail loudly, not have npx fetch and run latest from the registry.
         run: npx --no-install vitest run
 
-      # No vitest config: fall back to the repo's own `npm test`, if it has a
-      # real one. Detected in a step rather than an `if:` expression because
-      # workflow expressions can't read package.json.
-      - name: Detect npm test script
-        id: npm-test
-        if: ${{ hashFiles('vitest.config.*') == '' }}
-        run: |
-          if [ -f package.json ] && node -e "
-            const t = (require('./package.json').scripts || {}).test || '';
-            process.exit(t && !/no test specified/.test(t) ? 0 : 1);
-          "; then
-            echo 'present=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'present=false' >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Install dependencies (npm test)
-        if: ${{ steps.npm-test.outputs.present == 'true' }}
-        run: npm clean-install
-
       - name: Run npm test
-        if: ${{ steps.npm-test.outputs.present == 'true' }}
+        if: ${{ steps.probe.outputs.mode == 'npm-test' }}
         run: npm test
 
+      # One invocation per config, so a second workspace suite cannot be
+      # silently skipped the way the first one used to be. Prefers the owning
+      # workspace's own `test` script, because only the repo knows how its
+      # suite is meant to be invoked (nswds-ui's is `vitest --project storybook
+      # run`) — the same reasoning the typecheck job gives for running the
+      # repo's script instead of a bare `tsc --noEmit`. Bare vitest with --root
+      # is the fallback for a workspace with no script of its own.
+      - name: Run vitest (workspace configs)
+        if: ${{ steps.probe.outputs.mode == 'nested-vitest' }}
+        run: |
+          for dir in ${{ steps.probe.outputs.dirs }}; do
+            if node -e "
+              const t = (require('./$dir/package.json').scripts || {}).test || '';
+              process.exit(t && !/no test specified/.test(t) ? 0 : 1);
+            " 2>/dev/null; then
+              echo "::group::npm test -w $dir"
+              npm test -w "$dir"
+            else
+              echo "::group::vitest run --root $dir"
+              npx --no-install vitest run --root "$dir"
+            fi
+            echo '::endgroup::'
+          done
+
       - name: Nothing to run
-        if: ${{ hashFiles('vitest.config.*') == '' && steps.npm-test.outputs.present != 'true' }}
+        if: ${{ steps.probe.outputs.mode == 'none' }}
         run: echo "No vitest config and no npm test script — nothing to run."
