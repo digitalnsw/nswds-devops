@@ -28,12 +28,8 @@ const SENTINEL_LINE = '# ── Canonical base (generated from nswds-devops snyk
 // consumer for an unrelated repo and still satisfy "all N are enrolled".
 //
 // Pure, so it can be unit-tested on synthetic YAML rather than only against the
-// one real sync.yml. Earlier versions were wrong four ways, each silently
-// UNDERCOUNTING and so making the REACH assertion demand a false number:
-// regexing the whole file counted digitalnsw/<name> in prose; bailing on the
-// first non-matching line dropped every repo after an annotated entry; counting
-// commented-out entries inflated it; and matching only `|`/`>` skipped a group
-// whose header carries an indentation indicator (`repos: |2`).
+// real sync.yml. Parse literal headers explicitly and validate entire target
+// lines: silently extracting names can hide a config the sync action cannot use.
 const parseFleet = (yml) => {
   const lines = yml.split('\n')
   const names = new Set(['nswds-devops'])
@@ -41,7 +37,7 @@ const parseFleet = (yml) => {
     const key = lines[i].match(/^(\s*(?:-\s*)?)repos:\s*(.*)$/)
     if (!key) continue
     // LITERAL block scalars only: | with optional indentation and chomping
-    // indicators in either order (|2, |-, |2-, |-2).
+    // indicators in either order (|2, |-, |2-, |-2), and a separated comment.
     //
     // `>` is valid YAML and deliberately rejected. It FOLDS the lines into one
     // space-separated string, and repo-file-sync-action splits group.repos on
@@ -50,7 +46,7 @@ const parseFleet = (yml) => {
     // reads as user "digitalnsw", repo "a digitalnsw" -- the second repo silently
     // stops being synced. This parser reads raw pre-fold lines, so it would
     // count both and let the snapshot pass over a config the action mis-consumes.
-    if (!/^\|[0-9+-]*$/.test(key[2].trim())) {
+    if (!/^\|(?:[1-9][+-]?|[+-][1-9]?)?(?:[ \t]+#.*)?$/.test(key[2].trim())) {
       throw new Error(
         `.github/sync.yml:${i + 1} has a "repos:" key that is not a LITERAL block scalar: ` +
           `${JSON.stringify(lines[i].trim())}. Use \`|\`. A folded \`>\` header collapses the ` +
@@ -64,9 +60,16 @@ const parseFleet = (yml) => {
       if (line.trim() === '') continue
       const indent = line.length - line.trimStart().length
       if (indent <= keyIndent) break // dedent closes the block scalar
-      if (line.trimStart().startsWith('#')) continue // commented-out entry
-      const m = line.match(/digitalnsw\/([A-Za-z0-9._-]+)/)
-      if (m) names.add(m[1])
+      // Inside a scalar, # is content: the action consumes each trimmed line
+      // verbatim. Refuse annotations instead of blessing malformed targets.
+      const m = line.trim().match(/^digitalnsw\/([A-Za-z0-9._-]+)(?:@[^\s@#]+)?$/)
+      if (!m) {
+        throw new Error(
+          `.github/sync.yml:${j + 1} has an unsupported repo entry: ${JSON.stringify(line.trim())}. ` +
+            'Use digitalnsw/repo[@branch]; comments belong outside the scalar.',
+        )
+      }
+      names.add(m[1])
     }
   }
   return names
@@ -529,16 +532,40 @@ test('an empty tail cannot introduce duplicates the base does not already have',
 // parsing regression here does not fail loudly, it either stops guarding or
 // fails blaming the wrong file.
 
-test('parseFleet reads every block-scalar header style', () => {
+test('parseFleet reads literal block-scalar headers with separated comments', () => {
   const group = (header) => `group:\n  - repos: ${header}\n      digitalnsw/a\n      digitalnsw/b\n    files:\n`
-  // | and > with indentation and chomping indicators in either order. Missing
+  // Literal | with indentation and chomping indicators in either order. Missing
   // the indicator form silently dropped a whole group, and the undercount then
   // made the REACH assertion demand a number that is not true.
-  for (const header of ['|', '|-', '|+', '|2', '|2-', '|-2']) {
+  for (const header of ['|', '|-', '|+', '|2', '|2-', '|-2', '|2+', '|+2', '| # group', '|2- # group', '|-2 # group', '|+2\t# group']) {
     assert.deepEqual(
       [...parseFleet(group(header))].sort(),
       ['a', 'b', 'nswds-devops'],
       `block header ${header} should yield both repos`,
+    )
+  }
+})
+
+test('parseFleet refuses malformed literal headers', () => {
+  for (const header of ['|0', '|22', '|++', '|--', '|+-', '|2-2', '|#group', '|2-#group']) {
+    assert.throws(
+      () => parseFleet(`group:\n  - repos: ${header}\n      digitalnsw/a\n`),
+      /sync\.yml:2.*not a LITERAL block scalar/,
+      `malformed header ${header} must be refused`,
+    )
+  }
+})
+
+test('parseFleet refuses annotations and malformed scalar targets', () => {
+  for (const entry of [
+    '# digitalnsw/retired', 'digitalnsw/b # note', 'prefix digitalnsw/a',
+    'digitalnsw/a digitalnsw/b', 'digitalnsw/a@', 'digitalnsw/a@@main',
+    'digitalnsw/a/extra', 'other-org/a',
+  ]) {
+    assert.throws(
+      () => parseFleet(`group:\n  - repos: |\n      ${entry}\n`),
+      /sync\.yml:3 has an unsupported repo entry/,
+      `unsupported entry ${entry} must be refused`,
     )
   }
 })
@@ -575,8 +602,7 @@ test('parseFleet counts block contents only, and always includes nswds-devops', 
     'group:',
     '  - repos: |',
     '      digitalnsw/a',
-    '      # digitalnsw/retired (paused)', // commented-out entry
-    '      digitalnsw/b  # onboarding note', // annotated entry
+    '      digitalnsw/b@feature/onboarding', // branch suffix is not repo identity
     '',
     '      digitalnsw/c', // blank line does not close the block
     '    files:',
