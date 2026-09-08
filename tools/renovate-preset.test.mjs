@@ -11,9 +11,12 @@
 // WHAT THIS FILE CAN AND CANNOT DO, stated up front because pretending
 // otherwise is what went wrong three times with snyk-policy/base.snyk:
 //
-//   CAN  — assert the SHAPE of a rule against the repo's own data: that a
-//          block is scoped, that a repo it names exists, that nothing later
-//          silently voids it, that it states how it ends.
+//   CAN  — assert the SHAPE of a rule against the repo's own data: that the
+//          packages the fleet decided to block are still blocked and still
+//          cover the repos they were written for, that a block declares which
+//          update types it stops, that a repo it names exists, that nothing
+//          later silently voids it, that it states how it ends, and that the
+//          filters above found something to check in the first place.
 //   CANNOT — assert that a rule's factual claims are still TRUE. Peer ranges,
 //          npm `latest` versions and which repos depend on what all live in
 //          the registry and in sibling repos, and they drift without anything
@@ -38,11 +41,22 @@ const blocks = rules
   .map((rule, index) => ({ rule, index }))
   .filter(({ rule }) => rule.enabled === false)
 
-/** A block scoped to named packages, as opposed to one scoped to a depType. */
-const packageBlocks = blocks.filter(({ rule }) => Array.isArray(rule.matchPackageNames))
+// Renovate names packages through either matcher, and they are interchangeable
+// for our purposes. Reading only matchPackageNames silently exempted any block
+// written the other way from the scoping and exit assertions below — verified
+// by rewriting the vitest block to matchDepNames and watching both pass while
+// checking nothing.
+const NAME_MATCHERS = ['matchPackageNames', 'matchDepNames']
 
-const label = ({ rule, index }) =>
-  `packageRules[${index}] (${(rule.matchPackageNames ?? rule.matchDepTypes ?? []).join(', ')})`
+const namesOf = (rule) => NAME_MATCHERS.flatMap((key) => (Array.isArray(rule[key]) ? rule[key] : []))
+
+/** A block scoped to named packages, as opposed to one scoped to a depType. */
+const packageBlocks = blocks.filter(({ rule }) => namesOf(rule).length > 0)
+
+const label = ({ rule, index }) => {
+  const named = namesOf(rule)
+  return `packageRules[${index}] (${(named.length ? named : (rule.matchDepTypes ?? [])).join(', ')})`
+}
 
 test('the preset actually contains blocks to check', () => {
   // Guards the guards: every assertion below iterates a filtered list, and an
@@ -66,29 +80,66 @@ test('the packages the fleet has decided to block are still blocked', () => {
   // lifting a fleet-wide block should require deleting a line from this list,
   // deliberately, in a diff someone reviews — not just dropping a JSON key.
   //
+  // WHO the block covers is pinned too, not just THAT the package is blocked.
+  // Without it, re-pointing the vitest rule from [nswds-ui, nswds-app] to two
+  // unrelated repos passed every assertion in this file — the rule stays in
+  // place reading exactly as before while the two repos that need it go
+  // unprotected. `repositories` is a required SUBSET, so widening a block to
+  // cover another repo passes and narrowing it fails.
+  //
+  // `repositories: null` means the opposite claim: this block is fleet-wide and
+  // must stay that way. Adding matchRepositories to the typescript block would
+  // quietly shrink a fleet-wide freeze to a couple of repos, which is the same
+  // silent narrowing in the other direction.
+  //
   // When a block's removal condition is genuinely met, delete its entry here
   // in the same commit that lifts it.
+  const VITEST_REPOS = ['digitalnsw/nswds-ui', 'digitalnsw/nswds-app']
+  const MAIZZLE_REPOS = ['digitalnsw/nswds-email-framework', 'digitalnsw/nswds-email-starter']
+
   const MUST_STAY_BLOCKED = [
-    'npm',
-    'conventional-changelog-conventionalcommits',
-    'typescript',
-    'eslint',
-    '@maizzle/framework',
-    'tailwindcss',
-    'vite',
-    'vitest',
-    '@vitest/**',
+    { package: 'npm', repositories: null },
+    { package: 'conventional-changelog-conventionalcommits', repositories: null },
+    { package: 'typescript', repositories: null },
+    { package: 'eslint', repositories: null },
+    { package: '@maizzle/framework', repositories: MAIZZLE_REPOS },
+    { package: 'tailwindcss', repositories: MAIZZLE_REPOS },
+    { package: 'vite', repositories: VITEST_REPOS },
+    { package: 'vitest', repositories: VITEST_REPOS },
+    { package: '@vitest/**', repositories: VITEST_REPOS },
   ]
 
-  const blocked = new Set(packageBlocks.flatMap(({ rule }) => rule.matchPackageNames))
-  const missing = MUST_STAY_BLOCKED.filter((name) => !blocked.has(name))
+  for (const { package: name, repositories } of MUST_STAY_BLOCKED) {
+    const covering = packageBlocks.filter(({ rule }) => namesOf(rule).includes(name))
 
-  assert.deepEqual(
-    missing,
-    [],
-    `these packages are no longer blocked: ${missing.join(', ')}. ` +
-      'If that is deliberate, remove them from MUST_STAY_BLOCKED in the same commit.',
-  )
+    assert.notEqual(
+      covering.length,
+      0,
+      `"${name}" is no longer blocked by any rule. ` +
+        'If that is deliberate, remove it from MUST_STAY_BLOCKED in the same commit.',
+    )
+
+    if (repositories === null) {
+      // Union across every rule blocking it: a fleet-wide block is one with no
+      // repository scope at all.
+      const fleetWide = covering.some(({ rule }) => !Array.isArray(rule.matchRepositories))
+      assert.ok(
+        fleetWide,
+        `"${name}" is blocked fleet-wide today, but every rule blocking it now carries ` +
+          'matchRepositories, which narrows the freeze to those repos only.',
+      )
+      continue
+    }
+
+    const covered = new Set(covering.flatMap(({ rule }) => rule.matchRepositories ?? []))
+    const uncovered = repositories.filter((repo) => !covered.has(repo))
+    assert.deepEqual(
+      uncovered,
+      [],
+      `"${name}" is blocked, but no longer for ${uncovered.join(', ')}. ` +
+        'Those repos need the block; widening is fine, dropping one is not.',
+    )
+  }
 })
 
 test('a block scoped to named packages also declares which update types it blocks', () => {
@@ -139,14 +190,26 @@ test('a repo-scoped rule names repos that exist in the fleet', () => {
   // reason nobody looks.
   //
   // Checked against .github/sync.yml, the same source the fleet dashboard uses.
-  // That set is the file-sync fleet and excludes nswds-devops itself, which is
-  // allowed here because the preset can legitimately scope a rule to its own
-  // repo. A consumer outside the digitalnsw org (bastianbuilt extends this
-  // preset from laurenhitchon/) would not appear either, so only digitalnsw
-  // entries are checked for membership; everything is checked for shape.
+  //
+  // Every entry is checked, with an explicit allowlist rather than a blanket
+  // skip. An earlier version waved through anything outside the digitalnsw org,
+  // on the grounds that a consumer like bastianbuilt (which extends this preset
+  // from laurenhitchon/) cannot appear in the sync fleet — but that exempted a
+  // whole category from the guard, so a typo'd `laurenhitchon/bastianbuiltt`
+  // passed the shape check and was never looked at again. Nothing scopes to a
+  // non-fleet consumer today, so the allowlist is empty: adding one has to be a
+  // deliberate edit here, which is the point.
   const fleet = parseFleetFromSyncConfig(
     readFileSync(new URL('../.github/sync.yml', import.meta.url), 'utf8'),
   )
+
+  // Consumers that extend this preset without being in the file-sync fleet.
+  const KNOWN_NON_FLEET_CONSUMERS = new Set()
+
+  // The preset's own repo is absent from the sync fleet (it is the source, not
+  // a target) but a rule may legitimately scope to it.
+  const allowed = (repo) =>
+    fleet.has(repo) || repo === 'digitalnsw/nswds-devops' || KNOWN_NON_FLEET_CONSUMERS.has(repo)
 
   for (const entry of rules.map((rule, index) => ({ rule, index }))) {
     const repos = entry.rule.matchRepositories
@@ -158,12 +221,12 @@ test('a repo-scoped rule names repos that exist in the fleet', () => {
         /^[\w.-]+\/[\w.-]+$/,
         `${label(entry)} matchRepositories entry "${repo}" is not owner/repo shaped, so it matches nothing.`,
       )
-      if (!repo.startsWith('digitalnsw/')) continue
       assert.ok(
-        fleet.has(repo) || repo === 'digitalnsw/nswds-devops',
+        allowed(repo),
         `${label(entry)} scopes to "${repo}", which is not in .github/sync.yml. ` +
           'Either it is a typo (the rule then matches nothing and blocks nothing), ' +
-          'or the repo needs adding to the sync fleet.',
+          'or it is a real consumer outside the sync fleet — add it to ' +
+          'KNOWN_NON_FLEET_CONSUMERS so the next reader knows it was deliberate.',
       )
     }
   }
