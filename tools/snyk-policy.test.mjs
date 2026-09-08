@@ -27,20 +27,29 @@ const SENTINEL_LINE = '# ── Canonical base (generated from nswds-devops snyk
 // Returns NAMES, not a count: comparing cardinality alone let repos.json swap a
 // consumer for an unrelated repo and still satisfy "all N are enrolled".
 //
-// Parsed structurally from the block scalars. Earlier versions were wrong three
-// ways: regexing the whole file counted digitalnsw/<name> mentioned in prose;
-// bailing on the first non-matching line dropped every repo after an annotated
-// entry; and counting commented-out entries INSIDE a block inflated the fleet,
-// whose failure message then told the author to publish a false count.
-const realFleetNames = () => {
-  const yml = readFileSync(new URL('../.github/sync.yml', import.meta.url), 'utf8')
+// Pure, so it can be unit-tested on synthetic YAML rather than only against the
+// one real sync.yml. Earlier versions were wrong four ways, each silently
+// UNDERCOUNTING and so making the REACH assertion demand a false number:
+// regexing the whole file counted digitalnsw/<name> in prose; bailing on the
+// first non-matching line dropped every repo after an annotated entry; counting
+// commented-out entries inflated it; and matching only `|`/`>` skipped a group
+// whose header carries an indentation indicator (`repos: |2`).
+const parseFleet = (yml) => {
   const lines = yml.split('\n')
   const names = new Set(['nswds-devops'])
   for (let i = 0; i < lines.length; i++) {
-    // Any block-scalar style: `|`, `|-`, `>`, `>-`. `>` folds but still lists.
-    const open = lines[i].match(/^(\s*(?:-\s*)?)repos:\s*[|>][-+]?\s*$/)
-    if (!open) continue
-    const keyIndent = open[1].length
+    const key = lines[i].match(/^(\s*(?:-\s*)?)repos:\s*(.*)$/)
+    if (!key) continue
+    // Every valid block-scalar header: | or >, with indentation and chomping
+    // indicators in either order (|2, |-, |2-, |-2, >+).
+    if (!/^[|>][0-9+-]*$/.test(key[2].trim())) {
+      throw new Error(
+        `.github/sync.yml:${i + 1} has a "repos:" key that is not a block scalar: ` +
+          `${JSON.stringify(lines[i].trim())}. Skipping it silently would undercount the fleet ` +
+          'and make the REACH snapshot assertion demand a number that is not true.',
+      )
+    }
+    const keyIndent = key[1].length
     for (let j = i + 1; j < lines.length; j++) {
       const line = lines[j]
       if (line.trim() === '') continue
@@ -53,6 +62,9 @@ const realFleetNames = () => {
   }
   return names
 }
+
+const realFleetNames = () =>
+  parseFleet(readFileSync(new URL('../.github/sync.yml', import.meta.url), 'utf8'))
 
 // One numbered note from the canonical comment block.
 //
@@ -494,6 +506,92 @@ test('an empty tail cannot introduce duplicates the base does not already have',
   assert.deepEqual(findDuplicateKeys(compose(blockOf(dupBase), '')), ['ignore.k'])
   const okBase = ['ignore:', '  k:', '  # repo-specific'].join('\n')
   assert.deepEqual(findDuplicateKeys(compose(blockOf(okBase), '')), [])
+})
+
+// ── The three helpers these guards rest on ──────────────────────────────────
+// Unit-tested on synthetic input, like every other pure helper in this file.
+// They were added without direct tests and exercised only against the one real
+// base.snyk / sync.yml, which is how a block-header gap reached review: a
+// parsing regression here does not fail loudly, it either stops guarding or
+// fails blaming the wrong file.
+
+test('parseFleet reads every block-scalar header style', () => {
+  const group = (header) => `group:\n  - repos: ${header}\n      digitalnsw/a\n      digitalnsw/b\n    files:\n`
+  // | and > with indentation and chomping indicators in either order. Missing
+  // the indicator form silently dropped a whole group, and the undercount then
+  // made the REACH assertion demand a number that is not true.
+  for (const header of ['|', '|-', '|+', '|2', '|2-', '|-2', '>', '>-']) {
+    assert.deepEqual(
+      [...parseFleet(group(header))].sort(),
+      ['a', 'b', 'nswds-devops'],
+      `block header ${header} should yield both repos`,
+    )
+  }
+})
+
+test('parseFleet refuses a repos: key that is not a block scalar', () => {
+  // Fail loudly naming sync.yml, rather than returning a short set that sends
+  // the reader to base.snyk to "fix" a count that was never wrong.
+  assert.throws(
+    () => parseFleet('group:\n  - repos:\n      - digitalnsw/a\n'),
+    /sync\.yml:2 has a "repos:" key that is not a block scalar/,
+  )
+  assert.throws(() => parseFleet('group:\n  - repos: digitalnsw/a\n'), /not a block scalar/)
+})
+
+test('parseFleet counts block contents only, and always includes nswds-devops', () => {
+  const yml = [
+    '# see digitalnsw/nswds-skills for prior art', // prose outside a block
+    'group:',
+    '  - repos: |',
+    '      digitalnsw/a',
+    '      # digitalnsw/retired (paused)', // commented-out entry
+    '      digitalnsw/b  # onboarding note', // annotated entry
+    '',
+    '      digitalnsw/c', // blank line does not close the block
+    '    files:',
+    '      - source: scripts/',
+    '        dest: digitalnsw/not-a-repo', // below the block, must not count
+    '  - repos: |',
+    '      digitalnsw/d',
+    '',
+  ].join('\n')
+  assert.deepEqual([...parseFleet(yml)].sort(), ['a', 'b', 'c', 'd', 'nswds-devops'])
+})
+
+test('noteBody cuts a note at the next heading, not at the next ignore key', () => {
+  const base = [
+    'ignore:',
+    '  # 1. REACH. first line',
+    '  #    still reach',
+    '  #',
+    '  #    1. an indented list item must not end the note',
+    '  # 2. DEPTH. second note',
+    '  #    still depth',
+    '  SNYK-JS-X:',
+  ].join('\n')
+  const reach = noteBody(base, '# 1. REACH.')
+  assert.ok(reach.includes('still reach'))
+  assert.ok(reach.includes('an indented list item'), 'a numbered list item must not truncate')
+  assert.ok(!reach.includes('DEPTH'), 'REACH must stop before the next heading')
+  const depth = noteBody(base, '# 2. DEPTH.')
+  assert.ok(depth.includes('still depth'))
+  assert.ok(!depth.includes('SNYK-JS-X'), 'the note ends at the first non-comment line')
+  assert.equal(noteBody(base, '# 9. NOPE.'), null)
+})
+
+test('noteBody survives a blank line and the ignore keys being deleted', () => {
+  // base.snyk instructs deleting the undici entries on expiry; the note's own
+  // boundary must not depend on them, and a whitespace-stripped spacer must not
+  // truncate it either.
+  const base = ['ignore:', '  # 2. DEPTH. a', '', '  #    b'].join('\n')
+  const depth = noteBody(base, '# 2. DEPTH.')
+  assert.ok(depth.includes('a') && depth.includes('b'))
+})
+
+test('asProse flattens a wrapped comment note into one line', () => {
+  const note = ['  # 2. DEPTH. one', '  #    two   three', '  #', '  #    four'].join('\n')
+  assert.equal(asProse(note), '2. DEPTH. one two three four')
 })
 
 test('the base.snyk enrolment snapshot matches repos.json and the real fleet', () => {
