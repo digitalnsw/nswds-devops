@@ -86,12 +86,25 @@ ignore:
   #    safely. Enrolling also wants the repo confirmed as imported into the
   #    Snyk org.
   #
-  # 2. DEPTH. Inside a repo that DOES receive it, the fan-out writes only the
-  #    ROOT .snyk (POLICY_PATH in .github/scripts/snyk-policy.mjs) while Snyk
-  #    resolves a policy per project directory. So in the workspace monorepos
-  #    nswds-ui and nswds-email-design the root project is covered but
-  #    packages/semantic-release-config still reports all three; clearing that
-  #    needs its own .snyk, the way nswds-ui's apps/web/.snyk already does.
+  # 2. DEPTH. This file lands at the repo ROOT (POLICY_PATH in
+  #    .github/scripts/snyk-policy.mjs), and Snyk resolves a policy per
+  #    manifest DIRECTORY. So in a workspace monorepo, `snyk test
+  #    --all-projects` scans every package with NO policy at all -- not merely
+  #    the odd finding. Measured 2026-09-08 before the fix: nswds-ui had 15
+  #    already-accepted findings open across seven workspaces, and
+  #    nswds-email-design 28 across eight.
+  #
+  #    THE FIX IS `--policy-path=.snyk`, which makes this one file apply to
+  #    every project in the run. Both monorepos now pass it in their snyk:check
+  #    and snyk:monitor scripts (nswds-ui#178, nswds-email-design#33) and both
+  #    are clear of depth-gap findings.
+  #
+  #    Do NOT instead add a .snyk per workspace. That is 8-9 near-duplicates of
+  #    this block which the fan-out does not manage at that depth, so they
+  #    drift the moment this file changes. Note also that --policy-path
+  #    OVERRIDES per-directory files: nswds-ui's apps/web/.snyk is inert while
+  #    the flag is set, which is harmless only because its nanoid entries no
+  #    longer fire at nanoid 3.3.18.
   SNYK-JS-UNDICI-19635210:
     - '* > npm > * > undici':
         reason: undici vendored inside the npm CLI, reached only via semantic-release; no upstream fix (npm 11.19.1 still ships undici 6.28.0) and absent from every published artifact

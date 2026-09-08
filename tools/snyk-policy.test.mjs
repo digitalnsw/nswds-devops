@@ -22,6 +22,27 @@ const {
 // The sentinel the renderer emits; a converted file carries it above the marker.
 const SENTINEL_LINE = '# ── Canonical base (generated from nswds-devops snyk-policy/base.snyk) ─────'
 
+
+// The fleet is every repo the file-sync targets, plus nswds-devops itself,
+// which consumes the policy it publishes. Parsed from the `repos: |` blocks
+// rather than by regexing the whole file: sync.yml is heavily commented, and a
+// comment mentioning any other digitalnsw/<name> would otherwise inflate the
+// count and fail the suite for no real reason.
+const realFleet = () => {
+  const yml = readFileSync(new URL('../.github/sync.yml', import.meta.url), 'utf8')
+  const names = new Set(['nswds-devops'])
+  let inBlock = false
+  for (const line of yml.split('\n')) {
+    if (/^\s*-?\s*repos:\s*\|/.test(line)) { inBlock = true; continue }
+    if (inBlock) {
+      const m = line.match(/^\s+digitalnsw\/([A-Za-z0-9._-]+)\s*$/)
+      if (m) { names.add(m[1]); continue }
+      if (line.trim() !== '') inBlock = false
+    }
+  }
+  return names.size
+}
+
 const BASE = ['version: v1.25.0', 'ignore:', '  snyk:lic:npm:x:MPL-2.0:', '    - \'*\':', '  # repo-specific', ''].join('\n')
 
 test('blockOf ends at the marker and keeps it', () => {
@@ -430,4 +451,71 @@ test('an empty tail cannot introduce duplicates the base does not already have',
   assert.deepEqual(findDuplicateKeys(compose(blockOf(dupBase), '')), ['ignore.k'])
   const okBase = ['ignore:', '  k:', '  # repo-specific'].join('\n')
   assert.deepEqual(findDuplicateKeys(compose(blockOf(okBase), '')), [])
+})
+
+test('the base.snyk enrolment snapshot matches repos.json and the real fleet', () => {
+  // The REACH note states a repo count, and that comment is copied verbatim
+  // into every consumer. It has gone stale twice — once naming 13 consumers
+  // after 10 more were enrolled, once naming six unenrolled repos in the very
+  // PR that enrolled them — and neither was caught by CI, only by review. The
+  // failure is invisible: the policy still works, it just tells every repo
+  // something untrue about the fleet.
+  //
+  // BOTH sentence shapes are accepted on purpose. Full coverage is today's
+  // state, not an invariant: enrolling is a deliberate per-repo decision (see
+  // repos.json), so a repo can sit in the file-sync while it waits to be
+  // enrolled — that was true of six repos for weeks. Pinning only the "all N"
+  // shape would leave no truthful edit that passes, and main would stay red
+  // until someone enrolled a repo prematurely or deleted this test.
+  const realBase = readFileSync(new URL('../snyk-policy/base.snyk', import.meta.url), 'utf8')
+  const enrolled = Object.keys(
+    JSON.parse(readFileSync(new URL('../snyk-policy/repos.json', import.meta.url), 'utf8')).repos,
+  ).length
+  const fleet = realFleet()
+
+  const full = realBase.match(/all (\d+) repos in the fleet are enrolled/)
+  const partial = realBase.match(/(\d+) of the fleet's (\d+) repos are enrolled/)
+  assert.ok(
+    full || partial,
+    'base.snyk must state the snapshot as "all N repos in the fleet are enrolled" or ' +
+      '"N of the fleet\'s M repos are enrolled"',
+  )
+
+  if (full) {
+    const claimed = Number(full[1])
+    assert.equal(claimed, enrolled, `base.snyk claims ${claimed} enrolled; repos.json lists ${enrolled}`)
+    assert.equal(
+      claimed,
+      fleet,
+      `base.snyk claims all ${claimed} fleet repos are enrolled, but the fleet is ${fleet} — ` +
+        'reword the snapshot to "N of the fleet\'s M repos are enrolled"',
+    )
+  } else {
+    const [, n, m] = partial.map(Number)
+    assert.equal(n, enrolled, `base.snyk claims ${n} enrolled; repos.json lists ${enrolled}`)
+    assert.equal(m, fleet, `base.snyk claims a fleet of ${m}; sync.yml + nswds-devops is ${fleet}`)
+    assert.notEqual(n, m, 'the fleet is fully enrolled — use the "all N" wording instead')
+  }
+})
+
+test('base.snyk prescribes --policy-path, not a per-workspace .snyk', () => {
+  // Pins the ADVICE, not one phrasing of it. The earlier version asserted the
+  // absence of the literal string "needs its own .snyk", which any rewording
+  // would have slipped past while reading as a guarantee.
+  const realBase = readFileSync(new URL('../snyk-policy/base.snyk', import.meta.url), 'utf8')
+  const depth = realBase.slice(realBase.indexOf('# 2. DEPTH.'), realBase.indexOf('  SNYK-JS-UNDICI'))
+  assert.ok(depth.length > 0, 'base.snyk must carry a DEPTH note above the ignore entries')
+  assert.match(depth, /--policy-path/, 'the DEPTH note must name --policy-path as the fix')
+
+  // Any sentence that recommends a policy file per workspace, however worded.
+  const perWorkspace =
+    /(needs? its own \.snyk|add(ing)? an? \.snyk (to|per|in) (each|every)|\.snyk (per|in each|for each) (workspace|package|project))/i
+  const recommends = depth
+    .split(/\n\s*#\s*\n/)
+    .filter((para) => perWorkspace.test(para) && !/\bdo not\b|\bdon't\b|\bnot\b/i.test(para))
+  assert.deepEqual(
+    recommends,
+    [],
+    'the DEPTH note must not recommend a .snyk per workspace; that is 8-9 undrifting duplicates',
+  )
 })
