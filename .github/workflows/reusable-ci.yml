@@ -386,17 +386,23 @@ jobs:
       # `x$(id)y/vitest.config.ts`.
 
       # A reusable workflow's `run` steps execute against the CALLER's checkout,
-      # where .github/scripts/ does not exist — so the script is fetched.
-      # Pinned to v1, the same ref every consumer calls this workflow at, so the
-      # script and the workflow move together under one Promote v1 rather than
-      # skewing. nswds-devops is public, so no token is needed, and
+      # so for the 29 consumer repos .github/scripts/ is not there and the
+      # script has to be fetched. Pinned to v1 — the same ref they call this
+      # workflow at — so script and workflow move together under one Promote v1
+      # rather than skewing. nswds-devops is public, so no token is needed, and
       # persist-credentials:false leaves no credential in the consumer's tree.
       #
-      # Trade-off, stated because it is real: this repo's own `install / test`
-      # then runs v1's script rather than the branch's, so a PR changing the
-      # script is not self-exercised here. tools/test-mode.test.mjs covers it,
-      # and Promote v1 is the gate.
+      # Skipped when the script is already in the workspace, which is the case
+      # for nswds-devops itself: its ci.yml calls `./.github/workflows/
+      # reusable-ci.yml`, so the caller's checkout IS this repo. That is not an
+      # optimisation. Fetching v1 unconditionally deadlocks the very PR that
+      # introduces the script — v1 does not have it yet, the job dies with
+      # MODULE_NOT_FOUND, and v1 cannot be promoted past a red check. Using the
+      # local copy also means this repo's own `install / test` exercises the
+      # BRANCH's script rather than the released one, which is what you want
+      # from the repo that owns it.
       - name: Fetch the shared test-mode script
+        if: ${{ hashFiles('.github/scripts/test-mode.mjs') == '' }}
         uses: actions/checkout@v7
         with:
           repository: digitalnsw/nswds-devops
@@ -406,7 +412,14 @@ jobs:
 
       - name: Decide what to run
         id: probe
-        run: node .nswds-ci/.github/scripts/test-mode.mjs "$RUNNER_TEMP/vitest-run-plan"
+        run: |
+          script=.github/scripts/test-mode.mjs
+          [ -f "$script" ] || script=.nswds-ci/.github/scripts/test-mode.mjs
+          if [ ! -f "$script" ]; then
+            echo "::error::test-mode.mjs is neither in this repo nor in the fetched copy, so the test gate cannot decide what to run."
+            exit 1
+          fi
+          node "$script" "$RUNNER_TEMP/vitest-run-plan"
 
       - name: Install dependencies
         if: ${{ steps.probe.outputs.mode != 'none' }}
