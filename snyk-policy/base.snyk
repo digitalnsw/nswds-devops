@@ -101,11 +101,17 @@ ignore:
   #
   #    SCOPE OF THAT FIX, so nobody reads more into it: the flag takes effect
   #    in those npm scripts. Verified 2026-09-08 that NO workflow in nswds-ui,
-  #    nswds-email-design or nswds-devops invokes either script, and the checks
-  #    that gate a PR there -- Snyk's SCM integration, reported as code/snyk,
-  #    security/snyk and license/snyk -- never run the CLI, so they resolve
-  #    policy per manifest directory on their own and the flag never reaches
-  #    them. Treat the gap as closed for a CLI scan, not for those checks.
+  #    nswds-email-design or nswds-devops invokes either script. What gates a
+  #    PR instead is Snyk's SCM integration, and it never runs the CLI -- it
+  #    resolves policy per manifest directory on its own, so the flag never
+  #    reaches it. Treat the gap as closed for a CLI scan, not for those
+  #    checks.
+  #
+  #    Do not assume a fixed set of those contexts. code/snyk and security/snyk
+  #    are required in most enrolled repos, license/snyk in only one
+  #    (nswds-email-design), and a few require no Snyk check at all -- so "the
+  #    Snyk check will catch it" is not true everywhere. Read the repo's own
+  #    ruleset before relying on one.
   #
   #    POLICY: per-workspace .snyk = REJECTED; use --policy-path=.snyk
   #
