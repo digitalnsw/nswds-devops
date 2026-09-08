@@ -353,136 +353,68 @@ jobs:
           cache-dependency-path: package-lock.json
 
       # Pick the entry point ONCE, in precedence order, so every later step
-      # keys off a single decision instead of re-deriving it from hashFiles().
+      # keys off a single decision instead of re-deriving it.
       #
-      #   root-vitest  — a vitest config at the repo root. Unchanged behaviour.
+      #   root-vitest  — a vitest config at the repo root.
       #   npm-test     — no root config, but the root has a real `test` script.
-      #                  Unchanged behaviour, and it stays AHEAD of nested
-      #                  configs on purpose: an aggregate script is the repo's
-      #                  own entry point and may cover more than the suites a
-      #                  config scan can see (nswds-email-design's root script
-      #                  is `turbo test`; running only packages/email would
-      #                  quietly narrow it).
+      #                  Deliberately AHEAD of nested configs: an aggregate
+      #                  script is the repo's own entry point and may cover more
+      #                  than a config scan can see (nswds-email-design's is
+      #                  `turbo test`, which also reaches a node:test suite that
+      #                  has no vitest config at all).
       #   nested-vitest— no root config and no root script, but a workspace has
-      #                  a config. This is the case that was broken: hashFiles()
-      #                  only ever looked at the root, so nswds-ui (config at
+      #                  one. This is the case that was broken: detection was
+      #                  root-only, so nswds-ui (config at
       #                  apps/storybook/vitest.config.ts, no root test script)
       #                  fell through to "Nothing to run" and reported a GREEN
       #                  "install / test" having installed nothing and run
       #                  nothing — the exact silent gap this job exists to
-      #                  close, one directory down. Caught on nswds-ui#171,
-      #                  where it passed against a manifest that could not
-      #                  install at all.
+      #                  close, one directory down (nswds-ui#171).
       #   none         — nothing to run.
       #
-      # git ls-files rather than hashFiles('**/vitest.config.*'): the later
-      # steps evaluate after npm clean-install, when a `**` glob would walk
-      # every node_modules copy of vitest's own fixtures. Tracked files cannot
-      # include node_modules, so the probe stays honest and cheap. Done in a
-      # step rather than an `if:` expression for the same reason as the
-      # typecheck and prettier probes above — workflow expressions cannot read
-      # the filesystem or package.json.
+      # The decision lives in .github/scripts/test-mode.mjs and is asserted by
+      # tools/test-mode.test.mjs. Same reasoning as snyk-policy.mjs: a bug in
+      # this logic produces a GREEN check on a repo whose tests never ran, so it
+      # needs asserting directly rather than being exercised only by whichever
+      # repo happens to trip it. The shell version shipped four defects that no
+      # CI run would have caught — that script's header lists them.
       #
-      # The directory list goes to a FILE, and only `mode` — a fixed enum from
-      # the case below — becomes a step output. That split is a security
-      # boundary, not a style choice. Directory names come from the PR's own
-      # tree, and `${{ }}` is substituted into a run block as TEXT before bash
-      # parses it, so a tracked `x$(id)y/vitest.config.ts` in an earlier draft
-      # of this step executed `id` on the runner. A file read with `read -r`
-      # is data at every stage; an interpolated output is code.
+      # Only `mode` and `needs_playwright` — both fixed enums — become step
+      # outputs. Directory names stay in a file, because `${{ }}` is substituted
+      # into a run block as TEXT before bash parses it, and an earlier draft of
+      # this step executed `id` on the runner from a tracked
+      # `x$(id)y/vitest.config.ts`.
+
+      # A reusable workflow's `run` steps execute against the CALLER's checkout,
+      # where .github/scripts/ does not exist — so the script is fetched.
+      # Pinned to v1, the same ref every consumer calls this workflow at, so the
+      # script and the workflow move together under one Promote v1 rather than
+      # skewing. nswds-devops is public, so no token is needed, and
+      # persist-credentials:false leaves no credential in the consumer's tree.
       #
-      # dirname is done in-shell rather than with `xargs -n1 dirname` for the
-      # same family of reasons: xargs word-splits on spaces, so a legitimate
-      # `apps/my app/vitest.config.ts` yielded two bogus entries — one of them
-      # `.`, which flipped the mode to root-vitest and ran vitest at a root
-      # with no config at all.
-      #
-      # Paths containing a literal newline are out of scope: git quotes those
-      # (core.quotePath), so the quoted form never matches the regex and the
-      # config is skipped rather than mis-parsed.
+      # Trade-off, stated because it is real: this repo's own `install / test`
+      # then runs v1's script rather than the branch's, so a PR changing the
+      # script is not self-exercised here. tools/test-mode.test.mjs covers it,
+      # and Promote v1 is the gate.
+      - name: Fetch the shared test-mode script
+        uses: actions/checkout@v7
+        with:
+          repository: digitalnsw/nswds-devops
+          ref: v1
+          path: .nswds-ci
+          persist-credentials: false
+
       - name: Decide what to run
         id: probe
-        run: |
-          # Capture the listing's exit status explicitly — a `git ls-files`
-          # that fails inside a pipeline leaves the pipeline reporting sort's
-          # 0, i.e. "no configs", which is indistinguishable from a clean
-          # repo. Same reasoning as the conflict-marker and jq gates above:
-          # fail loudly rather than report a clean tree you never scanned.
-          if ! tracked="$(git ls-files)"; then
-            echo "::error::git ls-files failed, so the vitest config scan never ran. Failing instead of reporting no tests."
-            exit 1
-          fi
-
-          printf '%s\n' "$tracked" \
-            | grep -E '(^|/)vitest\.config\.[A-Za-z]+$' \
-            | while IFS= read -r f; do
-                case "$f" in
-                  */*) printf '%s\n' "${f%/*}" ;;
-                  *)   printf '.\n' ;;
-                esac
-              done \
-            | sort -u > "$RUNNER_TEMP/vitest-config-dirs"
-
-          if grep -qxF '.' "$RUNNER_TEMP/vitest-config-dirs"; then
-            mode=root-vitest
-          elif [ -f package.json ] && node -e "
-            const t = (require('./package.json').scripts || {}).test || '';
-            process.exit(t && !/no test specified/.test(t) ? 0 : 1);
-          "; then
-            mode=npm-test
-          elif [ -s "$RUNNER_TEMP/vitest-config-dirs" ]; then
-            mode=nested-vitest
-          else
-            mode=none
-          fi
-
-          echo "mode=$mode" >> "$GITHUB_OUTPUT"
-          echo "Mode: $mode"
-          [ -s "$RUNNER_TEMP/vitest-config-dirs" ] && sed 's/^/  vitest config in: /' "$RUNNER_TEMP/vitest-config-dirs"
-          exit 0
+        run: node .nswds-ci/.github/scripts/test-mode.mjs "$RUNNER_TEMP/vitest-run-plan"
 
       - name: Install dependencies
         if: ${{ steps.probe.outputs.mode != 'none' }}
         run: npm clean-install
 
-      # Browser-mode suites need a real browser. The playwright dependency can
-      # sit in the root manifest OR in the workspace that owns a config
-      # (nswds-ui declares it in apps/storybook, not at the root), so check
-      # both before concluding there is nothing to install.
-      #
-      # Deliberately NOT run on the npm-test path, which is how it has always
-      # been. Widening it there is tempting — an aggregate script COULD reach a
-      # browser-mode suite — but no repo in the fleet is in that state, while
-      # one concretely pays for it: nswds-email-framework declares playwright
-      # at the root for its own visual/a11y suites, which have their own
-      # configs and their own scripts, and its `npm test` is `test:scripts`, a
-      # node:test run that needs no browser. Widening would add a Chromium and
-      # apt-deps install to every one of its CI runs to guard a case that does
-      # not exist.
-      #
-      # The manifest path reaches node through argv, never through the script
-      # text: `require('./$dir/package.json')` inside a double-quoted shell
-      # string lets a directory name containing a quote close the JS string
-      # literal and run arbitrary JS.
       - name: Install Playwright browser (browser-mode vitest)
-        if: ${{ steps.probe.outputs.mode == 'root-vitest' || steps.probe.outputs.mode == 'nested-vitest' }}
-        run: |
-          needs=false
-          while IFS= read -r dir; do
-            [ -f "$dir/package.json" ] || continue
-            if node -e 'const path = require("node:path");
-              const p = require(path.resolve(process.argv[1], "package.json"));
-              process.exit((p.devDependencies?.playwright || p.dependencies?.playwright) ? 0 : 1);
-            ' "$dir"; then
-              needs=true
-              break
-            fi
-          done < <(printf '.\n'; cat "$RUNNER_TEMP/vitest-config-dirs")
-          if [ "$needs" = true ]; then
-            npx playwright install chromium --with-deps
-          else
-            echo "No playwright dependency — skipping browser install."
-          fi
+        if: ${{ steps.probe.outputs.needs_playwright == 'true' }}
+        run: npx playwright install chromium --with-deps
 
       - name: Run vitest (root config)
         if: ${{ steps.probe.outputs.mode == 'root-vitest' }}
@@ -495,45 +427,33 @@ jobs:
         run: npm test
 
       # One invocation per config, so a second workspace suite cannot be
-      # silently skipped the way the first one used to be. Prefers the owning
-      # workspace's own `test` script, because only the repo knows how its
-      # suite is meant to be invoked (nswds-ui's is `vitest --project storybook
-      # run`) — the same reasoning the typecheck job gives for running the
-      # repo's script instead of a bare `tsc --noEmit`. Bare vitest with --root
-      # is the fallback for a workspace with no script of its own.
+      # silently skipped the way the first one was. The runner for each is
+      # decided by the probe: `-w` only where the directory really is a declared
+      # npm workspace (npm otherwise fails with "No workspaces found" on a repo
+      # whose suite is fine), `--prefix` where it is not, and bare vitest where
+      # the workspace has no test script of its own.
+      #
+      # The plan is read on fd 3 and every child gets /dev/null for stdin. On
+      # the loop's own stdin, a child that reads stdin swallows the remaining
+      # lines and the later suites are skipped — the same silent-skip bug, one
+      # layer down. Failures are collected rather than aborting, so one broken
+      # suite does not hide the others, and ::endgroup:: is emitted either way
+      # or the failing output stays collapsed in the Actions log.
       - name: Run vitest (workspace configs)
         if: ${{ steps.probe.outputs.mode == 'nested-vitest' }}
         run: |
-          while IFS= read -r dir; do
-            # Three outcomes, not two: 0 the workspace has a real test script,
-            # 1 it has none, 2 its package.json is missing or unparseable. The
-            # earlier `2>/dev/null` collapsed 2 into 1 and quietly fell back to
-            # bare vitest, which is the same "sail through as clean" failure
-            # the jq gate above exists to prevent.
-            rc=0
-            node -e 'const path = require("node:path");
-              let pkg;
-              try { pkg = require(path.resolve(process.argv[1], "package.json")); }
-              catch (err) { console.error(err.message); process.exit(2); }
-              const t = (pkg.scripts || {}).test || "";
-              process.exit(t && !/no test specified/.test(t) ? 0 : 1);
-            ' "$dir" || rc=$?
-            case "$rc" in
-              0)
-                echo "::group::npm test -w $dir"
-                npm test -w "$dir"
-                ;;
-              1)
-                echo "::group::vitest run --root $dir"
-                npx --no-install vitest run --root "$dir"
-                ;;
-              *)
-                echo "::error::$dir has a vitest config but its package.json could not be read. Failing instead of guessing how to run its suite."
-                exit 1
-                ;;
+          status=0
+          while IFS="$(printf '\t')" read -r runner dir <&3; do
+            echo "::group::$runner $dir"
+            case "$runner" in
+              workspace) npm test -w "$dir" < /dev/null || status=$? ;;
+              prefix)    npm --prefix "$dir" test < /dev/null || status=$? ;;
+              vitest)    npx --no-install vitest run --root "$dir" < /dev/null || status=$? ;;
+              *)         echo "::error::unknown runner [$runner] for $dir"; status=1 ;;
             esac
             echo '::endgroup::'
-          done < "$RUNNER_TEMP/vitest-config-dirs"
+          done 3< "$RUNNER_TEMP/vitest-run-plan"
+          exit "$status"
 
       - name: Nothing to run
         if: ${{ steps.probe.outputs.mode == 'none' }}
