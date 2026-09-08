@@ -1,3 +1,9 @@
+## [1.25.2](https://github.com/digitalnsw/nswds-devops/compare/v1.25.1...v1.25.2) (2026-09-08)
+
+### Bug Fixes
+
+* **ci:** find vitest configs outside the repo root in the test gate ([#126](https://github.com/digitalnsw/nswds-devops/issues/126)) ([6754b34](https://github.com/digitalnsw/nswds-devops/commit/6754b3494a47894d89e9d1b0106a64e13a1a9443)), closes [nswds-ui#171](https://github.com/digitalnsw/nswds-ui/issues/171)
+
 ## [1.25.1](https://github.com/digitalnsw/nswds-devops/compare/v1.25.0...v1.25.1) (2026-09-08)
 
 ### Bug Fixes
