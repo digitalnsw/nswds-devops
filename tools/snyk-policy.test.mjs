@@ -84,6 +84,11 @@ const noteBody = (base, heading) => {
     if (t === '') continue // a stripped-whitespace spacer must not truncate
     if (!t.startsWith('#')) break // end of the comment block
     if (/^#\s\d+\.\s/.test(t)) break // next note heading
+    // A section divider also ends a note. Without this the LAST numbered note
+    // is bounded only by the first non-comment line, so deleting the undici
+    // entries -- which base.snyk instructs on expiry -- ran DEPTH on into the
+    // licence-acceptance comment block, 2448 chars becoming 3793.
+    if (/^#\s*──/.test(t)) break // next section divider
     out.push(lines[i])
   }
   return out.join('\n')
@@ -587,6 +592,45 @@ test('noteBody survives a blank line and the ignore keys being deleted', () => {
   const base = ['ignore:', '  # 2. DEPTH. a', '', '  #    b'].join('\n')
   const depth = noteBody(base, '# 2. DEPTH.')
   assert.ok(depth.includes('a') && depth.includes('b'))
+})
+
+test('noteBody bounds a note identically with and without the ignore entries', () => {
+  // The property the boundary exists for, asserted against the REAL base.snyk
+  // rather than a fixture, because the scheduled event is real: base.snyk tells
+  // the reader to DELETE the undici entries on expiry (2026-12-31).
+  //
+  // A previous round claimed this held and measured it wrongly, so the claim
+  // survived while the behaviour did not. Measuring both slices here is the
+  // check that would have caught it.
+  const realBase = readFileSync(new URL('../snyk-policy/base.snyk', import.meta.url), 'utf8')
+  const withoutEntries = realBase.replace(
+    /  SNYK-JS-UNDICI-\d+:\n    - '\* > npm > \* > undici':\n        reason:[^\n]*\n        expires:[^\n]*\n/g,
+    '',
+  )
+  assert.notEqual(withoutEntries, realBase, 'the strip must actually remove the entries, or this test is vacuous')
+
+  for (const heading of ['# 1. REACH.', '# 2. DEPTH.']) {
+    assert.equal(
+      noteBody(withoutEntries, heading).length,
+      noteBody(realBase, heading).length,
+      `${heading} changes size when the undici entries are deleted, so its assertions would ` +
+        'silently start reading a neighbouring section',
+    )
+  }
+})
+
+test('noteBody stops at a section divider', () => {
+  const base = [
+    'ignore:',
+    '  # 2. DEPTH. mine',
+    '  #    still mine',
+    '  # ── Licence acceptances ──────────',
+    '  #    not mine',
+    '  snyk:lic:x:',
+  ].join('\n')
+  const depth = noteBody(base, '# 2. DEPTH.')
+  assert.ok(depth.includes('still mine'))
+  assert.ok(!depth.includes('not mine'), 'a divider must end the note, like a heading does')
 })
 
 test('asProse flattens a wrapped comment note into one line', () => {
