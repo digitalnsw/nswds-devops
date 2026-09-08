@@ -40,13 +40,22 @@ const parseFleet = (yml) => {
   for (let i = 0; i < lines.length; i++) {
     const key = lines[i].match(/^(\s*(?:-\s*)?)repos:\s*(.*)$/)
     if (!key) continue
-    // Every valid block-scalar header: | or >, with indentation and chomping
-    // indicators in either order (|2, |-, |2-, |-2, >+).
-    if (!/^[|>][0-9+-]*$/.test(key[2].trim())) {
+    // LITERAL block scalars only: | with optional indentation and chomping
+    // indicators in either order (|2, |-, |2-, |-2).
+    //
+    // `>` is valid YAML and deliberately rejected. It FOLDS the lines into one
+    // space-separated string, and repo-file-sync-action splits group.repos on
+    // newlines alone (src/config.js:215 at the pinned 8b92be33), so
+    // `repos: >` with two entries yields ONE name, which parseRepoName then
+    // reads as user "digitalnsw", repo "a digitalnsw" -- the second repo silently
+    // stops being synced. This parser reads raw pre-fold lines, so it would
+    // count both and let the snapshot pass over a config the action mis-consumes.
+    if (!/^\|[0-9+-]*$/.test(key[2].trim())) {
       throw new Error(
-        `.github/sync.yml:${i + 1} has a "repos:" key that is not a block scalar: ` +
-          `${JSON.stringify(lines[i].trim())}. Skipping it silently would undercount the fleet ` +
-          'and make the REACH snapshot assertion demand a number that is not true.',
+        `.github/sync.yml:${i + 1} has a "repos:" key that is not a LITERAL block scalar: ` +
+          `${JSON.stringify(lines[i].trim())}. Use \`|\`. A folded \`>\` header collapses the ` +
+          'entries into one line, which the sync action reads as a single malformed repo; ' +
+          'anything else would be skipped here and undercount the fleet.',
       )
     }
     const keyIndent = key[1].length
@@ -525,11 +534,27 @@ test('parseFleet reads every block-scalar header style', () => {
   // | and > with indentation and chomping indicators in either order. Missing
   // the indicator form silently dropped a whole group, and the undercount then
   // made the REACH assertion demand a number that is not true.
-  for (const header of ['|', '|-', '|+', '|2', '|2-', '|-2', '>', '>-']) {
+  for (const header of ['|', '|-', '|+', '|2', '|2-', '|-2']) {
     assert.deepEqual(
       [...parseFleet(group(header))].sort(),
       ['a', 'b', 'nswds-devops'],
       `block header ${header} should yield both repos`,
+    )
+  }
+})
+
+test('parseFleet refuses a folded > header, which the sync action mis-parses', () => {
+  // Not a style rule. `>` folds "digitalnsw/a\n digitalnsw/b" into one string,
+  // and repo-file-sync-action splits group.repos on newlines only, so the two
+  // entries arrive as the single name "digitalnsw/a digitalnsw/b" and the
+  // second repo silently drops out of the sync. Reading raw lines here would
+  // count both and pass the snapshot over a broken config, so the header is
+  // rejected rather than accepted.
+  for (const header of ['>', '>-', '>+', '>2']) {
+    assert.throws(
+      () => parseFleet(`group:\n  - repos: ${header}\n      digitalnsw/a\n      digitalnsw/b\n`),
+      /not a LITERAL block scalar/,
+      `a folded ${header} header must be refused`,
     )
   }
 })
@@ -539,9 +564,9 @@ test('parseFleet refuses a repos: key that is not a block scalar', () => {
   // the reader to base.snyk to "fix" a count that was never wrong.
   assert.throws(
     () => parseFleet('group:\n  - repos:\n      - digitalnsw/a\n'),
-    /sync\.yml:2 has a "repos:" key that is not a block scalar/,
+    /sync\.yml:2 has a "repos:" key that is not a LITERAL block scalar/,
   )
-  assert.throws(() => parseFleet('group:\n  - repos: digitalnsw/a\n'), /not a block scalar/)
+  assert.throws(() => parseFleet('group:\n  - repos: digitalnsw/a\n'), /not a LITERAL block scalar/)
 })
 
 test('parseFleet counts block contents only, and always includes nswds-devops', () => {
