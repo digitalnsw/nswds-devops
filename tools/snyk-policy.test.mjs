@@ -595,28 +595,67 @@ test('noteBody survives a blank line and the ignore keys being deleted', () => {
 })
 
 test('noteBody bounds a note identically with and without the ignore entries', () => {
-  // The property the boundary exists for, asserted against the REAL base.snyk
-  // rather than a fixture, because the scheduled event is real: base.snyk tells
-  // the reader to DELETE the undici entries on expiry (2026-12-31).
+  // The property the divider boundary exists for: a note's extent must not
+  // depend on whether the ignore keys below it are present, because base.snyk
+  // instructs DELETING the undici entries on expiry (2026-12-31).
   //
-  // A previous round claimed this held and measured it wrongly, so the claim
-  // survived while the behaviour did not. Measuring both slices here is the
-  // check that would have caught it.
-  const realBase = readFileSync(new URL('../snyk-policy/base.snyk', import.meta.url), 'utf8')
-  const withoutEntries = realBase.replace(
-    /  SNYK-JS-UNDICI-\d+:\n    - '\* > npm > \* > undici':\n        reason:[^\n]*\n        expires:[^\n]*\n/g,
-    '',
-  )
-  assert.notEqual(withoutEntries, realBase, 'the strip must actually remove the entries, or this test is vacuous')
+  // Asserted on SYNTHETIC input, holding both variants. An earlier version
+  // built the second variant by stripping the entries out of the real
+  // base.snyk and asserted the strip removed something, so that it could not
+  // pass vacuously. That guard turned the file's own expiry instruction into a
+  // CI failure: once the entries are actually gone the strip is a no-op and the
+  // assertion fires, with a message about test internals and no hint that the
+  // fix is to edit the test. Constructing both inputs here cannot go vacuous
+  // and cannot rot when the real file changes.
+  const section = (body) => ['ignore:', '  # ── Vulnerability acceptances ──────', ...body].join('\n')
+  const notes = [
+    '  # 1. REACH. reach body',
+    '  #    more reach',
+    '  # 2. DEPTH. depth body',
+    '  #    more depth',
+  ]
+  const keys = ["  SNYK-JS-X:", "    - '*':", '        reason: r']
+  const nextSection = ['  # ── Licence acceptances ──────', '  #    licence prose', '  snyk:lic:a:']
+
+  const withKeys = section([...notes, ...keys, ...nextSection])
+  const withoutKeys = section([...notes, ...nextSection])
+  assert.notEqual(withKeys, withoutKeys, 'the two variants must differ, or this test proves nothing')
 
   for (const heading of ['# 1. REACH.', '# 2. DEPTH.']) {
     assert.equal(
-      noteBody(withoutEntries, heading).length,
-      noteBody(realBase, heading).length,
-      `${heading} changes size when the undici entries are deleted, so its assertions would ` +
-        'silently start reading a neighbouring section',
+      noteBody(withoutKeys, heading),
+      noteBody(withKeys, heading),
+      `${heading} changes extent when the ignore keys are deleted, so its assertions would ` +
+        'silently start reading the next section',
     )
   }
+  // And the extent is the note itself, not the section beyond it.
+  assert.ok(!noteBody(withKeys, '# 2. DEPTH.').includes('licence prose'))
+  assert.ok(!noteBody(withoutKeys, '# 2. DEPTH.').includes('licence prose'))
+})
+
+test('every section divider in the real base.snyk uses the form the boundary keys on', () => {
+  // noteBody ends a note at a divider, and it recognises the U+2500 form the
+  // file uses (`# ── Title ───`). That is a typographic convention nothing
+  // else enforces, and the file's prose uses ASCII `--` as an em-dash 24 times,
+  // so a maintainer adding `# --- New section ---` would be writing something
+  // that reads like a divider and does not act like one: the last numbered note
+  // would run straight into it.
+  //
+  // Asserted on the real file rather than synthetically, because the risk is a
+  // real edit to this specific file. It is independent of the undici entries,
+  // so it keeps working after they expire and are deleted.
+  const realBase = readFileSync(new URL('../snyk-policy/base.snyk', import.meta.url), 'utf8')
+  const dividers = realBase.split('\n').filter((l) => /^\s*#\s*[-=_*~—–]{3,}/.test(l))
+  assert.deepEqual(
+    dividers,
+    [],
+    'section dividers must use the U+2500 form (# ── Title ───) that noteBody breaks on; ' +
+      'these lines look like dividers but would not end a note',
+  )
+  // Non-vacuous: the U+2500 dividers this depends on are present.
+  const real = realBase.split('\n').filter((l) => /^\s*#\s*──/.test(l))
+  assert.ok(real.length >= 2, 'base.snyk should carry its section dividers')
 })
 
 test('noteBody stops at a section divider', () => {
