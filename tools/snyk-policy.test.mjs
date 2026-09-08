@@ -22,6 +22,99 @@ const {
 // The sentinel the renderer emits; a converted file carries it above the marker.
 const SENTINEL_LINE = '# ── Canonical base (generated from nswds-devops snyk-policy/base.snyk) ─────'
 
+
+// The fleet is every repo the file-sync targets, plus nswds-devops itself.
+// Returns NAMES, not a count: comparing cardinality alone let repos.json swap a
+// consumer for an unrelated repo and still satisfy "all N are enrolled".
+//
+// Pure, so it can be unit-tested on synthetic YAML rather than only against the
+// real sync.yml. Parse literal headers explicitly and validate entire target
+// lines: silently extracting names can hide a config the sync action cannot use.
+const parseFleet = (yml) => {
+  const lines = yml.split('\n')
+  const names = new Set(['nswds-devops'])
+  for (let i = 0; i < lines.length; i++) {
+    const key = lines[i].match(/^(\s*(?:-\s*)?)repos:\s*(.*)$/)
+    if (!key) continue
+    // LITERAL block scalars only: | with optional indentation and chomping
+    // indicators in either order (|2, |-, |2-, |-2), and a separated comment.
+    //
+    // `>` is valid YAML and deliberately rejected. It FOLDS the lines into one
+    // space-separated string, and repo-file-sync-action splits group.repos on
+    // newlines alone (src/config.js:215 at the pinned 8b92be33), so
+    // `repos: >` with two entries yields ONE name, which parseRepoName then
+    // reads as user "digitalnsw", repo "a digitalnsw" -- the second repo silently
+    // stops being synced. This parser reads raw pre-fold lines, so it would
+    // count both and let the snapshot pass over a config the action mis-consumes.
+    if (!/^\|(?:[1-9][+-]?|[+-][1-9]?)?(?:[ \t]+#.*)?$/.test(key[2].trim())) {
+      throw new Error(
+        `.github/sync.yml:${i + 1} has a "repos:" key that is not a LITERAL block scalar: ` +
+          `${JSON.stringify(lines[i].trim())}. Use \`|\`. A folded \`>\` header collapses the ` +
+          'entries into one line, which the sync action reads as a single malformed repo; ' +
+          'anything else would be skipped here and undercount the fleet.',
+      )
+    }
+    const keyIndent = key[1].length
+    for (let j = i + 1; j < lines.length; j++) {
+      const line = lines[j]
+      if (line.trim() === '') continue
+      const indent = line.length - line.trimStart().length
+      if (indent <= keyIndent) break // dedent closes the block scalar
+      // Inside a scalar, # is content: the action consumes each trimmed line
+      // verbatim. Refuse annotations instead of blessing malformed targets.
+      const m = line.trim().match(/^digitalnsw\/([A-Za-z0-9._-]+)(?:@[^\s@#]+)?$/)
+      if (!m) {
+        throw new Error(
+          `.github/sync.yml:${j + 1} has an unsupported repo entry: ${JSON.stringify(line.trim())}. ` +
+            'Use digitalnsw/repo[@branch]; comments belong outside the scalar.',
+        )
+      }
+      names.add(m[1])
+    }
+  }
+  return names
+}
+
+const realFleetNames = () =>
+  parseFleet(readFileSync(new URL('../.github/sync.yml', import.meta.url), 'utf8'))
+
+// One numbered note from the canonical comment block.
+//
+// A note heading is `# N. ` with EXACTLY one space after the hash; a numbered
+// list item inside prose is indented further (`#    1. ...`) and must not end
+// the note. An earlier version broke on any `# N.` (truncating on list items),
+// and the version after it only recognised SHOUTY headings, so a following
+// `# 3. History.` was swallowed INTO this note and its text could satisfy a
+// presence assertion belonging to a different note.
+const noteBody = (base, heading) => {
+  const lines = base.split('\n')
+  const start = lines.findIndex((l) => l.includes(heading))
+  if (start === -1) return null
+  const out = [lines[start]]
+  for (let i = start + 1; i < lines.length; i++) {
+    const t = lines[i].trim()
+    if (t === '') continue // a stripped-whitespace spacer must not truncate
+    if (!t.startsWith('#')) break // end of the comment block
+    if (/^#\s\d+\.\s/.test(t)) break // next note heading
+    // A section divider also ends a note. Without this the LAST numbered note
+    // is bounded only by the first non-comment line, so deleting the undici
+    // entries -- which base.snyk instructs on expiry -- ran DEPTH on into the
+    // licence-acceptance comment block, 2448 chars becoming 3793.
+    if (/^#\s*──/.test(t)) break // next section divider
+    out.push(lines[i])
+  }
+  return out.join('\n')
+}
+
+// A comment note as flat prose, so assertions read across its line wrapping.
+const asProse = (note) =>
+  note
+    .split('\n')
+    .map((l) => l.replace(/^\s*#\s?/, ''))
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
 const BASE = ['version: v1.25.0', 'ignore:', '  snyk:lic:npm:x:MPL-2.0:', '    - \'*\':', '  # repo-specific', ''].join('\n')
 
 test('blockOf ends at the marker and keeps it', () => {
@@ -430,4 +523,301 @@ test('an empty tail cannot introduce duplicates the base does not already have',
   assert.deepEqual(findDuplicateKeys(compose(blockOf(dupBase), '')), ['ignore.k'])
   const okBase = ['ignore:', '  k:', '  # repo-specific'].join('\n')
   assert.deepEqual(findDuplicateKeys(compose(blockOf(okBase), '')), [])
+})
+
+// ── The three helpers these guards rest on ──────────────────────────────────
+// Unit-tested on synthetic input, like every other pure helper in this file.
+// They were added without direct tests and exercised only against the one real
+// base.snyk / sync.yml, which is how a block-header gap reached review: a
+// parsing regression here does not fail loudly, it either stops guarding or
+// fails blaming the wrong file.
+
+test('parseFleet reads literal block-scalar headers with separated comments', () => {
+  const group = (header) => `group:\n  - repos: ${header}\n      digitalnsw/a\n      digitalnsw/b\n    files:\n`
+  // Literal | with indentation and chomping indicators in either order. Missing
+  // the indicator form silently dropped a whole group, and the undercount then
+  // made the REACH assertion demand a number that is not true.
+  for (const header of ['|', '|-', '|+', '|2', '|2-', '|-2', '|2+', '|+2', '| # group', '|2- # group', '|-2 # group', '|+2\t# group']) {
+    assert.deepEqual(
+      [...parseFleet(group(header))].sort(),
+      ['a', 'b', 'nswds-devops'],
+      `block header ${header} should yield both repos`,
+    )
+  }
+})
+
+test('parseFleet refuses malformed literal headers', () => {
+  for (const header of ['|0', '|22', '|++', '|--', '|+-', '|2-2', '|#group', '|2-#group']) {
+    assert.throws(
+      () => parseFleet(`group:\n  - repos: ${header}\n      digitalnsw/a\n`),
+      /sync\.yml:2.*not a LITERAL block scalar/,
+      `malformed header ${header} must be refused`,
+    )
+  }
+})
+
+test('parseFleet refuses annotations and malformed scalar targets', () => {
+  for (const entry of [
+    '# digitalnsw/retired', 'digitalnsw/b # note', 'prefix digitalnsw/a',
+    'digitalnsw/a digitalnsw/b', 'digitalnsw/a@', 'digitalnsw/a@@main',
+    'digitalnsw/a/extra', 'other-org/a',
+  ]) {
+    assert.throws(
+      () => parseFleet(`group:\n  - repos: |\n      ${entry}\n`),
+      /sync\.yml:3 has an unsupported repo entry/,
+      `unsupported entry ${entry} must be refused`,
+    )
+  }
+})
+
+test('parseFleet refuses a folded > header, which the sync action mis-parses', () => {
+  // Not a style rule. `>` folds "digitalnsw/a\n digitalnsw/b" into one string,
+  // and repo-file-sync-action splits group.repos on newlines only, so the two
+  // entries arrive as the single name "digitalnsw/a digitalnsw/b" and the
+  // second repo silently drops out of the sync. Reading raw lines here would
+  // count both and pass the snapshot over a broken config, so the header is
+  // rejected rather than accepted.
+  for (const header of ['>', '>-', '>+', '>2']) {
+    assert.throws(
+      () => parseFleet(`group:\n  - repos: ${header}\n      digitalnsw/a\n      digitalnsw/b\n`),
+      /not a LITERAL block scalar/,
+      `a folded ${header} header must be refused`,
+    )
+  }
+})
+
+test('parseFleet refuses a repos: key that is not a block scalar', () => {
+  // Fail loudly naming sync.yml, rather than returning a short set that sends
+  // the reader to base.snyk to "fix" a count that was never wrong.
+  assert.throws(
+    () => parseFleet('group:\n  - repos:\n      - digitalnsw/a\n'),
+    /sync\.yml:2 has a "repos:" key that is not a LITERAL block scalar/,
+  )
+  assert.throws(() => parseFleet('group:\n  - repos: digitalnsw/a\n'), /not a LITERAL block scalar/)
+})
+
+test('parseFleet counts block contents only, and always includes nswds-devops', () => {
+  const yml = [
+    '# see digitalnsw/nswds-skills for prior art', // prose outside a block
+    'group:',
+    '  - repos: |',
+    '      digitalnsw/a',
+    '      digitalnsw/b@feature/onboarding', // branch suffix is not repo identity
+    '',
+    '      digitalnsw/c', // blank line does not close the block
+    '    files:',
+    '      - source: scripts/',
+    '        dest: digitalnsw/not-a-repo', // below the block, must not count
+    '  - repos: |',
+    '      digitalnsw/d',
+    '',
+  ].join('\n')
+  assert.deepEqual([...parseFleet(yml)].sort(), ['a', 'b', 'c', 'd', 'nswds-devops'])
+})
+
+test('noteBody cuts a note at the next heading, not at the next ignore key', () => {
+  const base = [
+    'ignore:',
+    '  # 1. REACH. first line',
+    '  #    still reach',
+    '  #',
+    '  #    1. an indented list item must not end the note',
+    '  # 2. DEPTH. second note',
+    '  #    still depth',
+    '  SNYK-JS-X:',
+  ].join('\n')
+  const reach = noteBody(base, '# 1. REACH.')
+  assert.ok(reach.includes('still reach'))
+  assert.ok(reach.includes('an indented list item'), 'a numbered list item must not truncate')
+  assert.ok(!reach.includes('DEPTH'), 'REACH must stop before the next heading')
+  const depth = noteBody(base, '# 2. DEPTH.')
+  assert.ok(depth.includes('still depth'))
+  assert.ok(!depth.includes('SNYK-JS-X'), 'the note ends at the first non-comment line')
+  assert.equal(noteBody(base, '# 9. NOPE.'), null)
+})
+
+test('noteBody survives a blank line and the ignore keys being deleted', () => {
+  // base.snyk instructs deleting the undici entries on expiry; the note's own
+  // boundary must not depend on them, and a whitespace-stripped spacer must not
+  // truncate it either.
+  const base = ['ignore:', '  # 2. DEPTH. a', '', '  #    b'].join('\n')
+  const depth = noteBody(base, '# 2. DEPTH.')
+  assert.ok(depth.includes('a') && depth.includes('b'))
+})
+
+test('noteBody bounds a note identically with and without the ignore entries', () => {
+  // The property the divider boundary exists for: a note's extent must not
+  // depend on whether the ignore keys below it are present, because base.snyk
+  // instructs DELETING the undici entries on expiry (2026-12-31).
+  //
+  // Asserted on SYNTHETIC input, holding both variants. An earlier version
+  // built the second variant by stripping the entries out of the real
+  // base.snyk and asserted the strip removed something, so that it could not
+  // pass vacuously. That guard turned the file's own expiry instruction into a
+  // CI failure: once the entries are actually gone the strip is a no-op and the
+  // assertion fires, with a message about test internals and no hint that the
+  // fix is to edit the test. Constructing both inputs here cannot go vacuous
+  // and cannot rot when the real file changes.
+  const section = (body) => ['ignore:', '  # ── Vulnerability acceptances ──────', ...body].join('\n')
+  const notes = [
+    '  # 1. REACH. reach body',
+    '  #    more reach',
+    '  # 2. DEPTH. depth body',
+    '  #    more depth',
+  ]
+  const keys = ["  SNYK-JS-X:", "    - '*':", '        reason: r']
+  const nextSection = ['  # ── Licence acceptances ──────', '  #    licence prose', '  snyk:lic:a:']
+
+  const withKeys = section([...notes, ...keys, ...nextSection])
+  const withoutKeys = section([...notes, ...nextSection])
+  assert.notEqual(withKeys, withoutKeys, 'the two variants must differ, or this test proves nothing')
+
+  for (const heading of ['# 1. REACH.', '# 2. DEPTH.']) {
+    assert.equal(
+      noteBody(withoutKeys, heading),
+      noteBody(withKeys, heading),
+      `${heading} changes extent when the ignore keys are deleted, so its assertions would ` +
+        'silently start reading the next section',
+    )
+  }
+  // And the extent is the note itself, not the section beyond it.
+  assert.ok(!noteBody(withKeys, '# 2. DEPTH.').includes('licence prose'))
+  assert.ok(!noteBody(withoutKeys, '# 2. DEPTH.').includes('licence prose'))
+})
+
+test('every section divider in the real base.snyk uses the form the boundary keys on', () => {
+  // noteBody ends a note at a divider, and it recognises the U+2500 form the
+  // file uses (`# ── Title ───`). That is a typographic convention nothing
+  // else enforces, and the file's prose uses ASCII `--` as an em-dash 24 times,
+  // so a maintainer adding `# --- New section ---` would be writing something
+  // that reads like a divider and does not act like one: the last numbered note
+  // would run straight into it.
+  //
+  // Asserted on the real file rather than synthetically, because the risk is a
+  // real edit to this specific file. It is independent of the undici entries,
+  // so it keeps working after they expire and are deleted.
+  const realBase = readFileSync(new URL('../snyk-policy/base.snyk', import.meta.url), 'utf8')
+  const dividers = realBase.split('\n').filter((l) => /^\s*#\s*[-=_*~—–]{3,}/.test(l))
+  assert.deepEqual(
+    dividers,
+    [],
+    'section dividers must use the U+2500 form (# ── Title ───) that noteBody breaks on; ' +
+      'these lines look like dividers but would not end a note',
+  )
+  // Non-vacuous: the U+2500 dividers this depends on are present.
+  const real = realBase.split('\n').filter((l) => /^\s*#\s*──/.test(l))
+  assert.ok(real.length >= 2, 'base.snyk should carry its section dividers')
+})
+
+test('noteBody stops at a section divider', () => {
+  const base = [
+    'ignore:',
+    '  # 2. DEPTH. mine',
+    '  #    still mine',
+    '  # ── Licence acceptances ──────────',
+    '  #    not mine',
+    '  snyk:lic:x:',
+  ].join('\n')
+  const depth = noteBody(base, '# 2. DEPTH.')
+  assert.ok(depth.includes('still mine'))
+  assert.ok(!depth.includes('not mine'), 'a divider must end the note, like a heading does')
+})
+
+test('asProse flattens a wrapped comment note into one line', () => {
+  const note = ['  # 2. DEPTH. one', '  #    two   three', '  #', '  #    four'].join('\n')
+  assert.equal(asProse(note), '2. DEPTH. one two three four')
+})
+
+test('the base.snyk enrolment snapshot matches repos.json and the real fleet', () => {
+  // The REACH note states a repo count, and that comment is copied verbatim
+  // into every consumer. It has gone stale three times and CI caught none of
+  // them. The failure is invisible: the policy still works, it just tells every
+  // repo something untrue.
+  const realBase = readFileSync(new URL('../snyk-policy/base.snyk', import.meta.url), 'utf8')
+  const reach = noteBody(realBase, '# 1. REACH.')
+  assert.ok(reach, 'base.snyk must carry a "# 1. REACH." note stating the enrolment snapshot')
+  const prose = asProse(reach)
+
+  const enrolled = new Set(
+    Object.keys(
+      JSON.parse(readFileSync(new URL('../snyk-policy/repos.json', import.meta.url), 'utf8')).repos,
+    ),
+  )
+  const fleet = realFleetNames()
+
+  // Identity, not cardinality: equal counts hid a consumer being swapped for an
+  // unrelated repo, which silently stops that repo receiving policy updates.
+  assert.deepEqual(
+    [...enrolled].filter((r) => !fleet.has(r)).sort(),
+    [],
+    'repos.json enrols a repo that is not in the fleet (sync.yml + nswds-devops)',
+  )
+
+  // ANCHORED to the canonical "Snapshot <date>:" prefix. An unanchored search
+  // matched the claim as a substring, so "it is NOT the case that all 29 repos
+  // in the fleet are enrolled" satisfied it.
+  const CLAIM = /Snapshot \d{4}-\d{2}-\d{2}: (?:all (\d+) repos in the fleet are enrolled|(\d+) of the fleet['\u2019]s (\d+) repos are enrolled)/g
+  const claims = [...prose.matchAll(CLAIM)]
+  assert.equal(
+    claims.length,
+    1,
+    `the REACH note must carry exactly one "Snapshot <date>: ..." enrolment claim; found ${claims.length}. ` +
+      'Two claims of the SAME shape previously passed, because only the first match was read.',
+  )
+  const [, allN, partN, partM] = claims[0]
+
+  if (allN !== undefined) {
+    const claimed = Number(allN)
+    assert.equal(claimed, enrolled.size, `REACH claims ${claimed} enrolled; repos.json lists ${enrolled.size}`)
+    assert.equal(
+      claimed,
+      fleet.size,
+      `REACH claims all ${claimed} fleet repos are enrolled, but the fleet is ${fleet.size} — ` +
+        'reword to "N of the fleet\'s M repos are enrolled"',
+    )
+    assert.deepEqual(
+      [...fleet].filter((r) => !enrolled.has(r)).sort(),
+      [],
+      'REACH claims the fleet is fully enrolled, but these fleet repos are not in repos.json',
+    )
+  } else {
+    const n = Number(partN)
+    const m = Number(partM)
+    assert.equal(n, enrolled.size, `REACH claims ${n} enrolled; repos.json lists ${enrolled.size}`)
+    assert.equal(m, fleet.size, `REACH claims a fleet of ${m}; sync.yml + nswds-devops is ${fleet.size}`)
+    // n < m, not merely n !== m: "30 of the fleet's 29 repos are enrolled" is
+    // arithmetically impossible and previously passed.
+    assert.ok(n < m, `REACH claims ${n} of ${m} enrolled; enrolled cannot exceed the fleet`)
+  }
+})
+
+test('the DEPTH note declares the per-workspace policy in a machine-checkable form', () => {
+  // Regex cannot read the intent of English prose, and three rounds proved it:
+  //   absence detection   -> defeated by rewording
+  //   presence detection  -> defeated by adding the bad advice alongside, and
+  //                          by the "NEVER USE --policy-path" prefix
+  //   negation exclusions -> defeated by "do not skip this step: add a .snyk
+  //                          per workspace", by "do not hesitate to add", and by
+  //                          placing the negation AFTER the term so a
+  //                          backwards-looking pattern misses it
+  // Every one of those passed while the note carried the advice this test
+  // exists to block, which is worse than no test because a green suite stops
+  // anyone looking.
+  //
+  // So this pins a DECLARED TOKEN rather than the prose. It cannot be satisfied
+  // by accident, and reversing the decision requires editing a line that reads
+  // REJECTED. What it does NOT do is prove the surrounding paragraph agrees
+  // with the token — that is a human review job, and pretending otherwise is
+  // what went wrong three times.
+  const realBase = readFileSync(new URL('../snyk-policy/base.snyk', import.meta.url), 'utf8')
+  const depth = noteBody(realBase, '# 2. DEPTH.')
+  assert.ok(depth, 'base.snyk must carry a "# 2. DEPTH." note')
+
+  assert.match(
+    asProse(depth),
+    /POLICY: per-workspace \.snyk = REJECTED; use --policy-path=\.snyk/,
+    'the DEPTH note must declare, verbatim, ' +
+      '"POLICY: per-workspace .snyk = REJECTED; use --policy-path=.snyk". ' +
+      'Changing the decision means changing that line, deliberately.',
+  )
 })
