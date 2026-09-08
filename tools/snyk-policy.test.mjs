@@ -24,24 +24,61 @@ const SENTINEL_LINE = '# ── Canonical base (generated from nswds-devops snyk
 
 
 // The fleet is every repo the file-sync targets, plus nswds-devops itself,
-// which consumes the policy it publishes. Parsed from the `repos: |` blocks
-// rather than by regexing the whole file: sync.yml is heavily commented, and a
-// comment mentioning any other digitalnsw/<name> would otherwise inflate the
-// count and fail the suite for no real reason.
+// which consumes the policy it publishes.
+//
+// Parsed from the `repos: |` block scalars structurally, by indentation. Two
+// earlier attempts were wrong: regexing the whole file counted any
+// digitalnsw/<name> mentioned in prose, and bailing out of a block on the first
+// line that did not match a strict pattern meant one annotated entry silently
+// dropped every repo after it in that group.
 const realFleet = () => {
   const yml = readFileSync(new URL('../.github/sync.yml', import.meta.url), 'utf8')
+  const lines = yml.split('\n')
   const names = new Set(['nswds-devops'])
-  let inBlock = false
-  for (const line of yml.split('\n')) {
-    if (/^\s*-?\s*repos:\s*\|/.test(line)) { inBlock = true; continue }
-    if (inBlock) {
-      const m = line.match(/^\s+digitalnsw\/([A-Za-z0-9._-]+)\s*$/)
-      if (m) { names.add(m[1]); continue }
-      if (line.trim() !== '') inBlock = false
+  for (let i = 0; i < lines.length; i++) {
+    const open = lines[i].match(/^(\s*(?:-\s*)?)repos:\s*\|/)
+    if (!open) continue
+    const keyIndent = open[1].length
+    for (let j = i + 1; j < lines.length; j++) {
+      const line = lines[j]
+      if (line.trim() === '') continue
+      const indent = line.length - line.trimStart().length
+      if (indent <= keyIndent) break // dedent closes the block scalar
+      const m = line.match(/digitalnsw\/([A-Za-z0-9._-]+)/)
+      if (m) names.add(m[1])
     }
   }
   return names.size
 }
+
+// One numbered note from the canonical comment block, heading to just before
+// the next heading (or the end of the comment run).
+//
+// NOT delimited by the next ignore key: base.snyk instructs deleting the undici
+// entries on expiry, and indexOf() returning -1 then made slice() widen from
+// the note to most of the file, silently changing what these tests measure.
+const noteBody = (base, heading) => {
+  const lines = base.split('\n')
+  const start = lines.findIndex((l) => l.includes(heading))
+  if (start === -1) return null
+  const out = [lines[start]]
+  for (let i = start + 1; i < lines.length; i++) {
+    const t = lines[i].trim()
+    if (!t.startsWith('#')) break // end of the comment block
+    if (/^#\s+\d+\.\s+[A-Z]/.test(t)) break // next numbered note
+    out.push(lines[i])
+  }
+  return out.join('\n')
+}
+
+// A comment note as flat prose, so assertions read across its line wrapping.
+const asProse = (note) =>
+  note
+    .split('\n')
+    .map((l) => l.replace(/^\s*#\s?/, ''))
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 
 const BASE = ['version: v1.25.0', 'ignore:', '  snyk:lic:npm:x:MPL-2.0:', '    - \'*\':', '  # repo-specific', ''].join('\n')
 
@@ -455,67 +492,85 @@ test('an empty tail cannot introduce duplicates the base does not already have',
 
 test('the base.snyk enrolment snapshot matches repos.json and the real fleet', () => {
   // The REACH note states a repo count, and that comment is copied verbatim
-  // into every consumer. It has gone stale twice — once naming 13 consumers
-  // after 10 more were enrolled, once naming six unenrolled repos in the very
-  // PR that enrolled them — and neither was caught by CI, only by review. The
-  // failure is invisible: the policy still works, it just tells every repo
-  // something untrue about the fleet.
+  // into every consumer. It has gone stale three times — naming 13 consumers
+  // after 10 more were enrolled, naming six unenrolled repos in the PR that
+  // enrolled them, and misreporting the depth measurement. CI caught none of
+  // them. The failure is invisible: the policy still works, it just tells every
+  // repo something untrue.
   //
-  // BOTH sentence shapes are accepted on purpose. Full coverage is today's
-  // state, not an invariant: enrolling is a deliberate per-repo decision (see
-  // repos.json), so a repo can sit in the file-sync while it waits to be
-  // enrolled — that was true of six repos for weeks. Pinning only the "all N"
-  // shape would leave no truthful edit that passes, and main would stay red
-  // until someone enrolled a repo prematurely or deleted this test.
+  // Scoped to the REACH note, not the whole file: matching anywhere let a stale
+  // sentence left behind elsewhere satisfy the assertion while the corrected
+  // one went unchecked — which is the exact mistake being guarded against.
   const realBase = readFileSync(new URL('../snyk-policy/base.snyk', import.meta.url), 'utf8')
+  const reach = noteBody(realBase, '# 1. REACH.')
+  assert.ok(reach, 'base.snyk must carry a "# 1. REACH." note stating the enrolment snapshot')
+  const prose = asProse(reach)
+
   const enrolled = Object.keys(
     JSON.parse(readFileSync(new URL('../snyk-policy/repos.json', import.meta.url), 'utf8')).repos,
   ).length
   const fleet = realFleet()
 
-  const full = realBase.match(/all (\d+) repos in the fleet are enrolled/)
-  const partial = realBase.match(/(\d+) of the fleet's (\d+) repos are enrolled/)
+  // BOTH shapes are accepted on purpose. Full coverage is today's state, not an
+  // invariant: enrolling is a deliberate per-repo decision, and six repos sat
+  // in the file-sync unenrolled for weeks. Pinning only "all N" would leave no
+  // truthful edit that passes once a repo joins the fleet ahead of enrolment.
+  const full = prose.match(/all (\d+) repos in the fleet are enrolled/)
+  const partial = prose.match(/(\d+) of the fleet's (\d+) repos are enrolled/)
   assert.ok(
     full || partial,
-    'base.snyk must state the snapshot as "all N repos in the fleet are enrolled" or ' +
+    'the REACH note must state the snapshot as "all N repos in the fleet are enrolled" or ' +
       '"N of the fleet\'s M repos are enrolled"',
+  )
+  assert.ok(
+    !(full && partial),
+    'the REACH note states the snapshot twice; delete the stale sentence so only one is asserted',
   )
 
   if (full) {
     const claimed = Number(full[1])
-    assert.equal(claimed, enrolled, `base.snyk claims ${claimed} enrolled; repos.json lists ${enrolled}`)
+    assert.equal(claimed, enrolled, `REACH claims ${claimed} enrolled; repos.json lists ${enrolled}`)
     assert.equal(
       claimed,
       fleet,
-      `base.snyk claims all ${claimed} fleet repos are enrolled, but the fleet is ${fleet} — ` +
-        'reword the snapshot to "N of the fleet\'s M repos are enrolled"',
+      `REACH claims all ${claimed} fleet repos are enrolled, but the fleet is ${fleet} — ` +
+        'reword to "N of the fleet\'s M repos are enrolled"',
     )
   } else {
     const [, n, m] = partial.map(Number)
-    assert.equal(n, enrolled, `base.snyk claims ${n} enrolled; repos.json lists ${enrolled}`)
-    assert.equal(m, fleet, `base.snyk claims a fleet of ${m}; sync.yml + nswds-devops is ${fleet}`)
+    assert.equal(n, enrolled, `REACH claims ${n} enrolled; repos.json lists ${enrolled}`)
+    assert.equal(m, fleet, `REACH claims a fleet of ${m}; sync.yml + nswds-devops is ${fleet}`)
     assert.notEqual(n, m, 'the fleet is fully enrolled — use the "all N" wording instead')
   }
 })
 
-test('base.snyk prescribes --policy-path, not a per-workspace .snyk', () => {
-  // Pins the ADVICE, not one phrasing of it. The earlier version asserted the
-  // absence of the literal string "needs its own .snyk", which any rewording
-  // would have slipped past while reading as a guarantee.
+test('the DEPTH note prescribes --policy-path and rejects a per-workspace .snyk', () => {
+  // Asserts what the note MUST say, rather than trying to detect bad prose.
+  //
+  // The previous version searched for a paragraph recommending a per-workspace
+  // file and excluded any containing a negation, so the "Do NOT" sentence would
+  // not self-trip. That let a recommendation reading "...the root policy will
+  // not reach them, so every package needs its own copy..." through untouched:
+  // the suite passed while carrying the exact advice the test exists to block.
+  //
+  // Requiring the right advice instead of detecting the wrong advice fails
+  // LOUDLY on a careless rewrite, where the old shape failed SILENTLY. A
+  // legitimate rewording that trips this is a one-line fix; a silent bypass is
+  // a stale note in 29 repos.
   const realBase = readFileSync(new URL('../snyk-policy/base.snyk', import.meta.url), 'utf8')
-  const depth = realBase.slice(realBase.indexOf('# 2. DEPTH.'), realBase.indexOf('  SNYK-JS-UNDICI'))
-  assert.ok(depth.length > 0, 'base.snyk must carry a DEPTH note above the ignore entries')
-  assert.match(depth, /--policy-path/, 'the DEPTH note must name --policy-path as the fix')
+  const depth = noteBody(realBase, '# 2. DEPTH.')
+  assert.ok(depth, 'base.snyk must carry a "# 2. DEPTH." note')
+  const prose = asProse(depth)
 
-  // Any sentence that recommends a policy file per workspace, however worded.
-  const perWorkspace =
-    /(needs? its own \.snyk|add(ing)? an? \.snyk (to|per|in) (each|every)|\.snyk (per|in each|for each) (workspace|package|project))/i
-  const recommends = depth
-    .split(/\n\s*#\s*\n/)
-    .filter((para) => perWorkspace.test(para) && !/\bdo not\b|\bdon't\b|\bnot\b/i.test(para))
-  assert.deepEqual(
-    recommends,
-    [],
-    'the DEPTH note must not recommend a .snyk per workspace; that is 8-9 undrifting duplicates',
+  assert.match(
+    prose,
+    /--policy-path=\.snyk/,
+    'the DEPTH note must name --policy-path=.snyk as the supported fix',
+  )
+  assert.match(
+    prose,
+    /\bdo not\b[^.]{0,60}\.snyk per workspace/i,
+    'the DEPTH note must explicitly reject adding a .snyk per workspace; without that sentence a ' +
+      'future reader re-derives the duplicating fix the fan-out cannot manage',
   )
 })
