@@ -15,8 +15,9 @@ it catches broken states, not wrong behaviour.
 
 - **If a repo has a test suite, it runs in CI on every PR** — a suite that
   only runs on laptops is documentation, not a gate. The shared `install /
-  test` job runs it for you: the vitest suite when a vitest config exists,
-  otherwise the repo's `npm test`. Add that context to the repo's required
+  test` job runs it for you, in this order: a vitest config at the repo root,
+  else the root's own `npm test`, else a vitest config in a workspace (run
+  through that workspace's `test` script). Add that context to the repo's required
   checks once it's stable. Only wire a bespoke job when the suite needs setup
   the shared one doesn't do — services, fixtures, or a browser beyond the
   Playwright install vitest gets.
