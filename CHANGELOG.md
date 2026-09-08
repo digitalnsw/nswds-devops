@@ -1,3 +1,9 @@
+## [1.25.1](https://github.com/digitalnsw/nswds-devops/compare/v1.25.0...v1.25.1) (2026-09-08)
+
+### Bug Fixes
+
+* **snyk:** correct the depth note and guard it against going stale ([#124](https://github.com/digitalnsw/nswds-devops/issues/124)) ([b8878b8](https://github.com/digitalnsw/nswds-devops/commit/b8878b8d2c661bacfb18aeb6a49d523d87f420a5)), closes [nswds-ui#178](https://github.com/digitalnsw/nswds-ui/issues/178) [email-design#33](https://github.com/digitalnsw/email-design/issues/33)
+
 ## [1.25.0](https://github.com/digitalnsw/nswds-devops/compare/v1.24.5...v1.25.0) (2026-09-04)
 
 ### Features
