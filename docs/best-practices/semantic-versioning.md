@@ -23,11 +23,25 @@ deliberate addition so formatting-only fixes still ship).
 
 ## The bang-commit gotcha (do not re-learn this)
 
-semantic-release's bundled parser does **not** honour the `type!:` bang on
-its own. `release.config.mjs` carries a custom `breakingHeaderPattern` so
-`feat!:` actually majors — without it a breaking change shipped as a minor
-(`@nswds/tokens` v2.33.0, nswds-tokens#79). Never remove that pattern when
-upgrading semantic-release without re-verifying bang handling.
+`release.config.mjs` carries a custom `breakingHeaderPattern` so `feat!:`
+majors. It was load-bearing when added: the bundled parser did not honour the
+bang on its own, and a breaking change shipped as a minor (`@nswds/tokens`
+v2.33.0, nswds-tokens#79). On the current dependency set the conventionalcommits
+preset handles the bang itself — `tools/release-config.test.mjs` shows the bang
+cases still passing without the pattern — so treat it as a defensive fallback
+and keep it. What to re-verify when upgrading semantic-release is that `feat!:`
+still majors, not that this line is what makes it.
+
+## Prose is not a breaking change
+
+`release.config.mjs` also carries `notesPattern`, and that one is load-bearing.
+The bundled parser's default note regex accepts a **space** where the footer
+requires a **colon**, so an ordinary body line beginning "breaking changes …"
+declares a breaking change and takes the rest of the sentence as its
+description. It shipped `engagement` v2.0.0 off a Renovate `fix(deps)` bump
+whose body said the changes did not affect that repo, and `nswds-email` v3.0.0
+off a refactor. Commitlint cannot warn you: it resolves parser v7, which already
+requires the colon.
 
 ## Practices
 

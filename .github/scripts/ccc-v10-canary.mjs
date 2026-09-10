@@ -24,14 +24,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import { parserOpts } from '../../release.config.mjs'
+
 const RNG = '@semantic-release/release-notes-generator@latest'
 const CCC = 'conventional-changelog-conventionalcommits@latest'
 
-// Mirror release.config.mjs so the probe renders exactly as a real release does.
-const parserOpts = {
-  noteKeywords: ['BREAKING CHANGE', 'BREAKING CHANGES', 'BREAKING'],
-  breakingHeaderPattern: /^(\w+)(?:\(([^)]*)\))?!: (.*)$/,
-}
+// The REAL options, imported rather than mirrored, so the probe renders exactly
+// as a real release does. This was a copy until notesPattern was added to
+// release.config.mjs and not here: the probe would have gone on answering "is
+// the ccc v10 pin safe to lift?" against a configuration no release uses.
 
 const dir = mkdtempSync(join(tmpdir(), 'ccc-canary-'))
 writeFileSync(

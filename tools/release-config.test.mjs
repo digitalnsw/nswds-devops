@@ -19,7 +19,8 @@ import releaseConfig from '../release.config.mjs';
  * change and took the rest of the sentence as its description. It shipped
  * digitalnsw/engagement v2.0.0 off a Renovate `fix(deps)` bump whose body said
  * the breaking changes did not affect that repo, and digitalnsw/nswds-email
- * v3.0.0 off a refactor. Neither was noticed for weeks.
+ * v3.0.0 off a refactor. The engagement one stood for six weeks before anyone
+ * noticed.
  *
  * Commitlint cannot stand in for this. It resolves parser v7, which requires
  * the colon, so it parses these messages differently from the tool that acts on
@@ -113,7 +114,7 @@ test('a bare BREAKING footer still counts, deliberately', async () => {
 
 test('the bang header still declares a breaking change', async () => {
   // Pins the OUTCOME, not the mechanism. The config comment says
-  // breakingHeaderPattern is what makes this work, and that was true when a
+  // breakingHeaderPattern was what made this work, and that was true when a
   // `feat!:` shipped as a minor in @nswds/tokens v2.33.0 (nswds-tokens#79) —
   // but on the current dependency set it no longer is: deleting the pattern
   // leaves these two assertions passing, because the conventionalcommits preset
