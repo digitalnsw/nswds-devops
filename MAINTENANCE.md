@@ -340,10 +340,19 @@ Every entry is something that has actually happened.
 - The commit vocabulary (`commit-types.mjs`) and branch vocabulary
   (`branch-name-config.sh`) are fleet-wide decisions. Changing them changes
   policy everywhere; announce before merging.
-- `release.config.mjs` keeps `breakingHeaderPattern` because
-  semantic-release's parser does not honour the `type!:` bang on its own;
-  without it a `feat!:` ships as a minor. Do not remove it when upgrading
-  semantic-release without re-verifying bang handling.
+- `release.config.mjs` carries `notesPattern`, which is load-bearing. The
+  parser semantic-release bundles accepts a space where the Conventional
+  Commits footer requires a colon, so without it any body line beginning
+  "breaking changes …" ships a major — that cost engagement v2.0.0 and
+  nswds-email v3.0.0. Do not remove it. `tools/release-config.test.mjs`
+  pins it by running the real config through the real analyzer.
+- `release.config.mjs` also keeps `breakingHeaderPattern`, as a defensive
+  fallback only. It was load-bearing when added (a `feat!:` once shipped as
+  a minor, @nswds/tokens v2.33.0), but on the current dependency set the
+  conventionalcommits preset handles the bang itself and the same test
+  passes without it. Keep it for the version that stops doing so. What to
+  re-verify on a semantic-release upgrade is that `feat!:` still majors, not
+  that this line is what makes it.
 
 ## Exceptions register
 

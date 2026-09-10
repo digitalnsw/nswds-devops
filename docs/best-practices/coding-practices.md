@@ -15,9 +15,11 @@ this guide covers the practices tools can't fully check.
   laptop happens to have — a lockfile regenerated on a different npm version
   is churn at best and breakage at worst.
 - **Comments explain constraints, not mechanics.** The shared configs are
-  full of LOAD-BEARING comments (e.g. the `breakingHeaderPattern` note in
+  full of LOAD-BEARING comments (e.g. the `notesPattern` note in
   `release.config.mjs`, the `HUSKY: 0` note in the release workflow) — each
-  one exists because removing the line silently broke a release. Follow that
+  one exists because removing the line silently broke a release. Say when a
+  claim stops being true, too: the `breakingHeaderPattern` note beside it now
+  reads as a fallback, because a test showed the preset had caught up. Follow that
   pattern: when a line is only correct for a non-obvious reason, say so where
   the line lives.
 - **Committed build artefacts are the exception, not the rule.** Only commit
