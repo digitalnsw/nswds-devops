@@ -18,7 +18,9 @@ and propagate to 28 consumer repositories automatically.
 
 ## How propagation works
 
-There are three channels. Knowing which one applies is most of the job.
+There are four channels. Knowing which one applies is most of the job, and the
+difference that matters most is whether a change reaches consumers on its own
+or only once a pull request in each of them has merged.
 
 **1. File-sync PRs (file contents).** Anything merged to `main` here that is
 listed in [.github/sync.yml](.github/sync.yml) is pushed out by the `sync`
@@ -43,11 +45,20 @@ Moving the `v1` tag changes CI for all 28 consumer repos at once, with no PRs.
 That is why the tag is ruleset-protected and only moves through the
 **Promote v1** workflow, behind a reviewer gate, after CI here is green.
 
-**3. Read-at-runtime policy.** Two files are read from `main` here by the
-consuming service, so a merge applies fleet-wide with no sync and no tag move:
-`default.json` (the Renovate preset every repo's `renovate.json` extends) and
-`snyk-policy/base.snyk` (fanned out by its own workflow as a block inside each
-repo's `.snyk`, preserving the repo-owned tail).
+**3. Read-at-runtime policy.** `default.json` is the Renovate preset every
+repo's `renovate.json` extends, and Renovate resolves it from `main` here at
+run time. This is the only channel where merging is the whole job: a policy
+change applies fleet-wide on each repo's next Renovate run, with no sync, no
+tag move and no per-repo pull request.
+
+**4. Block sync (`.snyk`).** `snyk-policy/base.snyk` is the canonical policy
+block, delivered by `snyk-policy-sync.yml` as one pull request per consumer
+that rewrites the block and copies each repo's `# repo-specific` tail through
+byte-for-byte. Despite living beside the Renovate preset, this behaves like
+channel 1, not channel 3: **the policy is not in force in any repo until that
+repo's fan-out PR merges.** It is a separate mechanism from the file sync
+because `repo-file-sync-action` overwrites whole files and would delete the
+repo-owned tail.
 
 The split of file-sync plus tag was chosen over publishing an npm package: sync
 PRs give every repo a reviewable diff for content changes, while the tag gives
@@ -112,11 +123,13 @@ be overwritten, and `.github/sync.yml` encodes this as groups:
 
 Check names: a reusable workflow reports as `commitlint / commitlint`
 (caller job / called job), not `commitlint`. Required-check rulesets must use
-the two-part names. The standard required set on every fleet repo is
+the two-part names. Five contexts are required on **every** fleet repo:
 `commitlint / commitlint`, `install / install`, `install / lint`,
-`install / test`, `install / format`, `security/snyk (DigitalNSW)` and
-`code/snyk (DigitalNSW)`; `install / typecheck` is required where a repo has
-opted in (see [FLEET.md](FLEET.md)).
+`install / test` and `install / format`. The standard adds
+`security/snyk (DigitalNSW)` and `code/snyk (DigitalNSW)`, which four repos
+do not yet require, and `install / typecheck`, which five repos require.
+[FLEET.md](FLEET.md) lists the per-repo deltas and records the missing Snyk
+gates as open issues — do not assume a given repo has them.
 
 ## Developer usage (in any consumer repo)
 
@@ -169,6 +182,12 @@ manual; see [MAINTENANCE.md](MAINTENANCE.md).
 ```sh
 npm test    # unit tests for tools/, .github/scripts/snyk-policy.mjs and test-mode.mjs
 ```
+
+That suite includes `tools/fleet-docs.test.mjs`, which holds the fleet counts
+in this documentation to `.github/sync.yml` and `snyk-policy/repos.json`.
+Adding a repo to the sync without updating FLEET.md and the stated counts
+fails it. It guards size and membership only — no test can tell you whether
+what FLEET.md says *about* a repo is still true.
 
 CI additionally runs shellcheck over every shared script and actionlint over
 the workflows and the stubs (stubs are copied into a scratch tree so

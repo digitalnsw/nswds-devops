@@ -273,9 +273,13 @@ gh api -X POST repos/digitalnsw/<repo>/rulesets --input - <<'EOF'
 EOF
 ```
 
-Add `{"context": "install / typecheck"}` when the repo has a `type-check` or
-`typecheck` script; the job self-skips otherwise and a skipped required check
-would never report.
+Add `{"context": "install / typecheck"}` as well. The job runs on every repo
+and reports either way: where no `type-check` or `typecheck` script exists,
+its "Nothing to run" step reports success. Requiring it is therefore safe
+from the start — including on a repo with no TypeScript — and the gate is
+already in place on the day the repo adds a script. Most of the existing
+fleet predates the job and does not require it yet (see
+[FLEET.md](FLEET.md)); new repos should not repeat that.
 
 Bypass policy: **DeployKey only**. No admin or role bypass actors (the
 rationale is in the ruleset bypass policy section of MAINTENANCE.md).

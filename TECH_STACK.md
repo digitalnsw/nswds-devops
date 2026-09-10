@@ -11,11 +11,24 @@ repo uses every item, so each entry says where it applies.
 The fleet standard for a new application is: Next.js App Router on Vercel,
 `@nswds/ui` + `@nswds/tokens` + `@nswds/metadata`, Tailwind CSS 4, Better
 Auth, Neon Postgres with Drizzle ORM, Resend with React Email, Vitest, and
-the shared lint, format, commit and release tooling from this repo. nswds-app
-and the application repos built on it are the previous generation; the
-newer application repos (agile, risk-guidance, nswds-design,
-nswds-public-sans, data, nswds-community, nswds-signature) show the current
-shape.
+the shared lint, format, commit and release tooling from this repo.
+
+No single repo runs all of that on the current component generation, so read
+the reference in two halves:
+
+- **Data, auth and email** — nswds-app is the reference implementation. It is
+  the only repo running the full target stack (Better Auth + Neon + Drizzle,
+  with React Email and Resend), and attestation, awards, engagement,
+  nswds-email and reviewers repeat the same shape. All six still build their
+  UI on `@nswds/app`, which `@nswds/ui` supersedes.
+- **UI and tooling** — the content sites (agile, risk-guidance, nswds-design,
+  nswds-public-sans, data, nswds-community, nswds-signature) are the current
+  shape of the component and toolchain layer: `@nswds/ui`, `@nswds/tokens`,
+  `@nswds/metadata` and Tailwind 4 on Next 16. None of them has a database,
+  auth or transactional email, so do not read them as a full-stack model.
+
+A new application therefore takes its UI layer from a content site and its
+data, auth and email layer from nswds-app.
 
 ## Core framework
 
@@ -31,7 +44,7 @@ shape.
 |---|---|---|
 | [Tailwind CSS](https://tailwindcss.com/) 4 | 16 repos | via `@tailwindcss/postcss`; `prettier-plugin-tailwindcss` and `prettier-plugin-organize-imports` in the same repos |
 | Tailwind CSS 3 | nswds-email-framework, nswds-email-starter | Required by Maizzle 5; majors blocked in Renovate for these two repos by owner decision |
-| [NSW Design System](https://designsystem.nsw.gov.au/) via `@nswds/*` | fleet-wide | `@nswds/tokens` 5 (15 repos), `@nswds/ui` 7 (9 repos), `@nswds/metadata` 1 (14 repos), `@nswds/app` 5 (5 repos; superseded by `@nswds/ui`) |
+| [NSW Design System](https://designsystem.nsw.gov.au/) via `@nswds/*` | fleet-wide | Versions below are what consumers declare, not what is published. `@nswds/tokens` `^5` (15 repos), `@nswds/metadata` `^1` (14 repos), `@nswds/app` `^5` (5 repos; superseded by `@nswds/ui`), `@nswds/ui` **`^6` (8 consuming repos, while 7.0.2 is published** — see [FLEET.md](FLEET.md) open issues; nswds-ui's own apps resolve the workspace copy through `*`) |
 | [Base UI](https://base-ui.com/) | nswds-ui | The headless primitive layer under `@nswds/ui` |
 | [shadcn/ui](https://ui.shadcn.com/) pattern | nswds-ui (own registry at `apps/registry`), nswds-app, awards, nswds-email | `class-variance-authority`, `tailwind-merge`, `clsx`, `lucide-react` |
 | [Radix UI](https://www.radix-ui.com/) primitives | awards, nswds-app, nswds-email | Previous generation, arriving through `@nswds/app` |
@@ -78,7 +91,7 @@ shape.
 | Technology | Where | Notes |
 |---|---|---|
 | [Vitest](https://vitest.dev/) | attestation, engagement, nswds-app, nswds-design, nswds-email-design, nswds-tokens, nswds-ui | Vitest 5 in nswds-design, nswds-tokens and nswds-email-design; Vitest 4 elsewhere. nswds-app and nswds-ui run browser mode through `@storybook/addon-vitest`, which is why vitest and vite majors are blocked there |
-| Node's `node:test` | nswds-devops, nswds-eslint-config, nswds-prettier-config, nswds-metadata, awards, nswds-email | Run through `npm test` by the shared test gate |
+| Node's `node:test` | nswds-devops, nswds-eslint-config, nswds-prettier-config, nswds-metadata, awards, nswds-email, nswds-email-framework | Run through `npm test` by the shared test gate. nswds-ui also uses the runner (`test:scripts`) but has no root `test` script, so its suites reach the gate through the workspace-vitest path instead |
 | [Storybook](https://storybook.js.org/) 10 | nswds-app, nswds-ui | With `addon-a11y`, `addon-docs`, `addon-themes`, `addon-vitest` |
 | [Chromatic](https://www.chromatic.com/) | nswds-ui | Visual regression per PR; passes silently when the monthly snapshot quota is exhausted, so read the run log on CSS or token changes |
 | [Playwright](https://playwright.dev/) | nswds-app, nswds-ui (Storybook browser tests), nswds-email-framework, nswds-email-design | Visual regression suites in the two email repos |
@@ -91,7 +104,7 @@ shape.
 
 | Technology | Where | Notes |
 |---|---|---|
-| [ESLint](https://eslint.org/) 10 via `@nswds/eslint-config` | 17 repos on the shared package (Next.js entry point or `./base`); nswds-ui and nswds-email-design through workspace configs; nswds-tokens bespoke | Fleet-wide eslint major block in Renovate remains only for nswds-ui's workspace config |
+| [ESLint](https://eslint.org/) 10 via `@nswds/eslint-config` | 17 repos depend on the shared package: 16 directly (Next.js entry point or `./base`) and nswds-email-design through its `@workspace/eslint-config`. The two non-adopters are nswds-ui, whose workspace config wraps `eslint-plugin-react` itself, and nswds-tokens, which keeps a bespoke config | Fleet-wide eslint major block in Renovate remains only for nswds-ui's workspace config |
 | [Prettier](https://prettier.io/) 3 via `@nswds/prettier-config` | 24 repos | `package.json` key or a `.prettierrc.mjs` that spreads the base |
 | [Turborepo](https://turbo.build/) 2 | nswds-ui, nswds-email-design | Workspace monorepos |
 | [tsup](https://tsup.egoist.dev/) | nswds-app, nswds-email-design, nswds-tokens, nswds-ui | Package builds |

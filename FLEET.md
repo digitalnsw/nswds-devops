@@ -7,6 +7,12 @@ workflows, rulesets, the sync map) and from the GitHub, npm and Vercel
 consoles. When this file and a repository disagree, the repository is right
 and this file needs updating.
 
+The counts and the membership list below are held to `.github/sync.yml` and
+`snyk-policy/repos.json` by `tools/fleet-docs.test.mjs`, so adding a repo to
+the sync without updating this file fails CI. Everything else here — what a
+repo is for, where it deploys, which checks it requires — is unguarded prose
+that has to be re-verified by hand.
+
 Related documents: [README.md](README.md) (how the shared tooling works),
 [ONBOARDING.md](ONBOARDING.md) (adding a repo), [MAINTENANCE.md](MAINTENANCE.md)
 (operating it), [TECH_STACK.md](TECH_STACK.md) (what the fleet is built with).
@@ -32,7 +38,10 @@ lists only what differs from the standard seven (`commitlint / commitlint`,
 `install / install`, `install / lint`, `install / test`, `install / format`,
 `security/snyk (DigitalNSW)`, `code/snyk (DigitalNSW)`).
 
-### Applications (Next.js on Vercel)
+### Applications (Next.js)
+
+All but `agile` and `nswds-email-builder` deploy on Vercel; those two have no
+Vercel project and no live URL.
 
 | Repo | Purpose | Live URL | Stack notes | Sync group | Required checks (delta) |
 |---|---|---|---|---|---|
@@ -142,16 +151,30 @@ the release deploy key is the only bypass actor on every ruleset
 (MAINTENANCE.md, ruleset bypass policy). Fix: remove the role actor from the
 "Protect main" ruleset.
 
-**Eleven fleet repos have an empty `README.md`.** `agile`, `attestation`,
-`awards`, `engagement`, `reviewers`, `nswds-community`, `data`,
-`nswds-design`, `nswds-signature`, `nswds-email-builder` and `risk-guidance`
-ship a zero-byte README; `digitalnsw` and `images` have none. Every repo
-README should answer what it is, how to run it, how to test it and where it
-deploys ([Documentation](docs/best-practices/documentation.md)).
+**Thirteen fleet repos have no usable `README.md`.** Eleven ship a zero-byte
+file — `agile`, `attestation`, `awards`, `engagement`, `reviewers`,
+`nswds-community`, `data`, `nswds-design`, `nswds-signature`,
+`nswds-email-builder` and `risk-guidance` — and `digitalnsw` and `images`
+have no README at all. Every repo README should answer what it is, how to
+run it, how to test it and where it deploys
+([Documentation](docs/best-practices/documentation.md)).
+
+**Every `@nswds/ui` consumer is a major version behind.** `@nswds/ui` 7.0.2
+is published, but all eight consuming repos declare `^6.0.0`: `agile`,
+`attestation`, `nswds-design`, `nswds-email`, `nswds-email-builder`,
+`nswds-public-sans`, `risk-guidance`, and the `apps/*` and
+`packages/site-chrome` workspaces of `nswds-email-design`. (`nswds-ui`'s own
+`apps/*` resolve the workspace copy through `*`, so they are always on the
+version they build and are not part of this.) A caret range
+cannot cross a major, so Renovate raises this as an individual major PR per
+repo rather than in the weekly group, and each one is waiting for a human.
+Until they land, the fleet is running v6 against a v7 design system, and any
+fix shipped in 7.x reaches nobody. Fix: work the major PRs, taking one repo
+through first to establish the migration.
 
 **`@nswds/app` is superseded but still consumed.** `attestation`, `awards`,
 `engagement`, `nswds-email` and `reviewers` depend on `@nswds/app` 5;
-`@nswds/ui` 7 is the current generation. No migration is scheduled.
+`@nswds/ui` is the current generation. No migration is scheduled.
 
 **`nswds-ui` is public but still publishes without provenance.** Its `.npmrc`
 variant keeps `provenance=false` for a private-repo failure that no longer

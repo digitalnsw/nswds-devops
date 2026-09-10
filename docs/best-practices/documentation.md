@@ -32,10 +32,18 @@ minute while the context is fresh and saves hours later.
 - **Generated docs stay generated** — `CHANGELOG.md` is the bot's
   ([Changelog Management](changelog-management.md)).
 - **Docs describe the present state, not the history.** No dated journal
-  entries, PR references or "resolved" sections: a fixed issue is deleted,
-  not demoted to history, and version control holds the past. Where a date
-  is genuinely part of the fact (an expiry, a deadline), write it absolute,
-  never "recently".
+  entries, no narration of who changed what when, no "resolved" sections: a
+  fixed issue is deleted, not demoted to history, and version control holds
+  the past. Where a date is genuinely part of the fact (an expiry, a
+  deadline), write it absolute, never "recently".
+- **Keep an incident reference when a live decision rests on it.** The rule
+  above removes history, not evidence. A Renovate block, a pin, or an
+  `.snyk` acceptance is parked debt whose removal condition can only be
+  re-judged against the incident that motivated it, so those carry their
+  issue reference and keep it — that is why every `packageRules` entry in
+  [`default.json`](../../default.json) names one. The test is whether a
+  reader has to reopen the reference to decide what to do next: if yes it
+  stays, if it is only a record of work already finished it goes.
 - Repo READMEs answer, in order: what is this, how do I run it, how do I
   test it, where does it deploy. Anything longer moves to `docs/`.
 - Don't document what tooling enforces — link to the gate instead.

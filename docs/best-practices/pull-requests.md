@@ -2,11 +2,12 @@
 
 Everything reaches `main` through a PR, and `main` is protected everywhere:
 the "Protect main" ruleset blocks branch deletion and force-pushes and
-requires **`commitlint / commitlint`**, the **`install / *`** jobs
-(`install`, `lint`, `test`, `format`) and the two Snyk contexts to pass on
-the PR's test merge, with the branch **up to date with main** (strict
-policy). The release deploy key is the only bypass actor; repository admins
-are deliberately not.
+requires **`commitlint / commitlint`** and the **`install / *`** jobs
+(`install`, `lint`, `test`, `format`) to pass on the PR's test merge, with
+the branch **up to date with main** (strict policy). Most repos also require
+the two Snyk contexts, but four do not yet — check your repo's row in
+nswds-devops' `FLEET.md` rather than assuming. The release deploy key is the
+only bypass actor; repository admins are deliberately not.
 
 ## What the gates buy us
 

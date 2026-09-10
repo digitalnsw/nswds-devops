@@ -36,11 +36,13 @@ Concretely, every repo gets:
   also split out into their own PRs: SemVer gives a 0.x minor no
   compatibility guarantee, so it gets its own diff and release notes rather
   than riding in the grouped PR.
-- **A "storybook" group** (nswds-app, nswds-ui) — the `storybook` and
-  `@storybook/*` packages must move in lockstep, and one unresolvable
-  package in a group strands every other package in it, so the family is
-  isolated from both the dev-patch and the all-non-major groups. It never
-  automerges.
+- **A "storybook" group** — the `storybook` and `@storybook/*` packages must
+  move in lockstep, and one unresolvable package in a group strands every
+  other package in it, so the family is isolated from both the dev-patch and
+  the all-non-major groups. It never automerges. The rule is fleet-wide, not
+  repo-scoped: only nswds-app and nswds-ui run Storybook today, so nowhere
+  else sees the group, but a repo that adopts it is covered without a preset
+  change.
 - **A monthly "Lock file maintenance" PR** (first day of the month) that
   regenerates `package-lock.json` from scratch with real npm, keeping
   transitive pins fresh even when no direct dependency moved. Also
