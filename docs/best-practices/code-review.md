@@ -10,8 +10,8 @@ comments as a linter with opinions, not as the review.
    version bump, and the changelog line. A mislabelled type is a review
    blocker ([Semantic Versioning](semantic-versioning.md)).
 2. **Behaviour and blast radius** — especially anything in this repo, where
-   one merge fans out to 28 repos, and anything touching release configs or
-   workflows.
+   one merge fans out to every consumer repo, and anything touching release
+   configs or workflows.
 3. **Lockfile diffs.** Large lockfile changes deserve a skim: do they match
    the manifest change? GitHub renders lockfiles collapsed — expand them on
    bot PRs.

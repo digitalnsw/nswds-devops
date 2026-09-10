@@ -73,7 +73,7 @@ automerge boundary is drawn
   job**, not Renovate's — `vulnerabilityAlerts` is disabled in the preset so
   the two bots never open duplicate PRs for the same CVE.)
 - **Central policy, fleet-wide effect.** One preset file in this repo
-  governs all 28 consumer repos. A policy change lands everywhere on Renovate's
+  governs every consumer repo. A policy change lands everywhere on Renovate's
   next run with no per-repo work at all.
 
 ## Where the config lives (and how it propagates)

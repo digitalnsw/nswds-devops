@@ -9,7 +9,9 @@ and this file needs updating.
 
 The counts and the membership list below are held to `.github/sync.yml` and
 `snyk-policy/repos.json` by `tools/fleet-docs.test.mjs`, so adding a repo to
-the sync without updating this file fails CI. Everything else here — what a
+the sync without updating this file fails CI. This is the only place the fleet
+size is written down: other docs say "every consumer repo" and link here, so
+adding a repo means updating this file and nothing else. Everything else here — what a
 repo is for, where it deploys, which checks it requires — is unguarded prose
 that has to be re-verified by hand.
 
@@ -22,7 +24,7 @@ Related documents: [README.md](README.md) (how the shared tooling works),
 | Measure | Value |
 |---|---|
 | Consumer repos in [.github/sync.yml](.github/sync.yml) | 28 |
-| Repos under the canonical Snyk policy ([snyk-policy/repos.json](snyk-policy/repos.json)) | 29 (the 28 consumers plus this repo) |
+| Repos under the canonical Snyk policy ([snyk-policy/repos.json](snyk-policy/repos.json)) | 29 (every consumer plus this repo) |
 | Repos publishing to npm | 6 (`@nswds/ui`, `@nswds/tokens`, `@nswds/app`, `@nswds/eslint-config`, `@nswds/prettier-config`, `@nswds/metadata`) |
 | Repos deployed on Vercel (team "Digital NSW", Pro plan) | 15 repos, 20 projects |
 | Node baseline | `.nvmrc` `24.16.0`; `engines.node` `^22.22.2 \|\| >=24.15.0`; `engine-strict=true` |
@@ -31,12 +33,19 @@ Related documents: [README.md](README.md) (how the shared tooling works),
 ## Fleet members
 
 Every repo below carries the synced tooling, the shared CI stubs pinned to
-`@v1`, a "Protect main" ruleset with `DeployKey` as the only bypass actor,
-Renovate via the org preset, and the canonical Snyk policy block. The
-**Sync group** column is the group in `.github/sync.yml`; **Required checks**
-lists only what differs from the standard seven (`commitlint / commitlint`,
-`install / install`, `install / lint`, `install / test`, `install / format`,
-`security/snyk (DigitalNSW)`, `code/snyk (DigitalNSW)`).
+`@v1`, a ruleset protecting `main`, Renovate via the org preset, and the
+canonical Snyk policy block. The ruleset is named "Protect main" and has
+`DeployKey` as its only bypass actor, except where a row notes otherwise:
+`nswds-prettier-config`'s is named "Protect default branch", and
+`dtl-sandbox`'s also admits a repository role.
+
+The **Sync group** column is the group in `.github/sync.yml`. **Required
+checks** lists only what differs from the seven contexts the fleet is measured
+against today (`commitlint / commitlint`, `install / install`,
+`install / lint`, `install / test`, `install / format`,
+`security/snyk (DigitalNSW)`, `code/snyk (DigitalNSW)`). New repos also get
+`install / typecheck` as an eighth, which the rest are converging on (see open
+issues), so it appears here as a `+` delta.
 
 ### Applications (Next.js)
 
@@ -111,7 +120,7 @@ has auto-merge or branch auto-delete enabled.
 
 | Service | Scope | Notes |
 |---|---|---|
-| GitHub App `nswds-devops-sync` | Installed org-wide (all repositories) | Drives the file sync, the Snyk policy fan-out and the weekly canaries. Credentials are repository secrets on this repo (`SYNC_APP_ID`, `SYNC_APP_PRIVATE_KEY`) |
+| GitHub App `nswds-devops-sync` | Installed org-wide (all repositories) | Its token is minted by six workflows here: the file sync, the Snyk policy fan-out, `promote-v1` (to arm auto-merge on fan-out PRs), and three of the five weekly canaries. The other two canaries use `GITHUB_TOKEN`. Each workflow and its purpose is tabled in MAINTENANCE.md, which is the list to update when a workflow starts minting it. Credentials are repository secrets on this repo (`SYNC_APP_ID`, `SYNC_APP_PRIVATE_KEY`) |
 | GitHub App `renovate` (Mend) | Installed on **selected** repositories | The selection list cannot be read with a user token; confirm new repos are selected at https://developer.mend.io/github/digitalnsw |
 | GitHub App `snyk-io-au` | Installed org-wide | Posts `code/`, `security/` and `license/snyk (DigitalNSW)` statuses on PR heads for repos imported into the `digitalnsw` Snyk org |
 | GitHub App `ictds-export-bot` | Selected repositories | Power Platform solution export for `ictds-portal-flows` |
@@ -145,6 +154,16 @@ rulesets do not require `security/snyk (DigitalNSW)` or
 receives no Snyk statuses at all, so it has not been imported into the Snyk
 org. Fix: import `nswds-email-issues` in the Snyk console, then add the two
 contexts to each ruleset as in ONBOARDING.md step 10.
+
+**Most repos do not require `install / typecheck`.** Only `agile`,
+`dtl-sandbox`, `nswds-email`, `nswds-email-design` and `nswds-ui` require it,
+although new repos get it from onboarding step 7. Most of the rest already
+have a `type-check` or `typecheck` script, so a type error there reaches
+`main` without failing a merge; `install / typecheck` shows it but nothing
+enforces it. Requiring the context is safe on every repo, with or without a
+script, because the job always reports. Fix: add
+`{"context": "install / typecheck"}` to each remaining ruleset, fetching the
+ruleset id and PUTting it back as in ONBOARDING.md step 10.
 
 **`dtl-sandbox` has a `RepositoryRole` bypass actor.** Fleet policy is that
 the release deploy key is the only bypass actor on every ruleset

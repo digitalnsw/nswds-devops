@@ -10,7 +10,7 @@ What every repo runs via its synced stubs:
 
 | Stub | Purpose | Trigger | Needs |
 | --- | --- | --- | --- |
-| `ci.yml` | Merge gate: `install / install` (conflict-marker and self-override checks, `npm clean-install`, build), `install / lint`, `install / typecheck`, `install / format`, `install / test`; all but `typecheck` are required fleet-wide, `typecheck` where the repo has a type-check script | `pull_request` | — |
+| `ci.yml` | Merge gate: `install / install` (conflict-marker and self-override checks, `npm clean-install`, build), `install / lint`, `install / typecheck`, `install / format`, `install / test`; all but `typecheck` are required fleet-wide. `typecheck` runs and reports on every repo, script or not, but is required only where the ruleset lists it: new repos from the start, most existing repos not yet (see nswds-devops' `FLEET.md` open issues) | `pull_request` | — |
 | `commitlint.yml` | Lints every PR commit message (`commitlint / commitlint`, required) | `pull_request` | — |
 | `validate-branch-name.yml` | Enforces the branch naming policy from the PR base commit | `pull_request` (opened/edited/reopened) | — |
 | `commit-types-sync.yml` | Keeps the commit-type YAML mirror in lockstep with `commit-types.mjs` | PR/push touching those files | — |

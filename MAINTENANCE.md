@@ -14,7 +14,7 @@ Applies to `scripts/*`, `commit-types.mjs`, `commitlint.config.mjs`,
 1. Edit here, on a branch, PR into `main`. CI shellchecks the scripts,
    actionlints the workflows, runs the unit tests, and the commit-types-sync
    check keeps the YAML in lockstep with `commit-types.mjs`.
-2. On merge, the sync opens a `chore(ci): …` PR in all 28 consumer repos and
+2. On merge, the sync opens a `chore(ci): …` PR in every consumer repo and
    turns on GitHub auto-merge for each one, so they merge themselves as their
    checks go green. Nothing is bypassed: auto-merge waits on the same
    "Protect main" ruleset a human merge waits on, and a repo whose checks go
@@ -110,7 +110,7 @@ move. Full guide: [docs/best-practices/renovate.md](docs/best-practices/renovate
 ### Changing Snyk policy
 
 Edit `snyk-policy/base.snyk`, run `npm test`, merge. The Snyk policy sync
-opens one PR per consumer (29 repos including this one) rewriting only the
+opens one PR per repo in `snyk-policy/repos.json`, this one included, rewriting only the
 canonical block above each repo's `# repo-specific` marker. Preview without
 opening PRs:
 
@@ -348,7 +348,7 @@ Every entry is something that has actually happened.
 - Sync PRs are armed for auto-merge; they still wait on every required
   check, and a red one stays open for a human. Review the diff on the PR into
   this repo, not on each fan-out copy.
-- A central change fans out as up to 28 PRs. Batch central changes rather
+- A central change fans out as one PR per consumer repo. Batch central changes rather
   than merging five small ones in a day.
 - The commit vocabulary (`commit-types.mjs`) and branch vocabulary
   (`branch-name-config.sh`) are fleet-wide decisions. Changing them changes

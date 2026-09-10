@@ -4,7 +4,7 @@ The single source of truth for the build tooling shared across the
 `digitalnsw` repositories: the commit, branch and PR shell scripts, the
 commitlint and semantic-release configs, the husky hook sources, the CI
 workflows, the Renovate policy and the Snyk policy. These files live here once
-and propagate to 28 consumer repositories automatically.
+and propagate to every consumer repository automatically.
 
 | Document | Read it when |
 |---|---|
@@ -41,7 +41,7 @@ jobs:
 ```
 
 Stubs that need a secret map it explicitly; `secrets: inherit` is never used.
-Moving the `v1` tag changes CI for all 28 consumer repos at once, with no PRs.
+Moving the `v1` tag changes CI for every consumer repo at once, with no PRs.
 That is why the tag is ruleset-protected and only moves through the
 **Promote v1** workflow, behind a reviewer gate, after CI here is green.
 
@@ -100,7 +100,7 @@ be overwritten, and `.github/sync.yml` encodes this as groups:
 
 | Group | Repos | What is different |
 |---|---|---|
-| 1 | the 20 repos not listed below | full set: scripts, all four configs, `renovate.json`, `.nvmrc`, `.npmrc`, all eight stubs |
+| 1 | every repo not listed below | full set: scripts, all four configs, `renovate.json`, `.nvmrc`, `.npmrc`, all eight stubs |
 | 2a | nswds-ui | keeps its own `release.yml` and release config (monorepo publish with verification); takes the `.npmrc-nswds-ui` variant |
 | 2b | nswds-tokens | keeps its own `release.yml`, release config and `ci.yml`; the shared CI stub lands as `shared-ci.yml` |
 | 2c | nswds-eslint-config, nswds-metadata, nswds-prettier-config | keep their own `release.yml` (OIDC trusted publishing), release config and `ci.yml`; shared CI stub lands as `shared-ci.yml` |

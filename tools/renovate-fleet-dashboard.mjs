@@ -333,12 +333,28 @@ function parseProblems(sectionBody) {
  * comment elsewhere in the file cannot enrol itself.
  */
 function parseFleetFromSyncConfig(yaml) {
-  const repos = new Set();
+  return new Set(parseSyncGroupsFromSyncConfig(yaml).flat());
+}
+
+/**
+ * The same read as parseFleetFromSyncConfig, kept per `repos: |` block and in
+ * file order, with duplicates preserved.
+ *
+ * parseFleetFromSyncConfig is derived from this, so there is one implementation
+ * of which lines count as members. Keeping duplicates is the point: a repo listed
+ * in two groups would receive two conflicting file sets, and the flattened Set
+ * hides that entirely.
+ */
+function parseSyncGroupsFromSyncConfig(yaml) {
+  const groups = [];
+  let current = null;
   let blockIndent = null;
 
   for (const line of yaml.split('\n')) {
     if (/^\s*-?\s*repos:\s*\|/.test(line)) {
       blockIndent = line.search(/\S/);
+      current = [];
+      groups.push(current);
       continue;
     }
     if (blockIndent === null) continue;
@@ -350,9 +366,9 @@ function parseFleetFromSyncConfig(yaml) {
       continue;
     }
     const match = /^([\w.-]+\/[\w.-]+)$/.exec(line.trim());
-    if (match) repos.add(match[1]);
+    if (match) current.push(match[1]);
   }
-  return repos;
+  return groups;
 }
 
 async function loadFleet(fleetConfig) {
@@ -1022,6 +1038,7 @@ export {
   parseCheckboxes,
   parseFleetFromSyncConfig,
   parseProblems,
+  parseSyncGroupsFromSyncConfig,
   renderHtml,
   shouldIgnore,
   splitSections,
