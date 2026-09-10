@@ -1,8 +1,7 @@
 # File-sync map for BetaHuhn/repo-file-sync-action (driven by workflows/sync.yml).
 # Changes merged to main open a "chore(ci): …" PR in every repo listed below.
 #
-# ROLLOUT COMPLETE 2026-07-15: all consumer repos active (24 as of 2026-07-22,
-# when dtl-sandbox joined group 1).
+# All 28 consumer repos are active; the register is FLEET.md.
 # Onboarding a new repo = add it to the right group (group 1 unless it has a
 # bespoke release pipeline) — see ONBOARDING.md (step 5).
 #

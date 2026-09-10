@@ -10,6 +10,7 @@ What is linted, where the configs live, and how the gates enforce it.
 | shellcheck | Shared shell scripts | This repo's CI |
 | actionlint | Workflows + workflow stubs | This repo's CI |
 | eslint | JS/TS source | `install / lint` (required check; runs `npm run lint --if-present`) |
+| tsc | TypeScript types | `install / typecheck` (runs the repo's `type-check` or `typecheck` script when one exists; required where the repo has opted in) |
 | prettier | Formatting | `install / format` (required check; runs `prettier --check .` when the repo has a Prettier config) |
 | Snyk | Dependencies + code | `security/snyk` and `code/snyk (DigitalNSW)` (required checks; posted by the Snyk console integration) |
 

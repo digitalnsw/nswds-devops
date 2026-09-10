@@ -23,7 +23,7 @@ Full operating manual: [Renovate](renovate.md). The strategy in brief:
   `fix` cuts a patch release under the `conventionalcommits` preset — a
   production bump merged to `main` ships on the next release run, a
   devDependency bump doesn't. It is also exactly why automerge stops at
-  devDependencies: five repos publish to npm on release.
+  devDependencies: six repos publish to npm on release.
 - Renovate PRs are **not** rebased just because `main` moved — press
   **Update branch** when you're ready to merge one
   ([Rebasing](renovate.md#rebasing-and-staying-up-to-date)).
