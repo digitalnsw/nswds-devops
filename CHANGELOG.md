@@ -1,3 +1,9 @@
+## [1.25.3](https://github.com/digitalnsw/nswds-devops/compare/v1.25.2...v1.25.3) (2026-09-10)
+
+### Bug Fixes
+
+* **release:** require a colon before a breaking-change footer ([#129](https://github.com/digitalnsw/nswds-devops/issues/129)) ([a0f3d0c](https://github.com/digitalnsw/nswds-devops/commit/a0f3d0ce576dbf372df8f6760f88a451bb931b21))
+
 ## [1.25.2](https://github.com/digitalnsw/nswds-devops/compare/v1.25.1...v1.25.2) (2026-09-08)
 
 ### Bug Fixes
