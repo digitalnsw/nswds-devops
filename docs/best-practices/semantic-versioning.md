@@ -25,8 +25,8 @@ deliberate addition so formatting-only fixes still ship).
 
 semantic-release's bundled parser does **not** honour the `type!:` bang on
 its own. `release.config.mjs` carries a custom `breakingHeaderPattern` so
-`feat!:` actually majors — without it a breaking change shipped as a minor
-(`@nswds/tokens` v2.33.0, nswds-tokens#79). Never remove that pattern when
+`feat!:` actually majors — without it a breaking change ships as a minor
+(this has happened to `@nswds/tokens`). Never remove that pattern when
 upgrading semantic-release without re-verifying bang handling.
 
 ## Practices

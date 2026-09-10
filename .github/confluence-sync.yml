@@ -15,3 +15,7 @@ pages:
     folders: [Application Support]
   - source: MAINTENANCE.md
     folders: [Application Support]
+  - source: FLEET.md
+    folders: [Application Support]
+  - source: TECH_STACK.md
+    folders: [Application Support]

@@ -32,7 +32,15 @@ Concretely, every repo gets:
   required `install / lint` and `install / format` jobs already measure the
   whole of what these packages do ([Automerge](#automerge)).
 - **Individual PRs for majors** — each major arrives alone, whenever it's
-  released, because majors need individual judgement.
+  released, because majors need individual judgement. **0.x minors** are
+  also split out into their own PRs: SemVer gives a 0.x minor no
+  compatibility guarantee, so it gets its own diff and release notes rather
+  than riding in the grouped PR.
+- **A "storybook" group** (nswds-app, nswds-ui) — the `storybook` and
+  `@storybook/*` packages must move in lockstep, and one unresolvable
+  package in a group strands every other package in it, so the family is
+  isolated from both the dev-patch and the all-non-major groups. It never
+  automerges.
 - **A monthly "Lock file maintenance" PR** (first day of the month) that
   regenerates `package-lock.json` from scratch with real npm, keeping
   transitive pins fresh even when no direct dependency moved. Also
@@ -63,7 +71,7 @@ automerge boundary is drawn
   job**, not Renovate's — `vulnerabilityAlerts` is disabled in the preset so
   the two bots never open duplicate PRs for the same CVE.)
 - **Central policy, fleet-wide effect.** One preset file in this repo
-  governs all 24 consumer repos. A policy change lands everywhere on Renovate's
+  governs all 28 consumer repos. A policy change lands everywhere on Renovate's
   next run with no per-repo work at all.
 
 ## Where the config lives (and how it propagates)
@@ -263,9 +271,9 @@ the month is expected behaviour, not a fault.
 
 Renovate prefers GitHub's **native** auto-merge (`platformAutomerge`, on by
 default), which merges the instant the last required check turns green. That
-needs "Allow auto-merge" on the repo, which is **enabled fleet-wide** (all 26
-repos, 2026-08-04) and is part of [step 1 of onboarding](../../ONBOARDING.md)
-for new ones:
+needs "Allow auto-merge" on the repo, which is **enabled on every fleet
+repo** and is part of [step 1 of onboarding](../../ONBOARDING.md) for new
+ones:
 
 ```sh
 gh api repos/digitalnsw/<repo> --jq '.allow_auto_merge'     # check
@@ -333,7 +341,9 @@ is the source of truth; this table is the summary:
 | All updates to `overrides`-pinned packages | Two ways to the same broken lockfile: in-range bumps go in as a direct-dep install that conflicts with the override → `EOVERRIDE` → stale lockfile (nswds-email#459); range bumps half-apply it — outgoing entry removed, resolved one never added → `npm ci` fails `EUSAGE Missing: …`, with no artifact-update warning on the PR to give it away (nswds-email#485) | Renovate's npm manager writes correct lockfiles for `overrides`. Until then monthly lock file maintenance keeps the resolved versions fresh, and Snyk drives the range bumps by hand |
 | `conventional-changelog-conventionalcommits` v10 | incompatible with release-notes-generator 14: releases succeed but changelogs silently come out empty (nswds-email#437; upstream #992) | a v10.x compatible with release-notes-generator 14 ships |
 | `typescript` majors (6/7) | TS7 is the native compiler with no JS API: `next build` fails, typescript-eslint crashes, import-sorting silently no-ops (nswds-email#444) | Next.js + typescript-eslint declare TS 6/7 support |
-| `eslint` majors (10) | ESLint 10 removed `context.getFilename()`, still called by eslint-plugin-react — every lint invocation crashes, and PR CI wouldn't catch it (nswds-app#418; vercel/next.js#89764). The `fixupConfigRules` shim now ships inside `@nswds/eslint-config`, and the 14 Next.js repos are on eslint ^10 through it — the block stays for **nswds-ui**, whose workspace config imports eslint-plugin-react with no shim | nswds-ui's workspace config wraps or adopts `@nswds/eslint-config/base` (re-check 2026-10) |
+| `eslint` + `@eslint/js` majors | ESLint 10 removed `context.getFilename()`, still called by eslint-plugin-react — every lint invocation crashes, and PR CI wouldn't catch it (nswds-app#418; vercel/next.js#89764). The `fixupConfigRules` shim ships inside `@nswds/eslint-config`, and the Next.js repos are on eslint ^10 through it — the block stays for **nswds-ui**, whose workspace config imports eslint-plugin-react with no shim. The two packages are matched together because `@eslint/js@10` peer-depends on `eslint ^10`, so bumping one alone yields an unsatisfiable graph | nswds-ui's workspace config wraps or adopts `@nswds/eslint-config/base` (re-check 2026-10) |
+| `@maizzle/framework` and `tailwindcss` majors in nswds-email-framework and nswds-email-starter | Maizzle 5 requires Tailwind 3; the v4 exclusion sits in a transitive dependency Renovate cannot see. The owner has decided these repos will not migrate to Maizzle 6 | Permanent |
+| `vite`, `vitest` and `@vitest/*` majors in nswds-ui and nswds-app | `@storybook/addon-vitest` peers do not admit vitest 5, and vitest 4 declares vite as a non-optional peer, so either major lands as a manifest-only PR whose every `npm ci` fails | Storybook ships an addon-vitest release whose vitest peer admits `^5` (verify the peer range, not the release notes) |
 
 **Adding a block** (the pattern): when an update breaks the fleet, add a
 `packageRules` entry to `default.json` with `matchPackageNames` /

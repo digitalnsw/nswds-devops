@@ -83,5 +83,5 @@ Write the PR title as the changelog entry you want users to read.
   sync as `chore(ci):` — both pass the same lint. The only ignored pattern
   is the bot's own `chore(release): x.y.z [skip ci]` commit.
 - Release runs export `HUSKY=0` so hooks don't lint the bot's changelog
-  commit — a load-bearing line that has regressed before (tokens #94);
-  leave it alone.
+  commit — a load-bearing line whose removal breaks releases; leave it
+  alone.

@@ -23,11 +23,14 @@ publishing).
 
 ## Bespoke pipelines
 
-nswds-ui and nswds-tokens publish packages with extra verification and keep
-their own `release.yml` (same deploy-key checkout pattern);
-ictds-portal-flows' `release.yml` is a Power Platform production deploy —
-its semantic-release lives in `semantic-release.yml`. Never overwrite these
-via the sync map; the group layout in `.github/sync.yml` encodes this.
+nswds-ui, nswds-tokens, nswds-email-design and the three config packages
+(nswds-eslint-config, nswds-prettier-config, nswds-metadata) publish packages
+with extra verification and keep their own `release.yml` (same deploy-key
+checkout pattern, plus `id-token: write` for OIDC trusted publishing and a
+post-release npm-versus-tag guard); ictds-portal-flows' `release.yml` is a
+Power Platform production deploy, so its semantic-release lives in
+`semantic-release.yml`. Never overwrite these via the sync map; the group
+layout in `.github/sync.yml` encodes this.
 
 ## Practices
 

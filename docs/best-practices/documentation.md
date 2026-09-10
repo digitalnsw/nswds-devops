@@ -6,13 +6,15 @@ over what should theoretically work.
 
 ## The house pattern (from this repo)
 
-Three documents with distinct jobs — reuse the split anywhere it fits:
+Documents with distinct jobs — reuse the split anywhere it fits:
 
 | Doc | Job | Audience |
 | --- | --- | --- |
 | `README.md` | What this is, how it fits together | Anyone arriving |
+| `FLEET.md` | The register: what exists and how each thing is configured | Anyone looking something up |
+| `TECH_STACK.md` | What it is built with | Anyone assessing a change |
 | `ONBOARDING.md` | How to add yourself/a repo to the system | Someone doing it once |
-| `MAINTENANCE.md` | Operating model + troubleshooting table of things that *really broke*, in the order they broke | Future maintainers at 2am |
+| `MAINTENANCE.md` | Operating model, exceptions register, and a troubleshooting table of things that *really broke* | Future maintainers at 2am |
 
 The troubleshooting-table pattern is the most valuable one: every incident
 becomes a row (symptom → cause → fix) the day it happens. It costs one
@@ -29,8 +31,11 @@ minute while the context is fresh and saves hours later.
   ([Coding Practices](coding-practices.md)).
 - **Generated docs stay generated** — `CHANGELOG.md` is the bot's
   ([Changelog Management](changelog-management.md)).
-- **Convert relative time to absolute** — "as of 2026-07-16" ages fine;
-  "recently" doesn't.
+- **Docs describe the present state, not the history.** No dated journal
+  entries, PR references or "resolved" sections: a fixed issue is deleted,
+  not demoted to history, and version control holds the past. Where a date
+  is genuinely part of the fact (an expiry, a deadline), write it absolute,
+  never "recently".
 - Repo READMEs answer, in order: what is this, how do I run it, how do I
   test it, where does it deploy. Anything longer moves to `docs/`.
 - Don't document what tooling enforces — link to the gate instead.
