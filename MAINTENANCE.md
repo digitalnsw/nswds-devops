@@ -327,7 +327,14 @@ listed here should be treated as drift and converged.
   nswds-tokens).
 - File-sync + reusable workflows was chosen over an npm package: reviewable
   per-repo diffs for content, instant tag-based rollout/rollback for CI.
-- `release.config.mjs` keeps `breakingHeaderPattern` for a reason — without
-  it semantic-release treats `feat!:` as a minor bump (shipped a breaking
-  change as v2.33.0 in @nswds/tokens once). Comment in the file; don't
-  remove it when upgrading semantic-release without re-verifying.
+- `release.config.mjs` keeps `breakingHeaderPattern` as a defensive fallback.
+  It was load-bearing when added — semantic-release treated `feat!:` as a minor
+  and shipped a breaking change as v2.33.0 in @nswds/tokens — but on the current
+  dependency set the conventionalcommits preset handles the bang itself, and
+  `tools/release-config.test.mjs` shows the bang cases still passing without it.
+  Keep it for the version that stops doing so. What to re-verify on an upgrade
+  is that `feat!:` still majors, not that this line is what makes it.
+- `release.config.mjs` also carries `notesPattern`, which IS load-bearing:
+  without it the bundled parser accepts a space where the Conventional Commits
+  footer needs a colon, so a body line beginning "breaking changes …" ships a
+  major. That cost engagement v2.0.0 and nswds-email v3.0.0. Same test pins it.
