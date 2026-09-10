@@ -18,7 +18,7 @@ is done, add it to [FLEET.md](FLEET.md).
 | Workflow stubs | `ci.yml`, `commitlint.yml`, `validate-branch-name.yml`, `commit-types-sync.yml`, `ai-pr-title.yml`, `openai-pr-description.yml`, `release.yml`, `confluence-sync.yml`: thin callers pinned to `@v1` | File sync (step 5) |
 | Snyk policy | `.snyk` with the canonical block above a `# repo-specific` marker | Snyk policy fan-out (step 8) |
 | Lint/format config | `@nswds/eslint-config` (npm) + `eslint.config.mjs`; `@nswds/prettier-config` (npm) + `.prettierrc.mjs` or `package.json` key | Manual (steps 2 and 3) |
-| Branch governance | "Protect main" ruleset (7 required checks, `DeployKey` bypass only), squash-only merges, branch auto-delete, auto-merge allowed | Manual (steps 1 and 7) |
+| Branch governance | "Protect main" ruleset with 8 required checks (six created in step 7, the two Snyk contexts added in step 10) and `DeployKey` as the only bypass actor; squash-only merges, branch auto-delete, auto-merge allowed | Manual (steps 1, 7 and 10) |
 | Release | semantic-release via the synced stub, pushing over `RELEASE_DEPLOY_KEY` | Manual key setup (step 6) |
 | Dependency management | Renovate (Mend app, org preset) and Snyk PR scanning | Console (steps 8 and 9) |
 
@@ -241,11 +241,19 @@ list:
 
 - Contexts from reusable workflows use the two-part `caller job / called
   job` form (`install / install`, not `install`).
-- Require only contexts the repo **demonstrably receives**. That is why the
-  recipe below deliberately omits the two Snyk contexts: they come from the
-  Snyk console integration (step 8), and requiring them before a PR has
-  shown all three `…/snyk (DigitalNSW)` statuses posting blocks every merge
-  on "Expected — waiting for status". They are added in step 10.
+- Require only contexts the repo **demonstrably receives**. The recipe below
+  creates six of the eventual eight, and the split is decided by this rule:
+  - `install / typecheck` **is** included from the start. The job runs on
+    every repo and reports either way: where no `type-check` or `typecheck`
+    script exists, its "Nothing to run" step reports success. Requiring it is
+    safe even on a repo with no TypeScript, and the gate is already in place
+    on the day the repo adds a script. Most of the existing fleet predates
+    the job and does not require it yet (see [FLEET.md](FLEET.md)); new repos
+    should not repeat that.
+  - The two Snyk contexts are **deliberately omitted**. They come from the
+    Snyk console integration (step 8), and requiring them before a PR has
+    shown all three `…/snyk (DigitalNSW)` statuses posting blocks every merge
+    on "Expected — waiting for status". They are added in step 10.
 
 ```sh
 gh api -X POST repos/digitalnsw/<repo>/rulesets --input - <<'EOF'
@@ -265,21 +273,14 @@ gh api -X POST repos/digitalnsw/<repo>/rulesets --input - <<'EOF'
         {"context": "install / install"},
         {"context": "install / lint"},
         {"context": "install / test"},
-        {"context": "install / format"}
+        {"context": "install / format"},
+        {"context": "install / typecheck"}
       ]
     }}
   ]
 }
 EOF
 ```
-
-Add `{"context": "install / typecheck"}` as well. The job runs on every repo
-and reports either way: where no `type-check` or `typecheck` script exists,
-its "Nothing to run" step reports success. Requiring it is therefore safe
-from the start — including on a repo with no TypeScript — and the gate is
-already in place on the day the repo adds a script. Most of the existing
-fleet predates the job and does not require it yet (see
-[FLEET.md](FLEET.md)); new repos should not repeat that.
 
 Bypass policy: **DeployKey only**. No admin or role bypass actors (the
 rationale is in the ruleset bypass policy section of MAINTENANCE.md).

@@ -25,6 +25,15 @@
 //          and Vercel and drifts without a commit here. Checking it is canary
 //          work against the live APIs, not unit-test work.
 //
+// One limit inside the CAN, stated because missing it is how the first version
+// of this file overclaimed. The two fleet-size rows of FLEET.md's at-a-glance
+// table, and its member rows, are parsed structurally, so they are covered
+// however they are worded. The table's other rows (npm publishers, Vercel) are
+// CANNOT items above and are not checked at all. Prose counts
+// are found by pattern, so a count written in a phrasing no pattern here knows
+// is invisible until one is added. When you state the fleet size somewhere new,
+// check that `npm test` fails if you change the number.
+//
 // So a green run here means the docs are counting the same fleet the tooling
 // is. It does not mean the rest of FLEET.md is accurate.
 
@@ -47,6 +56,9 @@ const consumerNames = consumers.map((slug) => slug.replace(/^digitalnsw\//, ''))
 /** Consumers of the canonical Snyk policy block. This repo IS one of these: the
  *  fan-out treats it like any other repo. */
 const snykConsumers = Object.keys(JSON.parse(read('snyk-policy/repos.json')).repos)
+
+/** The whole fleet: every consumer plus this repo. */
+const wholeFleet = consumers.length + 1
 
 /** Every markdown file whose prose is in scope, plus the sync map's own header
  *  comment — it states the count too, and drifts the same way. */
@@ -108,8 +120,28 @@ test('the sync map and the Snyk consumer list describe the same fleet', () => {
   )
 })
 
+test("FLEET.md's at-a-glance counts match the sources they cite", () => {
+  // This table is the register's headline, so it is read by row label rather
+  // than by a prose pattern. Its numbers follow the label ("… | 28"), which is
+  // exactly the shape a "28 consumers" style matcher cannot see — the first
+  // version of this file left both rows unguarded for that reason.
+  const fleet = read('FLEET.md')
+  assert.equal(
+    glanceValue(fleet, 'Consumer repos in'),
+    consumers.length,
+    'FLEET.md at-a-glance consumer count disagrees with .github/sync.yml',
+  )
+  assert.equal(
+    glanceValue(fleet, 'Repos under the canonical Snyk policy'),
+    snykConsumers.length,
+    'FLEET.md at-a-glance Snyk policy count disagrees with snyk-policy/repos.json',
+  )
+})
+
 test('every stated consumer count matches .github/sync.yml', () => {
-  assertAll(claims(/(\d+) consumer repo/g), consumers.length, 'the consumer count')
+  // "28 consumer repos", "28 consumer repositories" and bare "28 consumers" are
+  // all the same claim; the `\b` keeps "consumers" from matching mid-word.
+  assertAll(claims(/(\d+) consumer(?:s\b| repo)/g), consumers.length, 'the consumer count')
 })
 
 test('every stated fan-out size matches the consumer count', () => {
@@ -121,34 +153,40 @@ test('every stated fan-out size matches the consumer count', () => {
   )
 })
 
-test('every stated Snyk policy count matches snyk-policy/repos.json', () => {
+test('every stated whole-fleet count matches the consumers plus this repo', () => {
+  // "29 repos including this one", "Delivered to all 29 repos", "all 29 fleet
+  // repos", and TECH_STACK's "all 29 repos" for semantic-release are all the
+  // whole fleet. The first test pins the Snyk list to exactly this set, so one
+  // number serves both.
   assertAll(
-    claims(/(\d+) repos including this one|Delivered to all (\d+) repos/g),
-    snykConsumers.length,
-    'the Snyk policy consumer count',
+    claims(/(\d+) repos including this one|all (\d+) (?:fleet )?repos\b/g),
+    wholeFleet,
+    'the whole-fleet count',
   )
 })
 
-test('FLEET.md has a row for every consumer and invents none', () => {
-  const fleet = read('FLEET.md')
-  // Members are named in backticks in the tables. A slug that differs from the
-  // local folder name (data, images) is written as the slug, which is what
-  // sync.yml and repos.json use — that consistency is the point of the file.
-  const missing = consumerNames.filter((name) => !fleet.includes(`\`${name}\``))
-  assert.deepEqual(missing, [], 'FLEET.md is missing a row for these consumers')
+test('FLEET.md has exactly one member row per fleet repo', () => {
+  // Rows are compared as a list, not searched for as substrings. A substring
+  // search passed with a member's row deleted outright, because the slug still
+  // appeared under Open issues, and it could not see a duplicated row at all.
+  const rows = memberRows(read('FLEET.md'))
+  const expected = [...consumerNames, 'nswds-devops']
 
-  // Catch the reverse too: a repo listed as a fleet member that the sync no
-  // longer delivers to would read as covered while receiving nothing.
-  const membersSection = fleet.slice(
-    fleet.indexOf('## Fleet members'),
-    fleet.indexOf('## Organisation repos outside the fleet'),
+  const duplicates = rows.filter((name, index) => rows.indexOf(name) !== index)
+  assert.deepEqual(duplicates, [], 'FLEET.md lists these repos more than once')
+
+  assert.deepEqual(
+    expected.filter((name) => !rows.includes(name)),
+    [],
+    'FLEET.md has no member row for these fleet repos',
   )
-  assert.ok(membersSection.length > 0, 'FLEET.md section headings moved — update this test')
-  const listed = [...membersSection.matchAll(/^\| `([\w.-]+)`/gm)].map((match) => match[1])
-  const phantom = listed.filter(
-    (name) => !consumerNames.includes(name) && name !== 'nswds-devops',
+  // The reverse matters as much: a repo shown as a member that the sync no
+  // longer delivers to reads as covered while receiving nothing.
+  assert.deepEqual(
+    rows.filter((name) => !expected.includes(name)),
+    [],
+    'FLEET.md lists repos as members that are not on the sync',
   )
-  assert.deepEqual(phantom, [], 'FLEET.md lists repos that are not on the sync')
 })
 
 test('the group sizes stated in README.md add up to the fleet', () => {
@@ -169,6 +207,32 @@ test('the group sizes stated in README.md add up to the fleet', () => {
   const total = groups.reduce((sum, group) => sum + group.length, 0)
   assert.equal(total, consumers.length, 'the sync groups do not partition the fleet')
 })
+
+/** The leading number in the value cell of FLEET.md's at-a-glance row whose
+ *  label starts with `label`. Throws rather than returning NaN, so a renamed row
+ *  fails loudly instead of comparing NaN and passing nothing. */
+function glanceValue(fleet, label) {
+  const row = fleet.split('\n').find((line) => line.startsWith(`| ${label}`))
+  assert.ok(row, `FLEET.md at-a-glance row "${label}" not found — update this test`)
+  // Cells are split on unescaped pipes only; the Node baseline row escapes its
+  // own `\|\|`, and a naive split would shift every cell after it.
+  const cells = row.split(/(?<!\\)\|/).map((cell) => cell.trim())
+  const value = /^(\d+)\b/.exec(cells[2] ?? '')
+  assert.ok(value, `FLEET.md at-a-glance row "${label}" has no leading number: ${row}`)
+  return Number(value[1])
+}
+
+/** Repo slugs in the first column of every table under "## Fleet members", in
+ *  file order, duplicates kept. */
+function memberRows(fleet) {
+  const start = fleet.indexOf('## Fleet members')
+  const end = fleet.indexOf('## Organisation repos outside the fleet')
+  // Both bounds are checked explicitly. slice() with a -1 end silently runs to
+  // the second-last character, which would pull the outside-the-fleet table in
+  // and report its repos as phantom members instead of naming the real fault.
+  assert.ok(start !== -1 && end > start, 'FLEET.md section headings moved — update this test')
+  return [...fleet.slice(start, end).matchAll(/^\| `([\w.-]+)`/gm)].map((match) => match[1])
+}
 
 /** Consumers per `repos: |` block, in file order. Deliberately a second, simpler
  *  parser than parseFleetFromSyncConfig: that one flattens every block into one

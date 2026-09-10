@@ -137,8 +137,20 @@ token as `GH_INSTALLATION_TOKEN` (App tokens do not work via `GH_PAT`).
 Because the App key equals org-wide write for anyone who can push to this
 repo's `main`: keep `main` here protected, and if the org ever gains a repo
 the sync must never touch, switch the App installation to selected repos.
-The same App token drives the Snyk policy fan-out and the four fleet-scanning
-canaries.
+Six workflows here mint that App token, so all six act with the key's
+org-wide reach:
+
+| Workflow | Uses it to |
+|---|---|
+| `sync.yml` | write the synced files and open the fan-out PRs in every consumer |
+| `snyk-policy-sync.yml` | open the `.snyk` block PRs in every consumer |
+| `promote-v1.yml` | arm auto-merge on waiting fan-out PRs after moving `v1` |
+| `ccc-pin-drift-canary.yml`, `npm-self-override-canary.yml`, `snyk-policy-canary.yml` | read every consumer's manifests and policy (the three fleet-scanning canaries) |
+
+The other two canaries, `ccc-v10-canary.yml` and `v1-drift-canary.yml`, need
+nothing outside this repo and use the repo-scoped `GITHUB_TOKEN`. Any new
+workflow that mints the App token widens what a push to `main` here can do
+across the org, so add it to this table.
 
 ### Reusable workflow access
 
@@ -293,8 +305,9 @@ job, because a canary that fails every week gets muted.
 | `npm-self-override-canary.yml` | Mondays 08:35 UTC | Scans every repo for a package declared both as a direct dependency and as a literal-pinned `overrides` entry; opens an `npm-self-override` issue (that shape aborts Renovate for the whole repo with no visible error) |
 | `snyk-policy-canary.yml` | Mondays 08:44 UTC | Opens or refreshes a `snyk-policy-drift` issue when a consumer's canonical block no longer matches the base, or a repo in `repos.json` is unreadable or unmigrated |
 
-The three fleet-scanning canaries and the Snyk sync mint a sync-App token
-because `GITHUB_TOKEN` is scoped to this repo and cannot read sibling repos.
+The three fleet-scanning canaries mint the sync-App token because
+`GITHUB_TOKEN` is scoped to this repo and cannot read sibling repos. The full
+list of workflows that mint it, and why, is under "The sync GitHub App" above.
 
 ## Troubleshooting
 
