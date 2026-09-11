@@ -42,7 +42,14 @@
 // lift?" against a configuration no release actually uses. Consumers of the
 // synced copy of this file do not import it; the export is inert there.
 export const parserOpts = {
-  noteKeywords: ['BREAKING CHANGE', 'BREAKING CHANGES', 'BREAKING'],
+  // `BREAKING-CHANGE` is the Conventional Commits spec's synonym for
+  // `BREAKING CHANGE`. The preset honours it by default; replacing the default
+  // with a hand-written list dropped it, so a correctly written
+  // `BREAKING-CHANGE:` footer released as a PATCH — the inverse of the prose
+  // trap, and the worse direction, since consumers upgrade automatically into
+  // the break. With notesPattern requiring the colon it cannot match prose such
+  // as "breaking-change handling is unchanged".
+  noteKeywords: ['BREAKING CHANGE', 'BREAKING CHANGES', 'BREAKING-CHANGE', 'BREAKING'],
   notesPattern: (keywords) => new RegExp(`^[\\s|*]*(${keywords}):\\s+(.*)`, 'i'),
   breakingHeaderPattern: /^(\w+)(?:\(([^)]*)\))?!: (.*)$/,
 }
