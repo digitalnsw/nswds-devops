@@ -1,3 +1,9 @@
+## [1.25.4](https://github.com/digitalnsw/nswds-devops/compare/v1.25.3...v1.25.4) (2026-09-11)
+
+### Bug Fixes
+
+* **release:** honour the spec's hyphenated breaking-change footer ([#130](https://github.com/digitalnsw/nswds-devops/issues/130)) ([457fe9f](https://github.com/digitalnsw/nswds-devops/commit/457fe9f2b7662ec9f346d2466981319fddbd3105)), closes [#129](https://github.com/digitalnsw/nswds-devops/issues/129) [#129](https://github.com/digitalnsw/nswds-devops/issues/129) [#129](https://github.com/digitalnsw/nswds-devops/issues/129)
+
 ## [1.25.3](https://github.com/digitalnsw/nswds-devops/compare/v1.25.2...v1.25.3) (2026-09-10)
 
 ### Bug Fixes
