@@ -93,7 +93,7 @@ test('a lowercase footer still counts, deliberately', async () => {
 });
 
 test('the Conventional Commits footers still declare a breaking change', async () => {
-  for (const keyword of ['BREAKING CHANGE', 'BREAKING CHANGES']) {
+  for (const keyword of ['BREAKING CHANGE', 'BREAKING CHANGES', 'BREAKING-CHANGE']) {
     const message = [
       'feat(api): move the endpoint',
       '',
@@ -102,6 +102,19 @@ test('the Conventional Commits footers still declare a breaking change', async (
 
     assert.equal(await releaseTypeFor(message), 'major', keyword + ' must release a major');
   }
+});
+
+test('the hyphenated synonym is prose unless it is a footer', async () => {
+  // `BREAKING-CHANGE` is a keyword now, so the hyphenated phrase in ordinary
+  // prose must stay prose — the colon is what separates the two.
+  const message = [
+    'fix(a): tidy the guard',
+    '',
+    'Some context first.',
+    'breaking-change handling is unchanged here.',
+  ].join('\n');
+
+  assert.notEqual(await releaseTypeFor(message), 'major');
 });
 
 test('a bare BREAKING footer still counts, deliberately', async () => {
