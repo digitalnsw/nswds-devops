@@ -1,7 +1,7 @@
 # digitalnsw Technology Stack
 
 What the fleet is built with: every repo covered by the nswds-devops tooling
-(the 28 consumers in [.github/sync.yml](.github/sync.yml) plus this repo).
+(every consumer in [.github/sync.yml](.github/sync.yml) plus this repo).
 Counts are the number of repos declaring the package in a root or workspace
 `package.json`; a per-repo breakdown is in [FLEET.md](FLEET.md). Not every
 repo uses every item, so each entry says where it applies.
@@ -110,7 +110,7 @@ data, auth and email layer from nswds-app.
 | [tsup](https://tsup.egoist.dev/) | nswds-app, nswds-email-design, nswds-tokens, nswds-ui | Package builds |
 | [Conventional Commits](https://www.conventionalcommits.org/) via [commitlint](https://commitlint.js.org/) 21 + [husky](https://typicode.github.io/husky/) 9 | every fleet repo | Shared config from this repo; [Commit Messages](docs/best-practices/commit-messages.md) |
 | [git-conventional-commits](https://github.com/qoomon/git-conventional-commits) | every fleet repo | The synced YAML, kept in lockstep with `commit-types.mjs` |
-| [semantic-release](https://github.com/semantic-release/semantic-release) 25 | all 29 repos | Conventionalcommits preset pinned to `^9`; publishes to npm in six repos over OIDC trusted publishing; [Releases](docs/best-practices/releases.md) |
+| [semantic-release](https://github.com/semantic-release/semantic-release) 25 | every fleet repo | Conventionalcommits preset pinned to `^9`; publishes to npm in six repos over OIDC trusted publishing; [Releases](docs/best-practices/releases.md) |
 | AI commit, branch and PR-title tooling | every fleet repo | The shared scripts here (`npm run commit`, `npm run branch:suggest`, the ai-pr-title and openai-pr-description workflows), calling the Vercel AI Gateway with secret redaction |
 | Node 24.16.0 (`.nvmrc`), `engine-strict=true` | every fleet repo | `engines.node` `^22.22.2 \|\| >=24.15.0`; npm majors blocked in Renovate until the platform bundles them |
 

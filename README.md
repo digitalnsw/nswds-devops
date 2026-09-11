@@ -4,7 +4,7 @@ The single source of truth for the build tooling shared across the
 `digitalnsw` repositories: the commit, branch and PR shell scripts, the
 commitlint and semantic-release configs, the husky hook sources, the CI
 workflows, the Renovate policy and the Snyk policy. These files live here once
-and propagate to 28 consumer repositories automatically.
+and propagate to every consumer repository automatically.
 
 | Document | Read it when |
 |---|---|
@@ -41,7 +41,7 @@ jobs:
 ```
 
 Stubs that need a secret map it explicitly; `secrets: inherit` is never used.
-Moving the `v1` tag changes CI for all 28 consumer repos at once, with no PRs.
+Moving the `v1` tag changes CI for every consumer repo at once, with no PRs.
 That is why the tag is ruleset-protected and only moves through the
 **Promote v1** workflow, behind a reviewer gate, after CI here is green.
 
@@ -100,7 +100,7 @@ be overwritten, and `.github/sync.yml` encodes this as groups:
 
 | Group | Repos | What is different |
 |---|---|---|
-| 1 | the 20 repos not listed below | full set: scripts, all four configs, `renovate.json`, `.nvmrc`, `.npmrc`, all eight stubs |
+| 1 | every repo not listed below | full set: scripts, all four configs, `renovate.json`, `.nvmrc`, `.npmrc`, all eight stubs |
 | 2a | nswds-ui | keeps its own `release.yml` and release config (monorepo publish with verification); takes the `.npmrc-nswds-ui` variant |
 | 2b | nswds-tokens | keeps its own `release.yml`, release config and `ci.yml`; the shared CI stub lands as `shared-ci.yml` |
 | 2c | nswds-eslint-config, nswds-metadata, nswds-prettier-config | keep their own `release.yml` (OIDC trusted publishing), release config and `ci.yml`; shared CI stub lands as `shared-ci.yml` |
@@ -183,11 +183,13 @@ manual; see [MAINTENANCE.md](MAINTENANCE.md).
 npm test    # unit tests for tools/, release.config.mjs, .github/scripts/snyk-policy.mjs and test-mode.mjs
 ```
 
-That suite includes `tools/fleet-docs.test.mjs`, which holds the fleet counts
-in this documentation to `.github/sync.yml` and `snyk-policy/repos.json`.
-Adding a repo to the sync without updating FLEET.md and the stated counts
-fails it. It guards size and membership only — no test can tell you whether
-what FLEET.md says *about* a repo is still true.
+That suite includes `tools/fleet-docs.test.mjs`, which holds FLEET.md's fleet
+count, member list and sync-group column to `.github/sync.yml` and
+`snyk-policy/repos.json`. FLEET.md is the only doc that states the fleet size,
+so adding or moving a repo in the sync means updating FLEET.md, and the test
+fails until you do. It also fails if a fleet-size number creeps back into any
+other doc and disagrees. It guards those facts only — no test can tell you
+whether what FLEET.md says *about* a repo is still true.
 
 CI additionally runs shellcheck over every shared script and actionlint over
 the workflows and the stubs (stubs are copied into a scratch tree so

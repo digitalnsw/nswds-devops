@@ -333,12 +333,44 @@ function parseProblems(sectionBody) {
  * comment elsewhere in the file cannot enrol itself.
  */
 function parseFleetFromSyncConfig(yaml) {
-  const repos = new Set();
+  return new Set(parseSyncGroupsFromSyncConfig(yaml).flatMap((group) => group.repos));
+}
+
+/**
+ * The same read as parseFleetFromSyncConfig, kept per `repos: |` block and in
+ * file order: `[{ label, repos }]`, duplicates preserved.
+ *
+ * parseFleetFromSyncConfig is derived from this, so there is one implementation
+ * of which lines count as members. Keeping duplicates is the point: a repo listed
+ * in two groups would receive two conflicting file sets, and the flattened Set
+ * hides that entirely.
+ *
+ * `label` is taken from the `# ── Group 2a: …` heading comment above the block,
+ * the convention .github/sync.yml uses, or null when a block has none. It lets a
+ * reader check which group a repo is documented as being in.
+ *
+ * A target may carry a branch (`digitalnsw/repo@develop`), which
+ * repo-file-sync-action accepts; it is read as the repo it names. The member
+ * pattern used to reject that form and drop the repo without a word, undercounting
+ * the fleet.
+ */
+function parseSyncGroupsFromSyncConfig(yaml) {
+  const groups = [];
+  let current = null;
   let blockIndent = null;
+  let pendingLabel = null;
 
   for (const line of yaml.split('\n')) {
+    const heading = /^\s*#\s*──\s*Group\s+(\S+?):?\s/.exec(line);
+    if (heading) {
+      pendingLabel = heading[1];
+      continue;
+    }
     if (/^\s*-?\s*repos:\s*\|/.test(line)) {
       blockIndent = line.search(/\S/);
+      current = { label: pendingLabel, repos: [] };
+      pendingLabel = null;
+      groups.push(current);
       continue;
     }
     if (blockIndent === null) continue;
@@ -349,10 +381,10 @@ function parseFleetFromSyncConfig(yaml) {
       blockIndent = null;
       continue;
     }
-    const match = /^([\w.-]+\/[\w.-]+)$/.exec(line.trim());
-    if (match) repos.add(match[1]);
+    const match = /^([\w.-]+\/[\w.-]+)(?:@[^\s@#]+)?$/.exec(line.trim());
+    if (match) current.repos.push(match[1]);
   }
-  return repos;
+  return groups;
 }
 
 async function loadFleet(fleetConfig) {
@@ -1022,6 +1054,7 @@ export {
   parseCheckboxes,
   parseFleetFromSyncConfig,
   parseProblems,
+  parseSyncGroupsFromSyncConfig,
   renderHtml,
   shouldIgnore,
   splitSections,

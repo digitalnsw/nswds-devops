@@ -476,8 +476,13 @@ Then continue from Path A step 2, skipping anything the repo already has.
 
 ## Coverage
 
-All 28 consumer repos are on the sync. The fleet-wide expectations this doc
-targets (ruleset contexts, Snyk gating, format gate, engines range, Snyk
-policy block) are live on every member except the drift recorded under
-[FLEET.md open issues](FLEET.md#open-issues); a new repo should arrive at the
-same end state.
+Every repo in FLEET.md's member tables is on the sync. The end state this doc
+targets is the eight ruleset contexts from steps 7 and 10, the format gate,
+the engines floor and the Snyk policy block. The existing fleet does not all
+meet it yet: most repos predate the typecheck job and do not require
+`install / typecheck`, and a few lack the Snyk gates. Every such gap is
+recorded under [FLEET.md open issues](FLEET.md#open-issues), or, where the
+divergence is sanctioned, in the exceptions register in
+[MAINTENANCE.md](MAINTENANCE.md). Anything recorded in neither should be
+treated as drift. A new repo should arrive at the full end state, not at what
+the rest of the fleet has today.
