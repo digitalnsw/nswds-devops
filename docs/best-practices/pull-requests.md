@@ -2,10 +2,12 @@
 
 Everything reaches `main` through a PR, and `main` is protected everywhere:
 the "Protect main" ruleset blocks branch deletion and force-pushes and
-requires **`commitlint / commitlint`** and **`install / install`** to pass
-on the PR's test merge, with the branch **up to date with main** (strict
-policy). Repository admins and the release deploy key are the only bypass
-actors.
+requires **`commitlint / commitlint`** and the **`install / *`** jobs
+(`install`, `lint`, `test`, `format`) to pass on the PR's test merge, with
+the branch **up to date with main** (strict policy). Most repos also require
+the two Snyk contexts, but four do not yet — check your repo's row in
+nswds-devops' `FLEET.md` rather than assuming. The release deploy key is the
+only bypass actor; repository admins are deliberately not.
 
 ## What the gates buy us
 
@@ -43,8 +45,11 @@ actors.
   issues/tickets, and calls out any breaking changes or manual steps. Avoid
   vague titles like "final changes" or "fix stuff"; the title is the commit
   and the changelog line.
-- Admin bypass is for emergencies, and every bypass should be explainable
-  after the fact.
+- There is no standing admin bypass. If `main` must take a direct push while
+  CI is broken, use `scripts/push-to-protected-branch.sh`, which disables
+  and restores the rulesets around the push so the exception is temporary
+  and auditable (see the bypass policy in
+  [MAINTENANCE.md](../../MAINTENANCE.md)).
 
 ## Stacked pull requests
 

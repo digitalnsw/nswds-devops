@@ -1,42 +1,69 @@
 # Config single source of truth
 
-Six config files had drifted across the fleet with no canonical version:
-`.nvmrc`, `.npmrc`, `.gitignore`, `eslint.config.mjs`, `.prettierrc`,
-`.prettierignore`. This establishes one source of truth for each and a rollout
-plan to converge the fleet (24 consumer repos) onto it.
+Where each root config file that every fleet repo carries is owned, and how
+it reaches the repos. There are three delivery mechanisms, because the
+file-sync action (`BetaHuhn/repo-file-sync-action`) overwrites the whole
+destination file: fine for files that are identical fleet-wide, destructive
+for files that carry legitimate per-repo content.
 
-The files split into three distribution mechanisms, because the file-sync action
-(`BetaHuhn/repo-file-sync-action`) **overwrites the whole destination file** —
-fine for files that are identical fleet-wide, destructive for files that carry
-legitimate per-repo content.
+| File | Mechanism | Canonical source | Status |
+|---|---|---|---|
+| `.nvmrc` | A: whole-file sync | `repo-files/.nvmrc` (`24.16.0`) | Synced to all groups |
+| `.npmrc` | A: whole-file sync | `repo-files/.npmrc`; `repo-files/.npmrc-nswds-ui` for nswds-ui and nswds-email-design | Synced to all groups |
+| `renovate.json` | A: whole-file sync | `repo-files/renovate.json` | Synced to all groups |
+| `eslint.config.mjs` | B: npm package | `@nswds/eslint-config` | Adopted (see exceptions) |
+| `.prettierrc` | B: npm package | `@nswds/prettier-config` | Adopted fleet-wide |
+| `.snyk` | C: block sync | `snyk-policy/base.snyk` | Delivered to all 29 repos |
+| `.gitignore` | C | `repo-files/.gitignore` (base only) | **No delivery mechanism** (open issue) |
+| `.prettierignore` | C | `repo-files/.prettierignore` (base only) | **No delivery mechanism** (open issue) |
 
-## Mechanism A — whole-file sync (`repo-files/` → root)
+## Mechanism A: whole-file sync
 
-For files that are (or should be) byte-identical everywhere.
+For files that are byte-identical everywhere. Mapped in `.github/sync.yml`
+from `repo-files/` to the repo root.
 
-| File | Canonical | Notes |
-|------|-----------|-------|
-| `.nvmrc` | `24.16.0` | Full pin. **Synced — all groups.** The earlier caveat about dtl-sandbox and nswds-tokens running Node 22 is resolved: every repo in the map is on `24.16.0`. |
-| `.npmrc` | `engine-strict=true` | **Synced — all groups.** **nswds-ui takes a variant source** (`repo-files/.npmrc-nswds-ui`), because it needs `provenance=false`: npm only supports provenance for public source repos, and a whole-file sync of the canonical would strand its releases as git tags that never reach npm (as v1.8.0–v2.1.0 were). |
+**`.nvmrc`** pins `24.16.0` in every repo. The reusable workflows read it
+for every Node setup step.
 
-`.gitignore` and `.prettierignore` **also** live in `repo-files/` as a canonical
-**base**, but they are NOT clean whole-file syncs — see Mechanism C.
+**`.npmrc`** sets `engine-strict=true`, which turns the `engines` floor in
+`package.json` (`^22.22.2 || >=24.15.0`) into a hard install error instead of
+a warning. Nothing else enforces the floor: CI takes its Node version solely
+from `.nvmrc`, so without this an `.nvmrc` edit below the floor would install
+and pass CI silently. Keep `engines` in step with `.nvmrc`.
 
-## Mechanism B — shared npm packages (extend, don't copy)
+nswds-ui and nswds-email-design take the `repo-files/.npmrc-nswds-ui`
+variant, which adds `provenance=false`. npm only supports provenance
+attestation for public source repositories; with it enabled on a private
+repo every publish fails with E422 and releases strand as git tags that never
+reach npm. nswds-email-design is private. nswds-ui is now public, so its use
+of the variant is a pending decision recorded in
+[MAINTENANCE.md](../MAINTENANCE.md#decisions-required).
 
-For config that every repo needs but each may extend. Copying a file can't
-express "shared base + local override"; an npm package can.
+## Mechanism B: shared npm packages
+
+For config that every repo needs but each may extend. A copied file cannot
+express "shared base plus local override"; an npm package can.
 
 | Package | Replaces | Consumer usage | Home |
-|---------|----------|----------------|------|
-| `@nswds/eslint-config` | per-repo `eslint.config.mjs` | `export default [...nswds, globalIgnores(['repo-specific/**'])]` | [digitalnsw/nswds-eslint-config](https://github.com/digitalnsw/nswds-eslint-config) |
-| `@nswds/prettier-config` | per-repo `.prettierrc` | `"prettier": "@nswds/prettier-config"` in `package.json`, or a `.prettierrc.mjs` that extends it — see below | [digitalnsw/nswds-prettier-config](https://github.com/digitalnsw/nswds-prettier-config) |
+|---|---|---|---|
+| `@nswds/eslint-config` (1.1.2) | per-repo `eslint.config.mjs` | `export default defineConfig([...nswds, globalIgnores(['repo-specific/**'])])`, or `@nswds/eslint-config/base` for non-Next repos | [digitalnsw/nswds-eslint-config](https://github.com/digitalnsw/nswds-eslint-config) |
+| `@nswds/prettier-config` (1.0.1) | per-repo `.prettierrc` | `"prettier": "@nswds/prettier-config"` in `package.json`, or a `.prettierrc.mjs` that extends it | [digitalnsw/nswds-prettier-config](https://github.com/digitalnsw/nswds-prettier-config) |
 
-The Prettier package has **two consumer shapes**, because the `package.json` key
-takes a bare package reference and cannot add options on top. Only base-only
-repos can use it — nswds-tokens and the two config packages. Every Tailwind repo needs the
-plugin block and an app-specific `tailwindStylesheet`, so it extends in a
-`.prettierrc.mjs` instead:
+Both repos are public, MPL-2.0 (matching `@nswds/tokens`), release with
+semantic-release over OIDC trusted publishing (no `NPM_TOKEN`), and publish
+`access: "public"`. Each carries a CI smoke test for its own silent-failure
+mode: the ESLint config lints a real JSX file (guards the ESLint 10
+`getFilename` crash through `eslint-config-next`), and the Prettier config
+resolves every option through Prettier's own support info (typo'd keys are
+ignored rather than rejected). Renovate keeps both current in every consumer
+and automerges their minors and patches, because the `install / lint` and
+`install / format` gates measure their whole effect.
+
+The Prettier package has two consumer shapes because the `package.json` key
+takes a bare package reference and cannot add options. Base-only repos use
+the key (nswds-tokens, the config packages, digitalnsw, dtl-sandbox, share).
+Every Tailwind repo needs the plugin block and an app-specific
+`tailwindStylesheet`, so it extends in a `.prettierrc.mjs`:
 
 ```js
 import base from '@nswds/prettier-config' with { type: 'json' }
@@ -51,246 +78,90 @@ const config = {
 export default config
 ```
 
-Assign to a variable rather than exporting the object literal: repos lint their
-own `.prettierrc.mjs`, and the literal form warns under
-`import/no-anonymous-default-export`, which `@nswds/eslint-config` inherits from
-`eslint-config-next/core-web-vitals`.
+Assign to a variable rather than exporting the object literal: repos lint
+their own `.prettierrc.mjs`, and the literal form warns under
+`import/no-anonymous-default-export`, which `@nswds/eslint-config` inherits
+from `eslint-config-next/core-web-vitals`.
 
-**Both packages have moved out of this repo**, and `packages/` is gone. Neither
-could ever be published from here: nswds-devops is `"private": true` at the root
-and deliberately comments out `@semantic-release/npm`, so it releases a changelog
-and GitHub release but never touches npm. That is why both sat at `0.0.0` with no
-adopters — a "single source of truth" that cannot reach a consumer isn't one.
+Adoption: `@nswds/eslint-config` is used by 17 repos. nswds-tokens keeps a
+bespoke `eslint.config.js` (its header says to converge on `./base` at the
+next change). nswds-ui and nswds-email-design extend through their own
+`@workspace/eslint-config`; nswds-email-design's workspace config depends on
+`@nswds/eslint-config`, nswds-ui's does not. `@nswds/prettier-config` is used
+by 24 repos, including both workspace monorepos through
+`@workspace/prettier-config`. No hand-copied `.prettierrc` remains.
 
-Each now has its own repo mirroring the nswds-tokens release setup:
-semantic-release + `@semantic-release/npm` + OIDC trusted publishing, so there is
-no `NPM_TOKEN` to rotate or leak. Both publish `access: "public"`, matching
-`@nswds/tokens`; `restricted` would have needed a paid npm org plan plus registry
-auth in every consumer's CI, which none of them have.
+## Mechanism C: base plus repo-specific tail
 
-Both carry a CI test that guards their specific silent-failure mode — the ESLint
-config lints a real JSX file (the ESLint 10 `getFilename` crash), and the
-Prettier config resolves every option through Prettier's own support info (typo'd
-keys are ignored rather than rejected).
+For files with a large common core where every repo legitimately appends
+its own entries. There is no "extends" for ignore files, and a whole-file
+sync would delete each repo's tail. The convention is a canonical block at
+the top of the file, then a `# repo-specific` marker, then the repo's own
+lines below it.
 
-Both new repos are **MPL-2.0**, matching `@nswds/tokens`, so the whole `@nswds/*`
-scope is consistent. The packages previously declared `ISC` — inherited from this
-repo's root rather than chosen for a published package. Relicensed before either
-was published, so there is no prior distribution under ISC to reconcile.
+### `.snyk` (delivered)
 
-## Mechanism C — base + repo-specific tail (`.gitignore`, `.prettierignore`, `.snyk`)
+The canonical block lives in [`snyk-policy/base.snyk`](../snyk-policy/base.snyk)
+and ends with a `  # repo-specific` marker. `.github/scripts/snyk-policy.mjs`
+rewrites everything down to and including that marker and copies the tail
+through byte-for-byte; it never parses, reorders or reformats the tail, so a
+repo cannot lose policy it owns. The only byte it may add is a trailing
+newline. Delivery is one PR per repo on a `chore/repo-sync/snyk-policy`
+branch, driven by `.github/workflows/snyk-policy-sync.yml` when the base
+changes, with `.github/workflows/snyk-policy-canary.yml` probing weekly for
+drift. Consumers are declared in [`snyk-policy/repos.json`](../snyk-policy/repos.json);
+all 29 fleet repos (the 28 consumers plus nswds-devops) are plain keys, and
+no `migrate` directive remains. `.snyk` stays absent from `.github/sync.yml`
+on purpose: the block sync is a different mechanism, not an exception to the
+whole-file constraint. Operating detail: [snyk-policy/README.md](../snyk-policy/README.md).
 
-These have a large common core but every repo legitimately appends its own
-build-output/generated-file ignores. There is no "extends" mechanism for ignore
-files, and a whole-file sync would delete each repo's tail.
+What the base contains:
 
-Convention: the synced canonical block sits at the top under a
-`# ── Canonical base (synced from nswds-devops) ──` header; repo-specific lines
-go **below** a `# repo-specific` header. Because sync is whole-file, we do **not**
-add these to the sync map as-is. Options, to decide during rollout:
+- Enumerated licence acceptances for weak-copyleft (MPL-2.0, LGPL-3.0) and
+  permissive (Artistic-2.0) findings on unmodified, transitively-installed
+  build and runtime libraries: the sharp/libvips platform binaries via next,
+  the lightningcss platform binaries via Tailwind, axe-core, npm bundled
+  inside semantic-release, and the `@nswds/*` packages.
+- Scoped vulnerability acceptances for the npm-vendored undici advisories,
+  scoped `* > npm > * > undici` and expiring 2026-12-31.
+- **No `'*:lic:*'` catch-all.** Snyk matches ignore keys as exact issue IDs
+  and does not support globs, so a catch-all is dead config that reads as
+  protection. Licence findings must be enumerated.
+- **No nanoid CWE-835 ignores.** Every repo resolves the postcss-introduced
+  nanoid to 3.3.17 or 3.3.18, which carry both fixes, and scanning with
+  `--ignore-policy` reports no nanoid findings. Do not re-add them
+  speculatively; if either advisory returns, re-triage on the evidence at
+  that time.
 
-- **C1 (recommended):** land the base in every repo once (manually or via a
-  one-off scripted PR), then keep them honest with a CI check that asserts the
-  canonical block is present and unmodified — rather than a destructive sync.
-- **C2:** move the common ignores into each repo's `.git/info/exclude` or a
-  tool-level ignore that sync owns, leaving the committed `.gitignore` for
-  repo-specific entries only.
-
-The canonical base for both is in `repo-files/.gitignore` and
-`repo-files/.prettierignore`. The `.gitignore` base normalizes the
-`.claude` vs `/.claude` split, folds in the AI-tooling and Snyk-output ignores
-several repos already carry, and includes `*.err`.
-
-### `.snyk` — Mechanism C, resolved as a block sync (C3)
-
-`.snyk` is a Mechanism C file for the same reason as the ignore files, and it
-is the one where the choice has actually been made. The C1/C2 options above
-were never rolled out, and the cost showed: the same policy change had to be
-written by hand in four repos on 2026-08-31, and only three repos ever received
-the enumerated licence list at all.
-
-**The mechanism.** The canonical block lives in
-[`snyk-policy/base.snyk`](../snyk-policy/base.snyk) and ends with a
-`  # repo-specific` marker. `.github/scripts/snyk-policy.mjs` rewrites
-everything down to and including that marker and copies the tail through
-byte-for-byte — it never parses, reorders or reformats the tail, so a repo
-cannot lose policy it owns. The only byte it may add is a trailing newline
-when the file would otherwise not end in one. Delivery is one PR per repo on a
-`chore/repo-sync/snyk-policy` branch, driven by
-`.github/workflows/snyk-policy-sync.yml` when the base changes, with
-`.github/workflows/snyk-policy-canary.yml` probing weekly for drift the
-fan-out would not otherwise notice.
-
-This is why `.snyk` is still absent from `.github/sync.yml`: the constraint
-that ruled out a whole-file sync has not gone away. The block sync is a
-different mechanism, not an exception to it.
-
-**Consumers and one-time migrations** are declared in
-[`snyk-policy/repos.json`](../snyk-policy/repos.json). A repo written before
-the convention existed carries a `migrate` directive saying how to derive its
-tail once, and the `fromSha` of the blob it was written against. It
-**disarms itself**: `selectTail()` runs a directive only on an exact SHA
-match, so it can fire at most until the first fan-out merges and never again.
-
-Both halves of that rule are load-bearing. A directive has to beat the marker
-early, because several repos put the marker in the wrong place: reviewers and
-nswds-email had it above their licence list, and trusting it there emits those
-28 keys twice. It must stop firing once the repo is converted, because
-re-running a `tail: "none"` directive would then delete any policy the repo
-added below the marker since — the exact loss this mechanism exists to
-prevent.
-
-The gate is an immutable blob SHA rather than anything read out of the file,
-because file contents are exactly what an errant consumer edit changes:
-inferring "already converted" from a generated-header sentinel meant that
-deleting that sentinel made a spent directive look live again. A forgotten
-entry in `repos.json` is therefore harmless; `--check` reports spent
-directives so they can be tidied up, and a directive whose SHA no longer
-matches a file that is not in canonical shape is refused rather than guessed
-at.
-
-`selectTail()` is exported and used by both `evaluate()` and the fan-out, so
-there is one implementation of the rule and the tests exercise the real one.
-
-**What the base contains, as of 2026-09-07.** Twenty-eight enumerated licence
-acceptances and three scoped vulnerability acceptances — the npm-vendored
-undici advisories added in #119, scoped `* > npm > * > undici` and expiring
-2026-12-31:
-
-- **Licence acceptances** — weak-copyleft (MPL-2.0 / LGPL-3.0) and permissive
-  (Artistic-2.0) findings on unmodified, transitively-installed build and
-  runtime libraries: the sharp/libvips platform binaries via next, the
-  lightningcss platform binaries via Tailwind, axe-core, npm bundled inside
-  semantic-release, and our own `@nswds/*` packages. Reviewers, attestation and
-  engagement already carried this list, byte-identical; it is now the base.
-  Repos that lacked it were failing those findings — nswds-design reported 12
-  live licence findings with a policy that ignored only dead entries.
-- **No `'*:lic:*'` catch-all, ever.** Snyk matches ignore keys as exact issue
-  IDs and does not support globs, so a catch-all is dead config that reads as
-  protection. Four repos carried one; the enumerated list replaces it.
-- **The two nanoid CWE-835 ignores are gone.** They are obsolete, not expired.
-  Verified resolution across the fleet (`package-lock.json`, 2026-09-04): every
-  repo resolves the postcss-introduced nanoid to **3.3.17 or 3.3.18** — most to
-  3.3.18, with nswds-app carrying both (one nested copy each) plus a direct
-  6.0.1 of its own. Nothing anywhere is still on the 3.3.16 the advisories were
-  written against. Snyk has since corrected the affected range, and a scan of
-  nswds-design with `--ignore-policy` reports zero nanoid findings. Attestation
-  and engagement removed them on 2026-08-31 on that evidence. Do not re-add
-  them speculatively — if either advisory returns it should be re-triaged on
-  the evidence at that time.
-
-  This is the same inventory `snyk-policy/base.snyk` records ("3.3.17 and
-  3.3.18 under postcss"); state it the same way in both places. These versions
-  are the justification for deleting security ignores, so two differing fleet
-  inventories would undermine the decision.
-
-**Genuinely repo-owned policy that the tail preserves**: nswds-email-framework
-excludes its generated `docs/` and `build_local/` from Snyk Code (~7,000 files;
+Repo-owned policy that the tail preserves: nswds-email-framework excludes
+its generated `docs/` and `build_local/` from Snyk Code (about 7,000 files;
 without it a root scan times out), nswds-tokens accepts a `javascript/PT`
 finding in one developer script, nswds-app accepts two transitive postcss
-advisories, and dtl-sandbox path-scopes js-yaml and the npm bundle. An earlier
-version of this document attributed the Snyk Code exclude to nswds-ui; that was
-wrong — nswds-ui carried only the obsolete nanoid entries.
+advisories, and dtl-sandbox path-scopes js-yaml and the npm bundle.
 
-dtl-sandbox was the one repo the fan-out could not convert: its path-scoping
-rationale was top-of-file prose sitting above `ignore:`, which the canonical
-block now owns, so re-homing it into the tail was a judgement call rather than
-a mechanical move. Converted by hand in digitalnsw/dtl-sandbox#54 — the prose
-moved into the tail with the entries it explains, and its local Artistic-2.0
-acceptance was dropped in favour of the canonical one (the same key twice is a
-duplicate; `'*'` is the right scope for a licence finding, since a licence is a
-property of the package rather than of the route taken to it).
+### `.gitignore` and `.prettierignore` (not delivered)
 
-**As at 2026-09-04 all 13 consumers of that round are converted and `--check`
-reports `13 in sync · 0 to change · 0 need attention`.** No `migrate` directive
-remains from it; each one disarmed itself as its migration merged and the check
-named it for removal.
+The canonical bases are `repo-files/.gitignore` and `repo-files/.prettierignore`.
+The `.gitignore` base normalises the `.claude` versus `/.claude` split, folds
+in the AI-tooling and Snyk-output ignores, and includes `*.err`. Neither file
+is in the sync map, and nothing checks that a repo's file matches the base.
 
-**2026-09-07:** ten more repos were enrolled, taking the fleet to 23 consumers.
-All ten had no `.snyk` at all, so the sync creates each file and none needed a
-migrate directive.
+## Open issues
 
-**2026-09-07 (second round):** the last six — `data`, `nswds-community`,
-`nswds-email-builder`, `nswds-eslint-config`, `nswds-public-sans` and
-`nswds-signature` — were enrolled as **plain keys**, bringing the whole 29-repo
-fleet under canonical policy. No `migrate` directive was needed: each already
-ends with the `  # repo-specific` marker and carries nothing after it, so
-`selectTail` returns `steady` with an empty tail. Calling `selectTail` and
-`compose` directly confirms a bare key and a `tail: "none"` directive render
-byte-identical files — and the directive would have been strictly worse, since
-these files predate the `generated from nswds-devops` sentinel, so a blob that
-moved before the fan-out evaluated it would have been REFUSED rather than
-synced.
+**Ignore files have no delivery mechanism.** `.gitignore` and
+`.prettierignore` drift freely across the fleet. The intended fix is to reuse
+the `.snyk` block sync unchanged: the same base plus marker plus preserved
+tail shape, the same fan-out and canary, generalised from `snyk-policy.mjs`
+to take the file name and base as parameters. No new machinery is needed.
+Until then, a new repo copies the base by hand (ONBOARDING.md steps 2 and 3).
 
-Their two nanoid ignores go with the rest of the pre-canonical block, losing
-nothing: all six resolve nanoid 3.3.18, which carries both fixes — `-894` was
-backported in 3.3.16, and `-897`'s `customRandom` size guard landed in 3.3.17.
-Scanning all six with `--ignore-policy` confirms neither advisory still fires.
+## Repos excluded from convergence
 
-## Rollout phases
-
-1. **Phase 1 (this PR):** establish the canonical files + packages + this plan
-   in nswds-devops. No `sync.yml` change — merging does not touch other repos.
-2. **Phase 2 — `.nvmrc` / `.npmrc`: done.** `.nvmrc` was mapped in every group
-   during the original rollout, and every repo now reports `24.16.0`, which
-   resolved the Node-22 caveat. `.npmrc` is mapped as of this change: 21 repos
-   take `repo-files/.npmrc`, and nswds-ui takes `repo-files/.npmrc-nswds-ui`
-   so its `provenance=false` survives.
-
-   Adding `engine-strict=true` to the 12 repos that lacked it is safe today —
-   every repo's `.nvmrc` (`24.16.0`) satisfies its own declared `engines.node`,
-   so nothing that installed before stops installing. It is load-bearing going
-   forward: it converts a silently-ignored `engines` warning into a failure in
-   the `install / install` job that rulesets already require.
-3. **Phase 3 — packages: done.** Both are published and adopted fleet-wide;
-   the first-publish/OIDC bootstrap described above is complete, so every merge
-   to `main` in either package repo now publishes itself.
-
-   - **`@nswds/eslint-config` (1.0.2)** — adopted by 13 repos. Each dropped its
-     local `eslint.config.mjs` body *and* its `@eslint/compat`
-     `fixupConfigRules` wrapper; the shim lives in the package. nswds-tokens and
-     nswds-ui are the two non-adopters: tokens is not a Next app, and nswds-ui
-     extends via its internal `@workspace/eslint-config`.
-   - **`@nswds/prettier-config` (1.0.1)** — adopted by all 15 repos. No
-     hand-copied `.prettierrc` remains anywhere in the fleet. 13 Tailwind repos
-     use the `.prettierrc.mjs` extend form, nswds-tokens uses the `package.json`
-     key, and nswds-ui extends through `@workspace/prettier-config`.
-
-   **Zero files were reformatted.** Every repo's `.prettierrc` was already
-   byte-identical to the package's `index.json`, so this was pure
-   de-duplication. Each migration was gated on two checks: `prettier
-   --list-different` identical before and after, and `resolveConfig()` on a
-   source file exactly equal to the deleted `.prettierrc`. Note the first check
-   is *unchanged*, not *empty* — most repos have a non-empty baseline
-   (`CHANGELOG.md`, drizzle metadata, generated token output are not formatted),
-   so "empty" would be the wrong pass condition and would have falsely blocked
-   correct changes.
-
-   Renovate keeps both packages current from here.
-4. **Phase 4 — ignore files:** roll out the `.gitignore` / `.prettierignore`
-   base via the chosen Mechanism-C approach. Still open — the only phase that
-   is. The completed `.snyk` block sync (Phase 5) is the worked example to copy: same base + marker + preserved tail
-   shape, same fan-out and canary, and it needs no new machinery to reuse.
-5. **Phase 5 — `.snyk`: done, 2026-09-04.** `snyk-policy/` holds the base and
-   the consumer map, `.github/scripts/snyk-policy.mjs` renders and delivers it,
-   and the sync + canary workflows are wired. The first fan-out opened twelve
-   PRs (three drift-only, nine one-time migrations); all twelve merged, each
-   verified byte-identical to its pre-merge render with every repo-owned entry
-   intact. dtl-sandbox, which the fan-out could not convert mechanically, was
-   converted by hand in digitalnsw/dtl-sandbox#54. Every `migrate` directive
-   disarmed itself as its migration merged and has been removed, so
-   `snyk-policy/repos.json` is now a plain consumer list.
-
-   `--check` reports `13 in sync · 0 to change · 0 need attention`.
-
-   The superseded `repo-files/.snyk` was removed — it was never in the sync map
-   and its two nanoid ignores are obsolete, so leaving it would have offered a
-   second, stale "canonical" file.
-
-## Bespoke repos to exclude from convergence
-
-- **nswds-ui** — monorepo; heavily-commented `.prettierignore`, `.npmrc`
-  `provenance=false`. Extends packages but keeps its own ignore files.
-- **nswds-email-framework** — Maizzle project; its ignores cover Maizzle build
-  artifacts, not Next.js. Not a consumer of the Next-based eslint config.
-- **ictds-portal-flows** — Power Platform; has no eslint/prettier config at all.
+- **nswds-ui**: monorepo; heavily-commented `.prettierignore`, `.npmrc`
+  variant. Extends the packages through workspace configs but keeps its own
+  ignore files.
+- **nswds-email-design**: same shape as nswds-ui.
+- **nswds-email-framework**, **nswds-email-starter**: Maizzle projects;
+  their ignores cover Maizzle build artifacts, not Next.js. Not consumers of
+  the Next-based ESLint entry point.
+- **ictds-portal-flows**: Power Platform; has no ESLint or Prettier config.
