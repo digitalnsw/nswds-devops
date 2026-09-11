@@ -11,6 +11,7 @@ import {
   parseCheckboxes,
   parseFleetFromSyncConfig,
   parseProblems,
+  parseSyncGroupsFromSyncConfig,
   shouldIgnore,
   splitSections,
 } from './renovate-fleet-dashboard.mjs';
@@ -384,4 +385,40 @@ test('a repo named in a comment or a files: block cannot enrol itself', () => {
   assert.equal(fleet.has('digitalnsw/not-a-member'), false);
   // `source: scripts/` style lines sit at deeper indentation but are not slugs.
   assert.equal([...fleet].some((r) => r.includes('scripts')), false);
+});
+
+test('groups keep their blocks apart, their labels, and their duplicates', () => {
+  // The duplicate is the reason this function exists: a repo in two groups gets
+  // two conflicting file sets, and a Set would hide it. Against the real
+  // sync.yml, which has no duplicate, a regression to deduplication passes
+  // everything else — so it is pinned here, on YAML that has one.
+  const groups = parseSyncGroupsFromSyncConfig(`group:
+  # ── Group 1: full set ──
+  - repos: |
+      digitalnsw/a
+      digitalnsw/b
+    files:
+      - source: scripts/
+        dest: scripts/
+  # ── Group 2a: one repo ──
+  # A second comment between heading and block keeps the label.
+  - repos: |
+      digitalnsw/b
+  - repos: |
+      digitalnsw/c
+`);
+  assert.deepEqual(groups, [
+    { label: '1', repos: ['digitalnsw/a', 'digitalnsw/b'] },
+    { label: '2a', repos: ['digitalnsw/b'] },
+    { label: null, repos: ['digitalnsw/c'] },
+  ]);
+});
+
+test('a repo targeted at a branch is still a member, under its repo name', () => {
+  // repo-file-sync-action accepts `repo@branch`. The member pattern used to reject
+  // it and silently drop the repo, which undercounts the fleet.
+  const yaml = '  - repos: |\n      digitalnsw/a\n      digitalnsw/b@develop\n';
+  assert.deepEqual(parseSyncGroupsFromSyncConfig(yaml)[0].repos, ['digitalnsw/a', 'digitalnsw/b']);
+  assert.equal(parseFleetFromSyncConfig(yaml).has('digitalnsw/b'), true);
+  assert.equal([...parseFleetFromSyncConfig(yaml)].some((repo) => repo.includes('@')), false);
 });

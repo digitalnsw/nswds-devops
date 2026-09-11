@@ -110,7 +110,7 @@ newline. Delivery is one PR per repo on a `chore/repo-sync/snyk-policy`
 branch, driven by `.github/workflows/snyk-policy-sync.yml` when the base
 changes, with `.github/workflows/snyk-policy-canary.yml` probing weekly for
 drift. Consumers are declared in [`snyk-policy/repos.json`](../snyk-policy/repos.json);
-every fleet repo (each consumer plus nswds-devops) are plain keys, and
+every fleet repo (each consumer plus nswds-devops) is a plain key, and
 no `migrate` directive remains. `.snyk` stays absent from `.github/sync.yml`
 on purpose: the block sync is a different mechanism, not an exception to the
 whole-file constraint. Operating detail: [snyk-policy/README.md](../snyk-policy/README.md).

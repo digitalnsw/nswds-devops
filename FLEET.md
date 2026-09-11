@@ -7,11 +7,12 @@ workflows, rulesets, the sync map) and from the GitHub, npm and Vercel
 consoles. When this file and a repository disagree, the repository is right
 and this file needs updating.
 
-The counts and the membership list below are held to `.github/sync.yml` and
-`snyk-policy/repos.json` by `tools/fleet-docs.test.mjs`, so adding a repo to
-the sync without updating this file fails CI. This is the only place the fleet
-size is written down: other docs say "every consumer repo" and link here, so
-adding a repo means updating this file and nothing else. Everything else here — what a
+The counts, the membership list and each member's sync group below are held to
+`.github/sync.yml` and `snyk-policy/repos.json` by `tools/fleet-docs.test.mjs`,
+so adding or moving a repo in the sync without updating this file fails CI.
+This is the only place in the documentation where the fleet size is written
+down: other docs say "every consumer repo" rather than a number, so adding a
+repo means updating this file and no other doc. Everything else here — what a
 repo is for, where it deploys, which checks it requires — is unguarded prose
 that has to be re-verified by hand.
 
@@ -157,13 +158,15 @@ contexts to each ruleset as in ONBOARDING.md step 10.
 
 **Most repos do not require `install / typecheck`.** Only `agile`,
 `dtl-sandbox`, `nswds-email`, `nswds-email-design` and `nswds-ui` require it,
-although new repos get it from onboarding step 7. Most of the rest already
-have a `type-check` or `typecheck` script, so a type error there reaches
-`main` without failing a merge; `install / typecheck` shows it but nothing
-enforces it. Requiring the context is safe on every repo, with or without a
-script, because the job always reports. Fix: add
-`{"context": "install / typecheck"}` to each remaining ruleset, fetching the
-ruleset id and PUTting it back as in ONBOARDING.md step 10.
+although new repos get it from onboarding step 7. `nswds-tokens` is covered
+another way: its ruleset requires its own `Typecheck` check, from its bespoke
+`ci.yml`. Most of the rest have a `type-check` or `typecheck` script but no
+required check that runs it, so a type error there reaches `main` without
+failing a merge; `install / typecheck` shows it but nothing enforces it.
+Requiring the context is safe on every repo, with or without a script, because
+the job always reports. Fix: add `{"context": "install / typecheck"}` to each
+remaining ruleset except `nswds-tokens`, fetching the ruleset id and PUTting
+it back as in ONBOARDING.md step 10.
 
 **`dtl-sandbox` has a `RepositoryRole` bypass actor.** Fleet policy is that
 the release deploy key is the only bypass actor on every ruleset

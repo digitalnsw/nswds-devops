@@ -14,9 +14,10 @@ Applies to `scripts/*`, `commit-types.mjs`, `commitlint.config.mjs`,
 1. Edit here, on a branch, PR into `main`. CI shellchecks the scripts,
    actionlints the workflows, runs the unit tests, and the commit-types-sync
    check keeps the YAML in lockstep with `commit-types.mjs`.
-2. On merge, the sync opens a `chore(ci): …` PR in every consumer repo and
-   turns on GitHub auto-merge for each one, so they merge themselves as their
-   checks go green. Nothing is bypassed: auto-merge waits on the same
+2. On merge, the sync opens a `chore(ci): …` PR in every consumer repo whose
+   group receives the changed file, and turns on GitHub auto-merge for each
+   one, so they merge themselves as their checks go green. Nothing is
+   bypassed: auto-merge waits on the same
    "Protect main" ruleset a human merge waits on, and a repo whose checks go
    red keeps its PR open for you to look at. The review that matters already
    happened on the PR into this repo; the fan-out is a mechanical copy of that
@@ -348,8 +349,9 @@ Every entry is something that has actually happened.
 - Sync PRs are armed for auto-merge; they still wait on every required
   check, and a red one stays open for a human. Review the diff on the PR into
   this repo, not on each fan-out copy.
-- A central change fans out as one PR per consumer repo. Batch central changes rather
-  than merging five small ones in a day.
+- A central change fans out as up to one PR per consumer repo — fewer when
+  the changed file reaches only some groups, as `release.config.mjs` does.
+  Batch central changes rather than merging five small ones in a day.
 - The commit vocabulary (`commit-types.mjs`) and branch vocabulary
   (`branch-name-config.sh`) are fleet-wide decisions. Changing them changes
   policy everywhere; announce before merging.

@@ -183,11 +183,13 @@ manual; see [MAINTENANCE.md](MAINTENANCE.md).
 npm test    # unit tests for tools/, release.config.mjs, .github/scripts/snyk-policy.mjs and test-mode.mjs
 ```
 
-That suite includes `tools/fleet-docs.test.mjs`, which holds the fleet counts
-in this documentation to `.github/sync.yml` and `snyk-policy/repos.json`.
-Adding a repo to the sync without updating FLEET.md and the stated counts
-fails it. It guards size and membership only — no test can tell you whether
-what FLEET.md says *about* a repo is still true.
+That suite includes `tools/fleet-docs.test.mjs`, which holds FLEET.md's fleet
+count, member list and sync-group column to `.github/sync.yml` and
+`snyk-policy/repos.json`. FLEET.md is the only doc that states the fleet size,
+so adding or moving a repo in the sync means updating FLEET.md, and the test
+fails until you do. It also fails if a fleet-size number creeps back into any
+other doc and disagrees. It guards those facts only — no test can tell you
+whether what FLEET.md says *about* a repo is still true.
 
 CI additionally runs shellcheck over every shared script and actionlint over
 the workflows and the stubs (stubs are copied into a scratch tree so
