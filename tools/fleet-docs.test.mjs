@@ -102,11 +102,17 @@ const docs = [
  *  line is a paragraph break and deliberately does not count as a gap. */
 const GAP = String.raw`(?:[ \t]+|[ \t]*\r?\n[ \t]*(?:>[ \t]*)?)`
 
-/** Builds a scanner from a source where each literal space means "a gap". */
-const phrase = (source) => new RegExp(source.replaceAll(' ', GAP), 'g')
+/** Builds a scanner from a source where each literal space means "a gap". The
+ *  scan is case-insensitive, so a sentence- or bullet-leading capital ("All 28
+ *  consumer repos …", the form this repo's sync header itself once used) is
+ *  still caught rather than slipping past a lower-case-only pattern. */
+const phrase = (source) => new RegExp(source.replaceAll(' ', GAP), 'gi')
 
-/** "repos" and "repositories" are the same word here; README uses both. */
-const REPO = String.raw`repo(?:s\b|sitor)`
+/** "repos" and "repositories" are the same word here; README uses both. Matched
+ *  as whole words — not a bare "repositor" prefix — so a following restrictive
+ *  clause reaches NOT_SUBSET: "all 5 consumer repositories that require
+ *  typecheck" reads as a subset, not the whole fleet. */
+const REPO = String.raw`repo(?:s|sitor(?:y|ies))\b`
 
 /** Rejects a match followed directly by a restrictive clause, which makes it a
  *  subset: "all 5 consumer repos that require typecheck". A comma before the
@@ -187,6 +193,9 @@ test('the scanner reads whole-fleet counts, reflowed or not, and ignores subsets
   // scanner still matches, independent of what the docs currently say.
   const reads = [
     ['consumer', 'changes CI for all 28 consumer repos at once', 28],
+    // A sentence- or bullet-leading capital reads the same: the scan is
+    // case-insensitive, so a capitalised restatement cannot slip past.
+    ['consumer', 'All 28 consumer repos are active', 28],
     ['consumer', 'propagate to all 28\n  consumer repositories', 28],
     ['consumer', 'reaches all 28\r\nconsumer repos', 28],
     ['consumer', 'all 28 consumer repos, which the sync targets', 28],
@@ -210,6 +219,9 @@ test('the scanner reads whole-fleet counts, reflowed or not, and ignores subsets
     // clause make it the whole fleet.
     'all 6 repos that publish to npm',
     'all 5 consumer repos that require typecheck',
+    // "repositories" is one whole word, so the restrictive clause still reaches
+    // NOT_SUBSET and this stays a subset rather than a whole-fleet claim.
+    'all 5 consumer repositories that require typecheck',
     'the 3 consumers in group 2c',
     // A group-scoped change can truly fan out to fewer repos than the fleet.
     'a release.config.mjs change fans out to 21 repos',
