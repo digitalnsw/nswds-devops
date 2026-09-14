@@ -54,29 +54,29 @@ All but `agile` deploy on Vercel; it has no Vercel project and no live URL.
 
 | Repo | Purpose | Live URL | Stack notes | Sync group | Required checks (delta) |
 |---|---|---|---|---|---|
-| `agile` | Next.js application using the Vercel AI SDK with Azure OpenAI. README is empty; purpose is not documented in the repo | — | Next 16, `@nswds/ui` 6, `@nswds/tokens` 5, `ai` + `@ai-sdk/azure` | 1 | + `install / typecheck` |
-| `attestation` | Digital Restart Fund (DRF) attestation application | https://projects.digital.nsw.gov.au | Next 16, `@nswds/app` 5 + `@nswds/ui` 6, Better Auth, Drizzle + Neon, Resend, Vitest | 1 | standard |
-| `awards` | Awards nomination and judging application | https://awards.digital.nsw.gov.au | Next 16, `@nswds/app` 5, Better Auth, Drizzle + Neon, Vercel Analytics | 1 | standard |
-| `engagement` | Engagement application | https://engagement.digital.nsw.gov.au | Next 16, `@nswds/app` 5, Better Auth, Drizzle + Neon, Resend, Vitest | 1 | standard |
-| `reviewers` | ICT Project Assurance expert reviewer application | https://reviewers.digital.nsw.gov.au | Next 16, `@nswds/app` 5, Better Auth, Drizzle + Neon, Resend, Vercel Blob | 1 | standard |
-| `nswds-email` | NSW Email Toolkit documentation site, component showcase and signature builder | https://email.digital.nsw.gov.au | Next 16, `@nswds/app` 5 + `@nswds/ui` 6, Better Auth, Drizzle + Neon, PostHog, Vercel Analytics; bespoke editorial, soft-404 and variant-HTML guard workflows | 1 | + `install / typecheck` |
-| `nswds-design` | Documentation site for `@nswds/tokens`: every token by name, value and use, with colour tools | https://design.digital.nsw.gov.au | Next 16, `@nswds/ui` 6, Vitest 5 | 1 | standard |
+| `agile` | Next.js application using the Vercel AI SDK with Azure OpenAI. README is empty; purpose is not documented in the repo | — | Next 16, `@nswds/ui`, `@nswds/tokens`, `ai` + `@ai-sdk/azure` | 1 | + `install / typecheck` |
+| `attestation` | Digital Restart Fund (DRF) attestation application | https://projects.digital.nsw.gov.au | Next 16, `@nswds/app` + `@nswds/ui`, Better Auth, Drizzle + Neon, Resend, Vitest | 1 | standard |
+| `awards` | Awards nomination and judging application | https://awards.digital.nsw.gov.au | Next 16, `@nswds/app`, Better Auth, Drizzle + Neon, Vercel Analytics | 1 | standard |
+| `engagement` | Engagement application | https://engagement.digital.nsw.gov.au | Next 16, `@nswds/app`, Better Auth, Drizzle + Neon, Resend, Vitest | 1 | standard |
+| `reviewers` | ICT Project Assurance expert reviewer application | https://reviewers.digital.nsw.gov.au | Next 16, `@nswds/app`, Better Auth, Drizzle + Neon, Resend, Vercel Blob | 1 | standard |
+| `nswds-email` | NSW Email Toolkit documentation site, component showcase and signature builder | https://email.digital.nsw.gov.au | Next 16, `@nswds/app` + `@nswds/ui`, Better Auth, Drizzle + Neon, PostHog, Vercel Analytics; bespoke editorial, soft-404 and variant-HTML guard workflows | 1 | + `install / typecheck` |
+| `nswds-design` | Documentation site for `@nswds/tokens`: every token by name, value and use, with colour tools | https://design.digital.nsw.gov.au | Next 16, `@nswds/ui`, Vitest 5 | 1 | standard |
 | `nswds-community` | Community site | https://community.digital.nsw.gov.au | Next 16 | 1 | standard |
 | `data` (local folder `nswds-data`) | Data site | https://data.digital.nsw.gov.au | Next 16 | 1 | standard |
-| `nswds-public-sans` | Download and specimen site for Public Sans, the NSW masterbrand typeface | — (Vercel project `nswds-public-sans`) | Next 16, `@nswds/ui` 6, PostHog, Vercel Analytics | 1 | standard |
+| `nswds-public-sans` | Download and specimen site for Public Sans, the NSW masterbrand typeface | — (Vercel project `nswds-public-sans`) | Next 16, `@nswds/ui`, PostHog, Vercel Analytics | 1 | standard |
 | `nswds-signature` | Email signature generator | https://signature.digital.nsw.gov.au | Next 16 | 1 | standard |
-| `risk-guidance` | Risk assessment guidance tool | https://risk-guidance.vercel.app | Next 16, `@nswds/ui` 6 | 1 | standard, **no Snyk contexts** (see open issues) |
+| `risk-guidance` | Risk assessment guidance tool | https://risk-guidance.vercel.app | Next 16, `@nswds/ui` | 1 | standard, **no Snyk contexts** (see open issues) |
 
 ### Design system and shared packages (publish to npm)
 
 | Repo | Publishes | Purpose | Deploys | Sync group | Required checks (delta) |
 |---|---|---|---|---|---|
-| `nswds-ui` (public) | `@nswds/ui` 7.0.2 | Design system source monorepo: the `@nswds/ui` package (Base UI primitives, shadcn pattern) plus a shadcn registry, Storybook and a docs site. Turborepo workspaces `apps/*`, `packages/*`; only `packages/ui` publishes | Vercel: `nswds-ui-web`, `nswds-ui-storybook`, `nswds-ui-registry`; Chromatic visual regression | 2a (own `release.yml` + release config, `.npmrc` variant) | + `install / typecheck`, `Lint, Typecheck & Storybook a11y` |
-| `nswds-tokens` (public) | `@nswds/tokens` 5.0.0 | Design tokens (colour, spacing, typography, and so on) for CSS, SCSS, Less, JS/TS, JSON, Tailwind, Figma and DTCG; Figma sync workflows | — | 2b (own `release.yml`, release config and `ci.yml`; shared gate lands as `shared-ci.yml`) | + `Check dist artifacts`, `Lockfile`, `Package surface`, `Typecheck`, `Validate tokens` |
-| `nswds-app` | `@nswds/app` 5.0.1 | Previous-generation application design system (Radix primitives, Storybook). Superseded by `@nswds/ui`; still consumed by attestation, awards, engagement, nswds-email and reviewers | Vercel: `nswds-app`, `nswds-app-storybook` | 3 (own release config, stock release stub) | standard |
-| `nswds-eslint-config` (public) | `@nswds/eslint-config` 1.1.2 | Shared ESLint flat config: `.` entry point for Next.js apps, `./base` for everything else | — | 2c | + `Config smoke test` |
-| `nswds-prettier-config` (public) | `@nswds/prettier-config` 1.0.1 | Shared Prettier options | — | 2c | + `Config smoke test` (ruleset is named "Protect default branch") |
-| `nswds-metadata` (public) | `@nswds/metadata` 1.1.2 | Shared Next.js App Router metadata, viewport and web manifest | — | 2c | `Package smoke test`; **no Snyk contexts** (see open issues) |
+| `nswds-ui` (public) | `@nswds/ui` [![npm](https://img.shields.io/npm/v/@nswds/ui?label=)](https://www.npmjs.com/package/@nswds/ui) | Design system source monorepo: the `@nswds/ui` package (Base UI primitives, shadcn pattern) plus a shadcn registry, Storybook and a docs site. Turborepo workspaces `apps/*`, `packages/*`; only `packages/ui` publishes | Vercel: `nswds-ui-web`, `nswds-ui-storybook`, `nswds-ui-registry`; Chromatic visual regression | 2a (own `release.yml` + release config, `.npmrc` variant) | + `install / typecheck`, `Lint, Typecheck & Storybook a11y` |
+| `nswds-tokens` (public) | `@nswds/tokens` [![npm](https://img.shields.io/npm/v/@nswds/tokens?label=)](https://www.npmjs.com/package/@nswds/tokens) | Design tokens (colour, spacing, typography, and so on) for CSS, SCSS, Less, JS/TS, JSON, Tailwind, Figma and DTCG; Figma sync workflows | — | 2b (own `release.yml`, release config and `ci.yml`; shared gate lands as `shared-ci.yml`) | + `Check dist artifacts`, `Lockfile`, `Package surface`, `Typecheck`, `Validate tokens` |
+| `nswds-app` | `@nswds/app` [![npm](https://img.shields.io/npm/v/@nswds/app?label=)](https://www.npmjs.com/package/@nswds/app) | Previous-generation application design system (Radix primitives, Storybook). Superseded by `@nswds/ui`; still consumed by attestation, awards, engagement, nswds-email and reviewers | Vercel: `nswds-app`, `nswds-app-storybook` | 3 (own release config, stock release stub) | standard |
+| `nswds-eslint-config` (public) | `@nswds/eslint-config` [![npm](https://img.shields.io/npm/v/@nswds/eslint-config?label=)](https://www.npmjs.com/package/@nswds/eslint-config) | Shared ESLint flat config: `.` entry point for Next.js apps, `./base` for everything else | — | 2c | + `Config smoke test` |
+| `nswds-prettier-config` (public) | `@nswds/prettier-config` [![npm](https://img.shields.io/npm/v/@nswds/prettier-config?label=)](https://www.npmjs.com/package/@nswds/prettier-config) | Shared Prettier options | — | 2c | + `Config smoke test` (ruleset is named "Protect default branch") |
+| `nswds-metadata` (public) | `@nswds/metadata` [![npm](https://img.shields.io/npm/v/@nswds/metadata?label=)](https://www.npmjs.com/package/@nswds/metadata) | Shared Next.js App Router metadata, viewport and web manifest | — | 2c | `Package smoke test`; **no Snyk contexts** (see open issues) |
 
 ### Email toolkit
 
@@ -179,21 +179,8 @@ have no README at all. Every repo README should answer what it is, how to
 run it, how to test it and where it deploys
 ([Documentation](docs/best-practices/documentation.md)).
 
-**Every `@nswds/ui` consumer is a major version behind.** `@nswds/ui` 7.0.2
-is published, but all seven consuming repos declare `^6.0.0`: `agile`,
-`attestation`, `nswds-design`, `nswds-email`, `nswds-public-sans`,
-`risk-guidance`, and the `apps/*` and
-`packages/site-chrome` workspaces of `nswds-email-design`. (`nswds-ui`'s own
-`apps/*` resolve the workspace copy through `*`, so they are always on the
-version they build and are not part of this.) A caret range
-cannot cross a major, so Renovate raises this as an individual major PR per
-repo rather than in the weekly group, and each one is waiting for a human.
-Until they land, the fleet is running v6 against a v7 design system, and any
-fix shipped in 7.x reaches nobody. Fix: work the major PRs, taking one repo
-through first to establish the migration.
-
 **`@nswds/app` is superseded but still consumed.** `attestation`, `awards`,
-`engagement`, `nswds-email` and `reviewers` depend on `@nswds/app` 5;
+`engagement`, `nswds-email` and `reviewers` depend on `@nswds/app`;
 `@nswds/ui` is the current generation. No migration is scheduled.
 
 **`nswds-ui` is public but still publishes without provenance.** Its `.npmrc`

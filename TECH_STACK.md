@@ -44,7 +44,7 @@ data, auth and email layer from nswds-app.
 |---|---|---|
 | [Tailwind CSS](https://tailwindcss.com/) 4 | 15 repos | via `@tailwindcss/postcss`; `prettier-plugin-tailwindcss` and `prettier-plugin-organize-imports` in the same repos |
 | Tailwind CSS 3 | nswds-email-framework, nswds-email-starter | Required by Maizzle 5; majors blocked in Renovate for these two repos by owner decision |
-| [NSW Design System](https://designsystem.nsw.gov.au/) via `@nswds/*` | fleet-wide | Versions below are what consumers declare, not what is published. `@nswds/tokens` `^5` (14 repos), `@nswds/metadata` `^1` (13 repos), `@nswds/app` `^5` (5 repos; superseded by `@nswds/ui`), `@nswds/ui` **`^6` (7 consuming repos, while 7.0.2 is published** — see [FLEET.md](FLEET.md) open issues; nswds-ui's own apps resolve the workspace copy through `*`) |
+| [NSW Design System](https://designsystem.nsw.gov.au/) via `@nswds/*` | fleet-wide | `@nswds/tokens` (14 repos), `@nswds/metadata` (13 repos), `@nswds/app` (5 repos; superseded by `@nswds/ui`), `@nswds/ui` (7 consuming repos; nswds-ui's own apps resolve the workspace copy through `*`). Published versions are shown live in [FLEET.md](FLEET.md) |
 | [Base UI](https://base-ui.com/) | nswds-ui | The headless primitive layer under `@nswds/ui` |
 | [shadcn/ui](https://ui.shadcn.com/) pattern | nswds-ui (own registry at `apps/registry`), nswds-app, awards, nswds-email | `class-variance-authority`, `tailwind-merge`, `clsx`, `lucide-react` |
 | [Radix UI](https://www.radix-ui.com/) primitives | awards, nswds-app, nswds-email | Previous generation, arriving through `@nswds/app` |
