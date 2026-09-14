@@ -34,7 +34,7 @@ data, auth and email layer from nswds-app.
 
 | Technology | Where | Notes |
 |---|---|---|
-| [Next.js](https://nextjs.org/) 16 | 14 application repos, plus the workspace apps in nswds-ui and nswds-email-design | App Router; `babel-plugin-react-compiler` enabled in 13 repos |
+| [Next.js](https://nextjs.org/) 16 | 13 application repos, plus the workspace apps in nswds-ui and nswds-email-design | App Router; `babel-plugin-react-compiler` enabled in 12 repos |
 | [React](https://react.dev/) 19 | every Next.js repo | |
 | [TypeScript](https://www.typescriptlang.org/) 5 | every Node repo except the shell-only ones | dtl-sandbox runs TypeScript 6; Renovate blocks TypeScript majors fleet-wide because Next.js and typescript-eslint do not yet support 6/7 |
 
@@ -42,9 +42,9 @@ data, auth and email layer from nswds-app.
 
 | Technology | Where | Notes |
 |---|---|---|
-| [Tailwind CSS](https://tailwindcss.com/) 4 | 16 repos | via `@tailwindcss/postcss`; `prettier-plugin-tailwindcss` and `prettier-plugin-organize-imports` in the same repos |
+| [Tailwind CSS](https://tailwindcss.com/) 4 | 15 repos | via `@tailwindcss/postcss`; `prettier-plugin-tailwindcss` and `prettier-plugin-organize-imports` in the same repos |
 | Tailwind CSS 3 | nswds-email-framework, nswds-email-starter | Required by Maizzle 5; majors blocked in Renovate for these two repos by owner decision |
-| [NSW Design System](https://designsystem.nsw.gov.au/) via `@nswds/*` | fleet-wide | Versions below are what consumers declare, not what is published. `@nswds/tokens` `^5` (15 repos), `@nswds/metadata` `^1` (14 repos), `@nswds/app` `^5` (5 repos; superseded by `@nswds/ui`), `@nswds/ui` **`^6` (8 consuming repos, while 7.0.2 is published** — see [FLEET.md](FLEET.md) open issues; nswds-ui's own apps resolve the workspace copy through `*`) |
+| [NSW Design System](https://designsystem.nsw.gov.au/) via `@nswds/*` | fleet-wide | Versions below are what consumers declare, not what is published. `@nswds/tokens` `^5` (14 repos), `@nswds/metadata` `^1` (13 repos), `@nswds/app` `^5` (5 repos; superseded by `@nswds/ui`), `@nswds/ui` **`^6` (7 consuming repos, while 7.0.2 is published** — see [FLEET.md](FLEET.md) open issues; nswds-ui's own apps resolve the workspace copy through `*`) |
 | [Base UI](https://base-ui.com/) | nswds-ui | The headless primitive layer under `@nswds/ui` |
 | [shadcn/ui](https://ui.shadcn.com/) pattern | nswds-ui (own registry at `apps/registry`), nswds-app, awards, nswds-email | `class-variance-authority`, `tailwind-merge`, `clsx`, `lucide-react` |
 | [Radix UI](https://www.radix-ui.com/) primitives | awards, nswds-app, nswds-email | Previous generation, arriving through `@nswds/app` |
@@ -65,7 +65,7 @@ data, auth and email layer from nswds-app.
 | [date-fns](https://date-fns.org/) | 4 repos |
 | [culori](https://culorijs.org/) | nswds-app, nswds-design, nswds-email, nswds-tokens (colour tooling) |
 | [Vercel AI SDK](https://sdk.vercel.ai/) (`ai`, `@ai-sdk/azure`, `@ai-sdk/openai`) | agile |
-| [Vue](https://vuejs.org/) 3 | nswds-email-builder, nswds-email-design (Maizzle 6 templating) |
+| [Vue](https://vuejs.org/) 3 | nswds-email-design (Maizzle 6 templating) |
 
 ## Auth, data and email
 
@@ -83,7 +83,7 @@ data, auth and email layer from nswds-app.
 
 | Technology | Where | Notes |
 |---|---|---|
-| [Maizzle](https://maizzle.com/) 6 | nswds-email-design (`packages/email`, the `@nswds/email` framework, unpublished), nswds-email-builder | Tailwind 4, Vue single-file components |
+| [Maizzle](https://maizzle.com/) 6 | nswds-email-design (`packages/email`, the `@nswds/email` framework, unpublished) | Tailwind 4, Vue single-file components |
 | Maizzle 5 | nswds-email-framework, nswds-email-starter | Tailwind 3; not migrating |
 
 ## Testing and component development

@@ -24,8 +24,8 @@ Related documents: [README.md](README.md) (how the shared tooling works),
 
 | Measure | Value |
 |---|---|
-| Consumer repos in [.github/sync.yml](.github/sync.yml) | 28 |
-| Repos under the canonical Snyk policy ([snyk-policy/repos.json](snyk-policy/repos.json)) | 29 (every consumer plus this repo) |
+| Consumer repos in [.github/sync.yml](.github/sync.yml) | 27 |
+| Repos under the canonical Snyk policy ([snyk-policy/repos.json](snyk-policy/repos.json)) | 28 (every consumer plus this repo) |
 | Repos publishing to npm | 6 (`@nswds/ui`, `@nswds/tokens`, `@nswds/app`, `@nswds/eslint-config`, `@nswds/prettier-config`, `@nswds/metadata`) |
 | Repos deployed on Vercel (team "Digital NSW", Pro plan) | 15 repos, 20 projects |
 | Node baseline | `.nvmrc` `24.16.0`; `engines.node` `^22.22.2 \|\| >=24.15.0`; `engine-strict=true` |
@@ -50,8 +50,7 @@ issues), so it appears here as a `+` delta.
 
 ### Applications (Next.js)
 
-All but `agile` and `nswds-email-builder` deploy on Vercel; those two have no
-Vercel project and no live URL.
+All but `agile` deploy on Vercel; it has no Vercel project and no live URL.
 
 | Repo | Purpose | Live URL | Stack notes | Sync group | Required checks (delta) |
 |---|---|---|---|---|---|
@@ -66,7 +65,6 @@ Vercel project and no live URL.
 | `data` (local folder `nswds-data`) | Data site | https://data.digital.nsw.gov.au | Next 16 | 1 | standard |
 | `nswds-public-sans` | Download and specimen site for Public Sans, the NSW masterbrand typeface | — (Vercel project `nswds-public-sans`) | Next 16, `@nswds/ui` 6, PostHog, Vercel Analytics | 1 | standard |
 | `nswds-signature` | Email signature generator | https://signature.digital.nsw.gov.au | Next 16 | 1 | standard |
-| `nswds-email-builder` | Email builder: Next.js front end over Maizzle 6 (Vue) templates. Superseded by the `apps/builder` workspace in `nswds-email-design` | — (no Vercel project) | Next 16, `@nswds/ui` 6, `@maizzle/framework` 6, Vue 3 | 1 | standard |
 | `risk-guidance` | Risk assessment guidance tool | https://risk-guidance.vercel.app | Next 16, `@nswds/ui` 6 | 1 | standard, **no Snyk contexts** (see open issues) |
 
 ### Design system and shared packages (publish to npm)
@@ -173,18 +171,18 @@ the release deploy key is the only bypass actor on every ruleset
 (MAINTENANCE.md, ruleset bypass policy). Fix: remove the role actor from the
 "Protect main" ruleset.
 
-**Thirteen fleet repos have no usable `README.md`.** Eleven ship a zero-byte
+**Twelve fleet repos have no usable `README.md`.** Ten ship a zero-byte
 file — `agile`, `attestation`, `awards`, `engagement`, `reviewers`,
-`nswds-community`, `data`, `nswds-design`, `nswds-signature`,
-`nswds-email-builder` and `risk-guidance` — and `digitalnsw` and `images`
+`nswds-community`, `data`, `nswds-design`, `nswds-signature` and
+`risk-guidance` — and `digitalnsw` and `images`
 have no README at all. Every repo README should answer what it is, how to
 run it, how to test it and where it deploys
 ([Documentation](docs/best-practices/documentation.md)).
 
 **Every `@nswds/ui` consumer is a major version behind.** `@nswds/ui` 7.0.2
-is published, but all eight consuming repos declare `^6.0.0`: `agile`,
-`attestation`, `nswds-design`, `nswds-email`, `nswds-email-builder`,
-`nswds-public-sans`, `risk-guidance`, and the `apps/*` and
+is published, but all seven consuming repos declare `^6.0.0`: `agile`,
+`attestation`, `nswds-design`, `nswds-email`, `nswds-public-sans`,
+`risk-guidance`, and the `apps/*` and
 `packages/site-chrome` workspaces of `nswds-email-design`. (`nswds-ui`'s own
 `apps/*` resolve the workspace copy through `*`, so they are always on the
 version they build and are not part of this.) A caret range
