@@ -742,6 +742,12 @@ if [[ "$untracked_files_count" -gt 120 ]]; then
 ... (${untracked_files_count} untracked files total; truncated for prompt)"
 fi
 
+# File lists are change metadata sent to the gateway; redact any key=value
+# secret that surfaced in a path before it reaches the prompt (only the diff
+# preview was redacted before).
+changed_files_for_prompt="$(redact_sensitive_diff "$changed_files_for_prompt")"
+untracked_files_for_prompt="$(redact_sensitive_diff "$untracked_files_for_prompt")"
+
 issue_requirement=""
 if [[ -n "$issue_kind" ]]; then
   issue_requirement="Required middle segment: /${issue_kind}/${issue_id}/"
