@@ -166,7 +166,7 @@ enrolment merges. Fix: complete the two console steps, then add
 (ONBOARDING.md step 10).
 
 **Most repos do not require `install / typecheck`.** Only `agile`,
-`dtl-sandbox`, `nswds-email`, `nswds-email-design` and `nswds-ui` require it,
+`dtl-sandbox`, `nswds-email`, `nswds-email-design`, `nswds-skills` and `nswds-ui` require it,
 although new repos get it from onboarding step 7. `nswds-tokens` is covered
 another way: its ruleset requires its own `Typecheck` check, from its bespoke
 `ci.yml`. Most of the rest have a `type-check` or `typecheck` script but no
