@@ -1,3 +1,9 @@
+## [1.25.5](https://github.com/digitalnsw/nswds-devops/compare/v1.25.4...v1.25.5) (2026-09-16)
+
+### Bug Fixes
+
+* harden shared commit/PR tooling flagged in review ([#136](https://github.com/digitalnsw/nswds-devops/issues/136)) ([527182a](https://github.com/digitalnsw/nswds-devops/commit/527182abbc99e022f7bb4edecb16ad17166ffc7e))
+
 ## [1.25.4](https://github.com/digitalnsw/nswds-devops/compare/v1.25.3...v1.25.4) (2026-09-11)
 
 ### Bug Fixes
