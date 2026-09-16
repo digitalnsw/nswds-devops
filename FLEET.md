@@ -96,7 +96,7 @@ All but `agile` deploy on Vercel; it has no Vercel project and no live URL.
 | `digitalnsw` | Scraped static mirror of digital.nsw.gov.au with a forms API backend (`api/`, Neon, Resend, optional Cloudflare Turnstile) | GitHub Pages and Vercel project `digitalnsw` | 1 | standard |
 | `images` (local folder `nswds-images`) | Static image and icon assets | GitHub Pages (https://digitalnsw.github.io/images/) | 1 | `install / *` + `commitlint` + `code/snyk` only (see open issues) |
 | `share` | Static HTML hosting for proofs of concept; publishes `README.md` to Confluence | GitHub Pages (https://digitalnsw.github.io/share/) | 1 | standard |
-| `nswds-skills` (public) | Agent skills and multi-agent workflow packages for AI coding agents, installable via `npx skills add`; the source of the fleet's own review, onboarding and Snyk skills | — | 1 | + `install / typecheck`; **no Snyk contexts yet** (import pending) |
+| `nswds-skills` (public) | Agent skills and multi-agent workflow packages for AI coding agents, installable via `npx skills add`; the source of the fleet's own review, onboarding and Snyk skills | — | 1 | + `install / typecheck`; **no Snyk contexts yet** (finishing onboarding — Snyk import and Renovate selection pending) |
 | `nswds-devops` (public) | This repo: the shared tooling, reusable workflows, Renovate preset, Snyk policy and fleet documentation | — | source | standard + `shellcheck`, `workflow-lint`; second ruleset "Protect v tags" |
 
 ## Organisation repos outside the fleet
@@ -154,6 +154,16 @@ and the newly onboarded `nswds-skills` receive no Snyk statuses at all, so they
 have not been imported into the Snyk org. Fix: import `nswds-email-issues` and
 `nswds-skills` in the Snyk console, then add the two contexts to each ruleset as
 in ONBOARDING.md step 10.
+
+**`nswds-skills` onboarding is finishing.** It carries the synced tooling, the
+CI stubs and the `Protect main` ruleset (`commitlint` and the five `install / *`
+checks, including `install / typecheck`). Still pending: selecting it in Renovate
+(it is not yet covered by the org preset), and importing it into the Snyk org
+(until then its ruleset does not require the two Snyk contexts — see above). Its
+`.snyk` policy block is delivered by the Snyk-policy fan-out when this repo's
+enrolment merges. Fix: complete the two console steps, then add
+`security/snyk (DigitalNSW)` and `code/snyk (DigitalNSW)` to the ruleset
+(ONBOARDING.md step 10).
 
 **Most repos do not require `install / typecheck`.** Only `agile`,
 `dtl-sandbox`, `nswds-email`, `nswds-email-design` and `nswds-ui` require it,
