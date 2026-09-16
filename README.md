@@ -126,8 +126,8 @@ Check names: a reusable workflow reports as `commitlint / commitlint`
 the two-part names. Five contexts are required on **every** fleet repo:
 `commitlint / commitlint`, `install / install`, `install / lint`,
 `install / test` and `install / format`. The standard adds
-`security/snyk (DigitalNSW)` and `code/snyk (DigitalNSW)`, which four repos
-do not yet require, and `install / typecheck`, which five repos require.
+`security/snyk (DigitalNSW)` and `code/snyk (DigitalNSW)`, which five repos
+do not yet require, and `install / typecheck`, which six repos require.
 [FLEET.md](FLEET.md) lists the per-repo deltas and records the missing Snyk
 gates as open issues — do not assume a given repo has them.
 
@@ -174,7 +174,7 @@ up in the audit log at both ends.
 
 semantic-release runs on every push to `main` and cuts a version from the
 commit types (`fix:` → patch, `feat:` → minor). That is automatic and mostly
-gives us a changelog. The `v1` tag that consumers pin to is separate and
+produces a changelog. The `v1` tag that consumers pin to is separate and
 manual; see [MAINTENANCE.md](MAINTENANCE.md).
 
 ## Testing this repo
