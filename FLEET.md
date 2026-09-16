@@ -150,7 +150,7 @@ gh api -X PATCH repos/digitalnsw/<repo> -F allow_merge_commit=false -F allow_reb
 `nswds-metadata` receive all three Snyk statuses on PR heads but their
 rulesets do not require `security/snyk (DigitalNSW)` or
 `code/snyk (DigitalNSW)`. `images` requires `code/snyk` only. `nswds-email-issues`
-and the newly onboarded `nswds-skills` receive no Snyk statuses at all, so they
+and `nswds-skills` receive no Snyk statuses at all, so they
 have not been imported into the Snyk org. Fix: import `nswds-email-issues` and
 `nswds-skills` in the Snyk console, then add the two contexts to each ruleset as
 in ONBOARDING.md step 10.

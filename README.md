@@ -174,7 +174,7 @@ up in the audit log at both ends.
 
 semantic-release runs on every push to `main` and cuts a version from the
 commit types (`fix:` → patch, `feat:` → minor). That is automatic and mostly
-gives us a changelog. The `v1` tag that consumers pin to is separate and
+produces a changelog. The `v1` tag that consumers pin to is separate and
 manual; see [MAINTENANCE.md](MAINTENANCE.md).
 
 ## Testing this repo
