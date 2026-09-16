@@ -24,12 +24,12 @@ Related documents: [README.md](README.md) (how the shared tooling works),
 
 | Measure | Value |
 |---|---|
-| Consumer repos in [.github/sync.yml](.github/sync.yml) | 27 |
-| Repos under the canonical Snyk policy ([snyk-policy/repos.json](snyk-policy/repos.json)) | 28 (every consumer plus this repo) |
+| Consumer repos in [.github/sync.yml](.github/sync.yml) | 28 |
+| Repos under the canonical Snyk policy ([snyk-policy/repos.json](snyk-policy/repos.json)) | 29 (every consumer plus this repo) |
 | Repos publishing to npm | 6 (`@nswds/ui`, `@nswds/tokens`, `@nswds/app`, `@nswds/eslint-config`, `@nswds/prettier-config`, `@nswds/metadata`) |
 | Repos deployed on Vercel (team "Digital NSW", Pro plan) | 15 repos, 20 projects |
 | Node baseline | `.nvmrc` `24.16.0`; `engines.node` `^22.22.2 \|\| >=24.15.0`; `engine-strict=true` |
-| Org repos outside the fleet | 3 active (`ai-type-selector`, `commitments-dashboard`, `nswds-skills`), 1 R package (`nswtheme`), 6 public learning/archive repos, 5 archived |
+| Org repos outside the fleet | 2 active (`ai-type-selector`, `commitments-dashboard`), 1 R package (`nswtheme`), 6 public learning/archive repos, 5 archived |
 
 ## Fleet members
 
@@ -96,6 +96,7 @@ All but `agile` deploy on Vercel; it has no Vercel project and no live URL.
 | `digitalnsw` | Scraped static mirror of digital.nsw.gov.au with a forms API backend (`api/`, Neon, Resend, optional Cloudflare Turnstile) | GitHub Pages and Vercel project `digitalnsw` | 1 | standard |
 | `images` (local folder `nswds-images`) | Static image and icon assets | GitHub Pages (https://digitalnsw.github.io/images/) | 1 | `install / *` + `commitlint` + `code/snyk` only (see open issues) |
 | `share` | Static HTML hosting for proofs of concept; publishes `README.md` to Confluence | GitHub Pages (https://digitalnsw.github.io/share/) | 1 | standard |
+| `nswds-skills` (public) | Agent skills and multi-agent workflow packages for AI coding agents, installable via `npx skills add`; the source of the fleet's own review, onboarding and Snyk skills | — | 1 | + `install / typecheck`; **no Snyk contexts yet** (import pending) |
 | `nswds-devops` (public) | This repo: the shared tooling, reusable workflows, Renovate preset, Snyk policy and fleet documentation | — | source | standard + `shellcheck`, `workflow-lint`; second ruleset "Protect v tags" |
 
 ## Organisation repos outside the fleet
@@ -108,7 +109,6 @@ has auto-merge or branch auto-delete enabled.
 |---|---|---|
 | `ai-type-selector` | SharePoint Framework (SPFx) web part for triaging AI approaches against the NSW AI Assessment Framework; heft toolchain, React 17, Node 22 | SPFx toolchain is incompatible with the fleet Node floor and gates; no npm-based CI |
 | `commitments-dashboard` | NSW Digital Strategy commitments dashboard: an SPFx web part over SharePoint list data, plus infra notes, reports and exports. No `package.json` at the root | Not an npm project at the root |
-| `nswds-skills` (public) | Agent skills for product development workflows, installable via skills.sh | Markdown-only; no build |
 | `nswtheme` (public) | R package for NSW-styled visualisations | R, not Node |
 | `nsw-design-system` (public) | The NSW Design System toolkit repo | Separately governed |
 | `accessibility-in-digital-procurement`, `accessibility-testing-basics`, `creating-accessible-documents`, `fundamentals-of-digital-accessibility` (public) | Accessibility learning modules | Static learning content, no active development |
@@ -146,13 +146,14 @@ squash-only, because every PR must become exactly one conventional commit on
 gh api -X PATCH repos/digitalnsw/<repo> -F allow_merge_commit=false -F allow_rebase_merge=false
 ```
 
-**Snyk merge gates are missing on four repos.** `risk-guidance` and
+**Snyk merge gates are missing on five repos.** `risk-guidance` and
 `nswds-metadata` receive all three Snyk statuses on PR heads but their
 rulesets do not require `security/snyk (DigitalNSW)` or
 `code/snyk (DigitalNSW)`. `images` requires `code/snyk` only. `nswds-email-issues`
-receives no Snyk statuses at all, so it has not been imported into the Snyk
-org. Fix: import `nswds-email-issues` in the Snyk console, then add the two
-contexts to each ruleset as in ONBOARDING.md step 10.
+and the newly onboarded `nswds-skills` receive no Snyk statuses at all, so they
+have not been imported into the Snyk org. Fix: import `nswds-email-issues` and
+`nswds-skills` in the Snyk console, then add the two contexts to each ruleset as
+in ONBOARDING.md step 10.
 
 **Most repos do not require `install / typecheck`.** Only `agile`,
 `dtl-sandbox`, `nswds-email`, `nswds-email-design` and `nswds-ui` require it,
