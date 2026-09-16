@@ -68,7 +68,11 @@
     "block, and that loses nothing: all six resolve nanoid 3.3.18, which",
     "carries both fixes -- -894 was backported in 3.3.16, and -897's",
     "customRandom size guard landed in 3.3.17. Scanning all six with",
-    "--ignore-policy confirms neither advisory still fires."
+    "--ignore-policy confirms neither advisory still fires.",
+    "",
+    "2026-09-16: nswds-skills was promoted from outside the fleet and enrolled",
+    "as a plain key. It had no prior .snyk, so the sync creates the file with",
+    "the canonical block and an empty tail -- no migrate directive needed."
   ],
 
   "owner": "digitalnsw",
@@ -97,6 +101,7 @@
     "nswds-prettier-config": {},
     "nswds-public-sans": {},
     "nswds-signature": {},
+    "nswds-skills": {},
     "nswds-tokens": {},
     "nswds-ui": {},
     "reviewers": {},
