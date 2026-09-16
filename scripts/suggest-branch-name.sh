@@ -742,9 +742,13 @@ if [[ "$untracked_files_count" -gt 120 ]]; then
 ... (${untracked_files_count} untracked files total; truncated for prompt)"
 fi
 
-# File lists are change metadata sent to the gateway; redact any key=value
-# secret that surfaced in a path before it reaches the prompt (only the diff
-# preview was redacted before).
+# Path-derived fields are change metadata sent to the gateway; redact any
+# key=value secret that surfaced in a path — or in a path-derived summary —
+# before it reaches the prompt. Every gateway-bound path field is covered (both
+# file lists AND both summaries), not just the diff preview; the summaries are
+# used only in the prompt, so redacting them here affects nothing else.
+change_scope_summary="$(redact_sensitive_diff "$change_scope_summary")"
+ignore_filter_summary="$(redact_sensitive_diff "$ignore_filter_summary")"
 changed_files_for_prompt="$(redact_sensitive_diff "$changed_files_for_prompt")"
 untracked_files_for_prompt="$(redact_sensitive_diff "$untracked_files_for_prompt")"
 

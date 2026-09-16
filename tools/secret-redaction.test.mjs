@@ -67,6 +67,25 @@ test('redacts high-signal token/key shapes regardless of surrounding key', () =>
   )
 })
 
+test('redacts the whole authorization value: bare, all-caps, compound, quoted, scheme-less', () => {
+  // The scheme (Bearer/Basic/…) is masked along with the credential — a plain
+  // key/value rule would keep "Bearer" and leak the token after it.
+  const cases = [
+    ['Authorization: Bearer abc.def.ghi', 'Authorization: [REDACTED]'],
+    ['AUTHORIZATION=Bearer xyz', 'AUTHORIZATION=[REDACTED]'],
+    ['HTTP_AUTHORIZATION=Bearer abc', 'HTTP_AUTHORIZATION=[REDACTED]'],
+    ['Authorization: Basic dXNlcjpwYXNz', 'Authorization: [REDACTED]'],
+    ['authorization = opaquetoken', 'authorization = [REDACTED]'],
+    ['  "authorization": "Bearer abc",', '  "authorization": "[REDACTED]",'],
+  ]
+  for (const [input, expected] of cases) {
+    assert.equal(redact(input).trimEnd(), expected, `redacting ${JSON.stringify(input)}`)
+  }
+  // A camelCase identifier that merely starts with "authorization" must survive.
+  const code = 'const authorizationHeader = req.headers.authorization'
+  assert.equal(redact(code).trimEnd(), code)
+})
+
 test('leaves code identifiers and non-secret keys intact', () => {
   // The value after `=` must survive: over-redacting these across a diff would
   // degrade every AI commit/PR title in the fleet.
@@ -85,7 +104,12 @@ test('leaves code identifiers and non-secret keys intact', () => {
 })
 
 test('detection warns on compound keys but not on code identifiers', () => {
-  for (const input of ['AWS_SECRET_ACCESS_KEY=x', 'CLIENT_SECRET=y', 'DB_PASSWORD=z']) {
+  for (const input of [
+    'AWS_SECRET_ACCESS_KEY=x',
+    'CLIENT_SECRET=y',
+    'DB_PASSWORD=z',
+    'HTTP_AUTHORIZATION=Bearer x',
+  ]) {
     assert.equal(detectsExit(input), true, `should detect ${JSON.stringify(input)}`)
   }
   for (const input of ['const tokenizer = new T()', 'cache_key=lookup', 'retry_count=5']) {

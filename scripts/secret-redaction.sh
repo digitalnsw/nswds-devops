@@ -71,9 +71,17 @@ redact_sensitive_diff() {
   # value rather than leaking one.
   local word='([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii][_-]?[Kk][Ee][Yy])'
   local suf='([_-][A-Za-z0-9]+)*'
+  # Authorization is handled separately from `word`: its value is a scheme plus
+  # a credential (Bearer/Basic/…), or occasionally no scheme, so the whole value
+  # is redacted rather than the first token — otherwise a plain key/value rule
+  # would mask "Bearer" and leave the credential. Covers bare, all-caps and
+  # compound keys (HTTP_AUTHORIZATION), quoted or not; the ${suf} rule still
+  # excludes camelCase identifiers like `authorizationHeader = …`.
+  local auth='[Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]'
   printf '%s' "$redacted" | sed -E \
     -e "s/(\"[A-Za-z0-9_-]*${word}${suf}\"[[:space:]]*:[[:space:]]*\")[^\"]*\"/\1[REDACTED]\"/g" \
     -e "s/([A-Za-z0-9_-]*${word}${suf}[[:space:]]*[:=][[:space:]]*\")[^\"]*\"/\1[REDACTED]\"/g" \
     -e "s/([A-Za-z0-9_-]*${word}${suf}[[:space:]]*[:=][[:space:]]*)[^[:space:]\"'#]+/\1[REDACTED]/g" \
-    -e "s/([Aa]uthorization[[:space:]]*[:=][[:space:]]*Bearer[[:space:]]+)[^[:space:]\"'#]+/\1[REDACTED]/g"
+    -e "s/(\"?[A-Za-z0-9_-]*${auth}${suf}\"?[[:space:]]*[:=][[:space:]]*\")[^\"]*\"/\1[REDACTED]\"/g" \
+    -e "s/([A-Za-z0-9_-]*${auth}${suf}[[:space:]]*[:=][[:space:]]*)[^[:space:]\"'#].*/\1[REDACTED]/g"
 }
