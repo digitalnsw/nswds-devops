@@ -65,8 +65,10 @@ redact_sensitive_diff() {
   # like `tokenizer = …` or `secretSauce = …` are left intact rather than having
   # their right-hand side redacted across a whole diff. Case is handled with
   # explicit classes because BSD/macOS sed has no /I flag. A double-quoted value
-  # (JSON or YAML) is masked in place as "[REDACTED]" for clean output; any other
-  # value — unquoted, single-quoted, backtick, multi-word, or containing '#' — is
+  # (JSON or YAML) is masked in place as "[REDACTED]" for clean output; its class
+  # consumes escaped characters as units (`\\.`), so a `\"` inside the value does
+  # not end the match early and leak the rest. Any other value — unquoted,
+  # single-quoted, backtick, multi-word, or containing '#' — is
   # masked to end of line, so a passphrase or a single-quoted secret can't
   # survive by hiding behind a space or a '#'. Over-redacting an innocuous
   # "*_token"/"*_secret" key (or a matched key's multi-token RHS in code) is
@@ -81,9 +83,9 @@ redact_sensitive_diff() {
   # excludes camelCase identifiers like `authorizationHeader = …`.
   local auth='[Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]'
   printf '%s' "$redacted" | sed -E \
-    -e "s/(\"[A-Za-z0-9_-]*${word}${suf}\"[[:space:]]*:[[:space:]]*\")[^\"]*\"/\1[REDACTED]\"/g" \
-    -e "s/([A-Za-z0-9_-]*${word}${suf}[[:space:]]*[:=][[:space:]]*\")[^\"]*\"/\1[REDACTED]\"/g" \
+    -e "s/(\"[A-Za-z0-9_-]*${word}${suf}\"[[:space:]]*:[[:space:]]*\")(\\\\.|[^\"\\\\])*\"/\1[REDACTED]\"/g" \
+    -e "s/([A-Za-z0-9_-]*${word}${suf}[[:space:]]*[:=][[:space:]]*\")(\\\\.|[^\"\\\\])*\"/\1[REDACTED]\"/g" \
     -e "s/([A-Za-z0-9_-]*${word}${suf}[[:space:]]*[:=][[:space:]]*)[^[:space:]\"].*/\1[REDACTED]/g" \
-    -e "s/(\"?[A-Za-z0-9_-]*${auth}${suf}\"?[[:space:]]*[:=][[:space:]]*\")[^\"]*\"/\1[REDACTED]\"/g" \
+    -e "s/(\"?[A-Za-z0-9_-]*${auth}${suf}\"?[[:space:]]*[:=][[:space:]]*\")(\\\\.|[^\"\\\\])*\"/\1[REDACTED]\"/g" \
     -e "s/([A-Za-z0-9_-]*${auth}${suf}[[:space:]]*[:=][[:space:]]*)[^[:space:]\"].*/\1[REDACTED]/g"
 }

@@ -104,6 +104,19 @@ test('masks the whole value: single-quoted, multi-word, backtick and #-bearing',
   }
 })
 
+test('masks double-quoted values that contain escaped quotes', () => {
+  // `[^"]*` ended at the first `"`, including an escaped one, leaking the rest;
+  // the value class now consumes `\.` (an escaped char) as a unit.
+  const cases = [
+    ['  "client_secret": "abc\\"def",', '  "client_secret": "[REDACTED]",'],
+    ['client_secret: "abc\\"def"', 'client_secret: "[REDACTED]"'],
+    ['  "Authorization": "Bearer ab\\"cd",', '  "Authorization": "[REDACTED]",'],
+  ]
+  for (const [input, expected] of cases) {
+    assert.equal(redact(input).trimEnd(), expected, `redacting ${JSON.stringify(input)}`)
+  }
+})
+
 test('leaves code identifiers and non-secret keys intact', () => {
   // The value after `=` must survive: over-redacting these across a diff would
   // degrade every AI commit/PR title in the fleet.
