@@ -64,11 +64,13 @@ redact_sensitive_diff() {
   # `_`/`-`-delimited segments (`suf`), never bare letters — so code identifiers
   # like `tokenizer = …` or `secretSauce = …` are left intact rather than having
   # their right-hand side redacted across a whole diff. Case is handled with
-  # explicit classes because BSD/macOS sed has no /I flag. Three value shapes are
-  # covered: quoted-key+quoted-value (JSON), unquoted-key+quoted-value
-  # (YAML/env), and unquoted-key+unquoted-value (env/ini/yaml). Over-redacting an
-  # innocuous "*_token"/"*_secret" key is deliberate: it errs toward hiding a
-  # value rather than leaking one.
+  # explicit classes because BSD/macOS sed has no /I flag. A double-quoted value
+  # (JSON or YAML) is masked in place as "[REDACTED]" for clean output; any other
+  # value — unquoted, single-quoted, backtick, multi-word, or containing '#' — is
+  # masked to end of line, so a passphrase or a single-quoted secret can't
+  # survive by hiding behind a space or a '#'. Over-redacting an innocuous
+  # "*_token"/"*_secret" key (or a matched key's multi-token RHS in code) is
+  # deliberate: it errs toward hiding a value rather than leaking one.
   local word='([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii][_-]?[Kk][Ee][Yy])'
   local suf='([_-][A-Za-z0-9]+)*'
   # Authorization is handled separately from `word`: its value is a scheme plus
@@ -81,7 +83,7 @@ redact_sensitive_diff() {
   printf '%s' "$redacted" | sed -E \
     -e "s/(\"[A-Za-z0-9_-]*${word}${suf}\"[[:space:]]*:[[:space:]]*\")[^\"]*\"/\1[REDACTED]\"/g" \
     -e "s/([A-Za-z0-9_-]*${word}${suf}[[:space:]]*[:=][[:space:]]*\")[^\"]*\"/\1[REDACTED]\"/g" \
-    -e "s/([A-Za-z0-9_-]*${word}${suf}[[:space:]]*[:=][[:space:]]*)[^[:space:]\"'#]+/\1[REDACTED]/g" \
+    -e "s/([A-Za-z0-9_-]*${word}${suf}[[:space:]]*[:=][[:space:]]*)[^[:space:]\"].*/\1[REDACTED]/g" \
     -e "s/(\"?[A-Za-z0-9_-]*${auth}${suf}\"?[[:space:]]*[:=][[:space:]]*\")[^\"]*\"/\1[REDACTED]\"/g" \
-    -e "s/([A-Za-z0-9_-]*${auth}${suf}[[:space:]]*[:=][[:space:]]*)[^[:space:]\"'#].*/\1[REDACTED]/g"
+    -e "s/([A-Za-z0-9_-]*${auth}${suf}[[:space:]]*[:=][[:space:]]*)[^[:space:]\"].*/\1[REDACTED]/g"
 }

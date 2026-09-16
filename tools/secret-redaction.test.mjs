@@ -86,6 +86,24 @@ test('redacts the whole authorization value: bare, all-caps, compound, quoted, s
   assert.equal(redact(code).trimEnd(), code)
 })
 
+test('masks the whole value: single-quoted, multi-word, backtick and #-bearing', () => {
+  // A single token that stopped at the first space/quote/# left the rest of a
+  // passphrase, single-quoted value, or #-bearing value exposed.
+  const cases = [
+    ["CLIENT_SECRET='abc def'", 'CLIENT_SECRET=[REDACTED]'],
+    ['DB_PASSWORD: correct horse battery staple', 'DB_PASSWORD: [REDACTED]'],
+    ['PASSWORD=ab#cd', 'PASSWORD=[REDACTED]'],
+    ['SECRET=`tmpl with spaces`', 'SECRET=[REDACTED]'],
+    ["authorization='Bearer abc def'", 'authorization=[REDACTED]'],
+    // Double-quoted values stay masked in place, preserving the quotes.
+    ['  "client_secret": "a b c",', '  "client_secret": "[REDACTED]",'],
+    ['secret: "multi word val"', 'secret: "[REDACTED]"'],
+  ]
+  for (const [input, expected] of cases) {
+    assert.equal(redact(input).trimEnd(), expected, `redacting ${JSON.stringify(input)}`)
+  }
+})
+
 test('leaves code identifiers and non-secret keys intact', () => {
   // The value after `=` must survive: over-redacting these across a diff would
   // degrade every AI commit/PR title in the fleet.
