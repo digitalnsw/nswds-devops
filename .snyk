@@ -282,3 +282,33 @@ ignore:
         expires: 2027-08-31T00:00:00.000Z
 
   # repo-specific
+# ── Snyk Code (SAST): exclude the install/test probe ────────────────────────
+# CWE-23 path traversal (Low): process.argv[2] -> node:fs.writeFileSync in
+# .github/scripts/test-mode.mjs. FALSE POSITIVE. That script is the shared
+# `install / test` probe, invoked only as
+#   node .github/scripts/test-mode.mjs "$RUNNER_TEMP/vitest-run-plan"
+# -- the write path is chosen by the workflow, not by untrusted input, and
+# whoever controls that invocation already has full filesystem access on the
+# runner, so no privilege boundary is crossed. The plan written is derived from
+# `git ls-files`, not sensitive.
+#
+# WHY `exclude: code:` and NOT a `javascript/PT:` ignore: Snyk Code in the
+# digitalnsw org does not honour finding-level .snyk ignores -- verified
+# 2026-09-17, a scoped `javascript/PT` entry left the finding firing, and a
+# resolve()+RUNNER_TEMP containment guard in the script did not clear Snyk's
+# dataflow either (it wants basename(), which would break the write). Removing
+# the argv->sink flow means changing the @v1-promoted reusable-ci.yml caller,
+# disproportionate for a Low FP; the Snyk UI would work but lives outside the
+# repo. So exclude this one file. (nswds-tokens' `javascript/PT` tail entry is
+# almost certainly dead config for the same reason -- worth revisiting.)
+#
+# SCOPE: excludes ONLY this script from Snyk Code, and only because the flagged
+# argv[2] -> writeFileSync flow above is the false positive. Coverage loss is
+# small because every input the script handles is trusted CI data -- the
+# workflow-supplied argv and `git ls-files` output (run via a fixed argv array,
+# no shell) -- and its two file sinks both write trusted CI paths: the argv plan
+# file, and $GITHUB_OUTPUT via appendFileSync. None is attacker-controlled. Do
+# NOT widen to a directory -- keep sibling scripts scanned.
+exclude:
+  code:
+    - .github/scripts/test-mode.mjs
