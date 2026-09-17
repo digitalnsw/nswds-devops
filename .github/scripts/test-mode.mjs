@@ -163,7 +163,7 @@ export function readManifest(path) {
 // ---------------------------------------------------------------------------
 // CLI. Invoked by the shared `install / test` job's probe step as:
 //
-//     node .github/scripts/test-mode.mjs "$RUNNER_TEMP/vitest-config-dirs"
+//     node .github/scripts/test-mode.mjs "$RUNNER_TEMP/vitest-run-plan"
 //
 // Writes `mode` and `needs_playwright` straight to $GITHUB_OUTPUT — both fixed
 // enums — and the per-directory plan to the file named in argv[2], one
