@@ -23,6 +23,15 @@ on:
         required: false
         default: false
         type: boolean
+      automerge:
+        description: >-
+          Arm auto-merge on the fan-out PRs so each lands when its own checks
+          pass. "never" leaves every PR to be merged by hand. Ignored on a
+          dry run, which opens no PRs.
+        required: false
+        default: 'yes'
+        type: choice
+        options: ['yes', 'never']
 
 permissions:
   contents: read
@@ -56,6 +65,7 @@ jobs:
       # DRY_RUN is empty on a push event (no inputs), which takes the apply
       # branch — the intended default for a base change merged to main.
       - name: Fan the canonical policy out
+        id: fanout
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           DRY_RUN: ${{ inputs.dry_run }}
@@ -66,3 +76,45 @@ jobs:
           else
             node .github/scripts/snyk-policy.mjs --apply
           fi
+
+      # Arm GitHub auto-merge on the PRs the fan-out just opened, reusing the
+      # same helper — and therefore the same "Protect main" gate — as the
+      # file-sync fan-out. Auto-merge never merges a PR GitHub does not already
+      # consider mergeable, so every required check (install, lint, format,
+      # test, commitlint, the Snyk contexts) still has to be green; a red or
+      # conflicted PR simply waits for a human. This removes the clicking, not
+      # the gate — the review that matters happened on the base.snyk edit.
+      #
+      # The snyk fan-out branch is chore/repo-sync/snyk-policy, which the
+      # helper's chore/repo-sync* guard already accepts. No stub-pairing gate
+      # is needed as in sync.yml: a .snyk change carries no workflow-stubs/, so
+      # there is nothing for Promote v1 to arm later — arm here, unless the
+      # dispatch asked not to. The step is skipped on a dry run (no URLs) and on
+      # a run that found nothing to change (pull_request_urls is []).
+      #
+      # `!cancelled()` rather than the default `success()`, matching
+      # snyk-policy-canary.yml: the fan-out emits pull_request_urls BEFORE it may
+      # exit nonzero on a per-repo error, so a partial fan-out (some repos opened,
+      # one failed) leaves real URLs in the output. Under the default guard this
+      # step would be skipped and those opened PRs left unarmed — the very toil
+      # this removes, lost exactly when the fleet is messy. `!cancelled()` arms
+      # them anyway; the fan-out step still fails, so the error stays visible, and
+      # a genuinely cancelled run does not arm.
+      - name: Arm auto-merge on the fan-out PRs
+        if: >-
+          ${{ !cancelled()
+              && inputs.automerge != 'never'
+              && steps.fanout.outputs.pull_request_urls != ''
+              && steps.fanout.outputs.pull_request_urls != '[]' }}
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          PR_URLS: ${{ steps.fanout.outputs.pull_request_urls }}
+        run: |
+          set -euo pipefail
+          # snyk-policy.mjs serialises the opened PR URLs as a JSON array.
+          mapfile -t urls < <(jq -r '.[]' <<<"$PR_URLS")
+          if [ "${#urls[@]}" -eq 0 ]; then
+            echo "No PRs were opened or refreshed by this run"
+            exit 0
+          fi
+          .github/scripts/enable-sync-automerge.sh "${urls[@]}"
