@@ -156,13 +156,13 @@ across the org, so add it to this table.
 ### Reusable workflow access
 
 This repo is **public**. GitHub forbids public repos from calling reusable
-workflows in a private one, and nswds-email-issues is public, so the
-reusables must be callable from anywhere. If this repo is ever made private,
-two things break: set Settings → Actions → General → Access to "Accessible
-from repositories owned by the organization" for the private repos, and
-nswds-email-issues' CI stops resolving entirely. The test gate also fetches
-`.github/scripts/test-mode.mjs` from this repo at `v1` without a token, which
-relies on the repo being public.
+workflows in a private one, and several fleet consumer repos are public, so
+the reusables must be callable from anywhere. If this repo is ever made
+private, two things break: set Settings → Actions → General → Access to
+"Accessible from repositories owned by the organization" for the private
+repos, and the public consumers' CI stops resolving entirely. The test gate
+also fetches `.github/scripts/test-mode.mjs` from this repo at `v1` without a
+token, which relies on the repo being public.
 
 ### Pinned third-party actions
 
@@ -386,7 +386,7 @@ under [FLEET.md open issues](FLEET.md#open-issues).
 | ictds-portal-flows | `release.yml` is a Power Platform PROD deploy; the release stub maps to `semantic-release.yml` (sync group 4) | Filename collision with a production pipeline | Permanent |
 | ictds-portal-flows | PROD deploy approval is the `RELEASE_APPROVERS` allowlist in `release.yml`, not GitHub environment required reviewers | Required reviewers on private repos is Enterprise-only (org is on Team) | Enterprise upgrade or repo visibility change |
 | dtl-sandbox | Deploys are manual `pulumi up` from operator machines; `pulumi-preview.yml` (a required `preview` check) is inert until the `PULUMI_PREVIEW_ENABLED` repo variable is set | Azure OIDC federated credential and Pulumi backend variables not yet configured (setup steps are in the workflow header) | OIDC federation lands; then set the variable |
-| digitalnsw, images, nswds-email-issues | No ESLint over mirror or static content (digitalnsw lints `api/` and `scripts/` only) | Scraped mirror, static assets, issue tracker | Permanent |
+| digitalnsw, images | No ESLint over mirror or static content (digitalnsw lints `api/` and `scripts/` only) | Scraped mirror, static assets | Permanent |
 | nswds-devops | No `lint` script and no Prettier config, so `install / lint` and `install / format` self-skip here | Shell and YAML repo; shellcheck and actionlint are the gates | n/a |
 
 ## Decisions required
