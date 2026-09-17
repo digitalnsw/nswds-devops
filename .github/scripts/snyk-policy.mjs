@@ -616,11 +616,17 @@ const main = async () => {
     }
   }
 
+  // The PRs this run opened or refreshed, in the order they were processed.
+  // Emitted so the workflow's auto-merge step can arm exactly these, rather
+  // than discovering them by search — which lags PR creation by seconds and,
+  // unlike the file-sync fan-out, these carry no label to search on.
+  const openedUrls = []
   if (MODE === 'apply' && actionable.length && !DRY_RUN) {
     console.log('\nOpening PRs:')
     for (const r of actionable) {
       try {
         const url = await openPr(r.repo, r)
+        openedUrls.push(url)
         console.log(`  ${r.repo}: ${url}`)
       } catch (err) {
         r.state = 'error'
@@ -633,6 +639,11 @@ const main = async () => {
   const drifted = actionable.length + attention.length > 0
   if (process.env.GITHUB_OUTPUT) {
     appendFileSync(process.env.GITHUB_OUTPUT, `drifted=${drifted}\n`)
+    // A JSON array, matching repo-file-sync-action's `pull_request_urls`
+    // output that sync.yml already feeds to enable-sync-automerge.sh — so the
+    // auto-merge step consumes it identically. Empty ([]) on check, dry-run,
+    // or a run that opened nothing, which the step treats as "nothing to arm".
+    appendFileSync(process.env.GITHUB_OUTPUT, `pull_request_urls=${JSON.stringify(openedUrls)}\n`)
     const body = join(tmpdir(), 'snyk-policy-report.md')
     writeFileSync(
       body,
