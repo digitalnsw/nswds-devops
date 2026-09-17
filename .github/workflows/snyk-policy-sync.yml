@@ -91,9 +91,19 @@ jobs:
       # there is nothing for Promote v1 to arm later — arm here, unless the
       # dispatch asked not to. The step is skipped on a dry run (no URLs) and on
       # a run that found nothing to change (pull_request_urls is []).
+      #
+      # `!cancelled()` rather than the default `success()`, matching
+      # snyk-policy-canary.yml: the fan-out emits pull_request_urls BEFORE it may
+      # exit nonzero on a per-repo error, so a partial fan-out (some repos opened,
+      # one failed) leaves real URLs in the output. Under the default guard this
+      # step would be skipped and those opened PRs left unarmed — the very toil
+      # this removes, lost exactly when the fleet is messy. `!cancelled()` arms
+      # them anyway; the fan-out step still fails, so the error stays visible, and
+      # a genuinely cancelled run does not arm.
       - name: Arm auto-merge on the fan-out PRs
         if: >-
-          ${{ inputs.automerge != 'never'
+          ${{ !cancelled()
+              && inputs.automerge != 'never'
               && steps.fanout.outputs.pull_request_urls != ''
               && steps.fanout.outputs.pull_request_urls != '[]' }}
         env:
