@@ -24,8 +24,8 @@ Related documents: [README.md](README.md) (how the shared tooling works),
 
 | Measure | Value |
 |---|---|
-| Consumer repos in [.github/sync.yml](.github/sync.yml) | 28 |
-| Repos under the canonical Snyk policy ([snyk-policy/repos.json](snyk-policy/repos.json)) | 29 (every consumer plus this repo) |
+| Consumer repos in [.github/sync.yml](.github/sync.yml) | 27 |
+| Repos under the canonical Snyk policy ([snyk-policy/repos.json](snyk-policy/repos.json)) | 28 (every consumer plus this repo) |
 | Repos publishing to npm | 6 (`@nswds/ui`, `@nswds/tokens`, `@nswds/app`, `@nswds/eslint-config`, `@nswds/prettier-config`, `@nswds/metadata`) |
 | Repos deployed on Vercel (team "Digital NSW", Pro plan) | 15 repos, 20 projects |
 | Node baseline | `.nvmrc` `24.16.0`; `engines.node` `^22.22.2 \|\| >=24.15.0`; `engine-strict=true` |
@@ -85,7 +85,6 @@ All but `agile` deploy on Vercel; it has no Vercel project and no live URL.
 | `nswds-email-design` | Next-generation email toolkit monorepo: the `@nswds/email` Maizzle 6 framework (`packages/email`, not yet published), its docs site, the email builder and the signature app. Turborepo; Playwright + axe visual and accessibility suites | Vercel: `nswds-email-design-docs`, `nswds-email-design-builder`, `nswds-email-design-signature` | 2d (own `release.yml` + release config, `.npmrc` variant) | + `install / typecheck`, `license/snyk (DigitalNSW)` |
 | `nswds-email-framework` | Maizzle 5 email framework with components, layouts and build tools; Playwright visual regression, axe and Lighthouse accessibility suites. Tailwind 3 by design (Maizzle 5); majors blocked in Renovate | — | 1 | standard |
 | `nswds-email-starter` | Maizzle 5 starter kit for NSW-branded HTML email. Tailwind 3 by design; majors blocked in Renovate | — | 1 | standard |
-| `nswds-email-issues` (public) | Public issue tracker for the NSW Email Toolkit; no source code | — | 1 | **no Snyk contexts** (repo is not imported into Snyk) |
 
 ### Infrastructure, platform and static content
 
@@ -146,13 +145,11 @@ squash-only, because every PR must become exactly one conventional commit on
 gh api -X PATCH repos/digitalnsw/<repo> -F allow_merge_commit=false -F allow_rebase_merge=false
 ```
 
-**Snyk merge gates are missing on four repos.** `risk-guidance` and
+**Snyk merge gates are missing on three repos.** `risk-guidance` and
 `nswds-metadata` receive all three Snyk statuses on PR heads but their
 rulesets do not require `security/snyk (DigitalNSW)` or
-`code/snyk (DigitalNSW)`. `images` requires `code/snyk` only. `nswds-email-issues`
-receives no Snyk statuses at all, so it has not been imported into the Snyk
-org. Fix: import `nswds-email-issues` in the Snyk console, then add the two
-contexts to each ruleset as in ONBOARDING.md step 10.
+`code/snyk (DigitalNSW)`. `images` requires `code/snyk` only. Fix: add the
+missing contexts to each ruleset as in ONBOARDING.md step 10.
 
 **Most repos do not require `install / typecheck`.** Only `agile`,
 `dtl-sandbox`, `nswds-email`, `nswds-email-design`, `nswds-skills` and `nswds-ui` require it,

@@ -386,7 +386,7 @@ under [FLEET.md open issues](FLEET.md#open-issues).
 | ictds-portal-flows | `release.yml` is a Power Platform PROD deploy; the release stub maps to `semantic-release.yml` (sync group 4) | Filename collision with a production pipeline | Permanent |
 | ictds-portal-flows | PROD deploy approval is the `RELEASE_APPROVERS` allowlist in `release.yml`, not GitHub environment required reviewers | Required reviewers on private repos is Enterprise-only (org is on Team) | Enterprise upgrade or repo visibility change |
 | dtl-sandbox | Deploys are manual `pulumi up` from operator machines; `pulumi-preview.yml` (a required `preview` check) is inert until the `PULUMI_PREVIEW_ENABLED` repo variable is set | Azure OIDC federated credential and Pulumi backend variables not yet configured (setup steps are in the workflow header) | OIDC federation lands; then set the variable |
-| digitalnsw, images, nswds-email-issues | No ESLint over mirror or static content (digitalnsw lints `api/` and `scripts/` only) | Scraped mirror, static assets, issue tracker | Permanent |
+| digitalnsw, images | No ESLint over mirror or static content (digitalnsw lints `api/` and `scripts/` only) | Scraped mirror, static assets | Permanent |
 | nswds-devops | No `lint` script and no Prettier config, so `install / lint` and `install / format` self-skip here | Shell and YAML repo; shellcheck and actionlint are the gates | n/a |
 
 ## Decisions required
