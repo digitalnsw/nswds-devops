@@ -299,3 +299,77 @@ test('every package block declares how it ends', () => {
     )
   }
 })
+
+// The #132 fix: an npm-scoped minimumReleaseAge floor. Like the blocks above,
+// this is a SILENT-FAILURE invariant — drop the floor, or let a later npm rule
+// set a shorter age, and the isolated storybook group can once again fail to
+// resolve a fresh exact-pinned dependency another npm group merged, producing
+// NO branch, NO PR and NO red check (the strand the storybook rule documents).
+// This cannot prove the strand is fixed at runtime — that is the storybook
+// rule's own caveat — but it pins the config shape the fix depends on so it
+// cannot be removed without deleting a line from a diff someone reviews.
+const FLOOR_HOURS = 72 // 3 days
+
+/** Parse a Renovate age like "3 days" / "12 hours" to hours; null if unparseable. */
+const ageHours = (value) => {
+  if (typeof value !== 'string') return null
+  const match = value.trim().match(/^(\d+)\s*(hour|day|week)s?$/i)
+  if (!match) return null
+  const n = Number(match[1])
+  return { hour: n, day: n * 24, week: n * 24 * 7 }[match[2].toLowerCase()]
+}
+
+test('the npm release-age floor that fixes #132 is present and never undercut', () => {
+  // Pin the EXACT scope, not just "some rule mentioning npm". A floor that also
+  // matched github-actions would reintroduce the action-security delay that
+  // npm-scoping avoids (Snyk does not cover workflow actions); a package- or
+  // repo-scoped npm rule would leave group:allNonMajor / storybook unprotected.
+  // Both would satisfy a loose check and silently re-open #132, so require
+  // matchManagers to be exactly ["npm"] with no other match* key — i.e. a
+  // catch-all across every npm update.
+  const matchKeys = (rule) => Object.keys(rule).filter((key) => key.startsWith('match'))
+  const isNpmFloor = (rule) =>
+    rule.minimumReleaseAge !== undefined &&
+    Array.isArray(rule.matchManagers) &&
+    rule.matchManagers.length === 1 &&
+    rule.matchManagers[0] === 'npm' &&
+    matchKeys(rule).length === 1
+  const floor = rules.find(isNpmFloor)
+  assert.ok(
+    floor,
+    'no packageRule scopes minimumReleaseAge to exactly matchManagers ["npm"] (and nothing else) — ' +
+      'the #132 storybook-strand floor is gone or mis-scoped. A rule that also matches github-actions, ' +
+      'or narrows to specific packages/repos, is NOT the fleet-wide npm floor. Restore it, or if the ' +
+      'storybook group no longer inherits a --before, update this test in the same diff.',
+  )
+  assert.equal(
+    ageHours(floor.minimumReleaseAge),
+    FLOOR_HOURS,
+    `the npm floor is "${floor.minimumReleaseAge}", expected "3 days" (see the storybook rule / #132).`,
+  )
+
+  // Renovate applies packageRules in order and LATER MATCHES WIN, so a later
+  // rule with a shorter age would re-open #132 while the floor above still reads
+  // as though it holds. A LONGER age is fine — only a shorter one strands the
+  // storybook group. Scope this to npm-affecting rules only: a rule whose
+  // matchManagers is present and excludes npm (e.g. a github-actions-only age)
+  // cannot undercut the npm floor, and policing it here would block a legitimate
+  // action-specific age — the "pressure to revert a correct change to satisfy a
+  // guard" this file's header warns against.
+  const affectsNpm = (rule) =>
+    !Array.isArray(rule.matchManagers) || rule.matchManagers.includes('npm')
+  for (const [index, rule] of rules.entries()) {
+    if (rule.minimumReleaseAge === undefined || !affectsNpm(rule)) continue
+    const hours = ageHours(rule.minimumReleaseAge)
+    assert.notEqual(
+      hours,
+      null,
+      `packageRules[${index}] minimumReleaseAge "${rule.minimumReleaseAge}" is unparseable.`,
+    )
+    assert.ok(
+      hours >= FLOOR_HOURS,
+      `packageRules[${index}] sets minimumReleaseAge "${rule.minimumReleaseAge}", below the 3-day ` +
+        'floor — a shorter age on any npm group re-opens #132 (the storybook strand).',
+    )
+  }
+})
