@@ -244,6 +244,24 @@ test('a marker pair on a line inside an open block does not leak surrounding tex
   assert.doesNotMatch(out, /MORESECRETBODY/, 'in-block body must not leak')
 })
 
+test('nested BEGIN markers on one line do not leak the outer block body', () => {
+  // redact_inline_pairs took the FIRST END after a BEGIN. With stacked markers
+  // (BEGIN…BEGIN…END…secret…END) that pairs the outer BEGIN with the inner END,
+  // leaving the outer body ("OUTERSECRET") exposed. An intervening BEGIN before
+  // the selected END now aborts the inline path so the caller opens block mode
+  // and suppresses the rest.
+  const nested =
+    '-----BEGIN PRIVATE KEY-----AAA-----BEGIN PRIVATE KEY-----BBB' +
+    '-----END PRIVATE KEY-----OUTERSECRET-----END PRIVATE KEY-----'
+  assert.doesNotMatch(redact(nested), /OUTERSECRET/, 'outer block body must not leak')
+  // Legit content before the nested markers must still survive.
+  const withKeep = 'keep1 -----BEGIN PRIVATE KEY-----X-----END PRIVATE KEY----- keep2 ' + nested
+  const out = redact(withKeep)
+  assert.doesNotMatch(out, /OUTERSECRET/, 'outer block body must not leak')
+  assert.match(out, /keep1/, 'content before an independent pair must survive')
+  assert.match(out, /keep2/, 'content between pairs must survive')
+})
+
 test('an END marker before a BEGIN on one line does not bypass block redaction', () => {
   // The same-line rule keys off the ordered BEGIN…END pattern, not BEGIN and END
   // independently. A line where an END precedes the BEGIN that opens a real

@@ -61,14 +61,23 @@ redact_sensitive_diff() {
   # block-body content. The trailing sed catches any orphan BEGIN/END markers
   # that weren't part of a complete block.
   redacted="$(printf '%s' "$redacted" | awk '
-    function redact_inline_pairs(s,   out, bstart, blen, rest) {
+    function redact_inline_pairs(s,   out, bstart, blen, rest, ep, el) {
       out = "";
       while (match(s, /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/)) {
         bstart = RSTART; blen = RLENGTH;
         rest = substr(s, bstart + blen);
         if (match(rest, /-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/)) {
+          ep = RSTART; el = RLENGTH;
+          # A second BEGIN before the selected END means the markers are nested
+          # or stacked, so this END does not close THIS BEGIN. Stop and leave the
+          # outer BEGIN in the residual, so the caller opens block mode and
+          # suppresses the rest of the line — otherwise the outer body between the
+          # inner END and the outer END (e.g. BEGIN…BEGIN…END…secret…END) leaks.
+          if (substr(rest, 1, ep - 1) ~ /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/) {
+            break;
+          }
           out = out substr(s, 1, bstart - 1) "[REDACTED_PRIVATE_KEY_BLOCK]";
-          s = substr(rest, RSTART + RLENGTH);
+          s = substr(rest, ep + el);
         } else {
           break;
         }

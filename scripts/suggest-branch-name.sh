@@ -294,7 +294,10 @@ if [[ "$ignored_paths_count" -gt 0 ]]; then
 fi
 
 # SENSITIVE_REGEX comes from secret-redaction.sh (sourced above).
-if [[ "$USE_OPENAI_API" == "true" ]] && printf '%s\n' "$full_diff" | grep -Eqi "$SENSITIVE_REGEX"; then
+# A here-string (not a `... | grep -q` pipe) feeds grep: under `set -o pipefail`,
+# grep -q exits on the first match and SIGPIPEs the upstream printf, so a pipe
+# would return 141 for a large diff and silently skip this warning.
+if [[ "$USE_OPENAI_API" == "true" ]] && grep -Eqi "$SENSITIVE_REGEX" <<<"$full_diff"; then
   printf "⚠️ Potential secrets detected in the diff.\n"
   printf "This script sends a diff preview to the OpenAI API.\n"
   proceed=""

@@ -153,8 +153,11 @@ fi
 # window, so a larger OPENAI_DIFF_MAX_LINES can't send unscanned lines) plus the
 # branch name and staged file list, which are sent as prompt metadata too and
 # would otherwise let a secret in a branch name or a key=value path slip past the
-# warning. A newline between each keeps a token from spanning the join.
-if printf '%s\n%s\n%s\n' "$DIFF" "$BRANCH" "$STAGED" | grep -Eqi "$SENSITIVE_REGEX"; then
+# warning. A newline between each keeps a token from spanning the join. A
+# here-string (not a `... | grep -q` pipe) feeds grep: under `set -o pipefail`,
+# grep -q exits on the first match and SIGPIPEs the upstream printf, so a pipe
+# would return 141 for a large diff and silently skip this warning.
+if grep -Eqi "$SENSITIVE_REGEX" <<<"$(printf '%s\n%s\n%s' "$DIFF" "$BRANCH" "$STAGED")"; then
   printf "⚠️ Potential secrets detected in the staged diff or change metadata.\n"
   printf "This script will send code to the OpenAI API.\n"
   read -r -p "Proceed anyway? (y/N) " _ans
