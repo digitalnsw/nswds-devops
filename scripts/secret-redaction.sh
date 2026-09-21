@@ -72,9 +72,10 @@ redact_sensitive_diff() {
   #                     suffix that falls through to the OUT rules.
   #   Rule 2  OUT       a complete ordered BEGIN…END pair on the line: redact each
   #                     pair in place (redact_inline_pairs), preserving text
-  #                     around/between pairs; a lone BEGIN left over → go IN.
-  #   Rule 3  OUT       a lone BEGIN with no closing END: go IN, preserving any
-  #                     text before the marker.
+  #                     around/between pairs; a residual BEGIN → go IN, seeding
+  #                     depth from open_depth() so stacked BEGINs count fully.
+  #   Rule 3  OUT       a lone BEGIN with no closing END: go IN (depth seeded from
+  #                     open_depth()), preserving any text before the marker.
   #   Rule 4            default: print the line unchanged.
   #
   # Invariants to preserve when editing:
@@ -112,6 +113,22 @@ redact_sensitive_diff() {
       }
       return out s;
     }
+    # Net unmatched-BEGIN depth of a line: BEGIN opens a level, END closes one
+    # (an END with no open level is an orphan and ignored). Used when a line
+    # OPENS a block so the depth counter starts at the real number of stacked
+    # BEGINs, not 1 — otherwise the first END would close the block early and
+    # leak the outer body.
+    function open_depth(s,   d, bpos, blen, epos, elen) {
+      d = 0;
+      while (1) {
+        if (match(s, /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/)) { bpos = RSTART; blen = RLENGTH; } else { bpos = 0; }
+        if (match(s, /-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/)) { epos = RSTART; elen = RLENGTH; } else { epos = 0; }
+        if (bpos && (epos == 0 || bpos < epos)) { d++; s = substr(s, bpos + blen); }
+        else if (epos) { if (d > 0) d--; s = substr(s, epos + elen); }
+        else break;
+      }
+      return d;
+    }
     in_private_key {
       # in_private_key is a DEPTH counter, not a boolean. Stacked BEGINs across
       # lines (malformed/adversarial input — a real PEM body is marker-free
@@ -148,19 +165,20 @@ redact_sensitive_diff() {
       $0 = redact_inline_pairs($0);
       if (match($0, /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/)) {
         printf "%s[REDACTED_PRIVATE_KEY_BLOCK]\n", substr($0, 1, RSTART - 1);
-        in_private_key = 1;
+        in_private_key = open_depth($0);
         next;
       }
       print;
       next;
     }
     /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/ {
-      # A lone BEGIN opens a multi-line block. Keep any legitimate text before
-      # the marker (e.g. metadata that precedes an inline key on the same line),
-      # replacing only from the BEGIN onward.
+      # A lone BEGIN opens a multi-line block. Seed the depth counter with the
+      # number of unmatched BEGINs on this line (stacked BEGINs need that many
+      # ENDs to close). Keep any legitimate text before the first marker (e.g.
+      # metadata that precedes an inline key), replacing only from the BEGIN on.
+      in_private_key = open_depth($0);
       match($0, /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/);
       printf "%s[REDACTED_PRIVATE_KEY_BLOCK]\n", substr($0, 1, RSTART - 1);
-      in_private_key = 1;
       next;
     }
     { print; }

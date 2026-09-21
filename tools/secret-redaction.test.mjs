@@ -301,6 +301,20 @@ test('a close line that also starts the next block keeps the metadata between th
   assert.doesNotMatch(redact(withSecret), /hunter2/, 'a secret between keys must still be redacted')
 })
 
+test('stacked BEGINs on the opening line do not leak the outer block body', () => {
+  // The opening rule seeds the depth counter with the number of unmatched BEGINs
+  // on the line. If it assumed 1, an opening line with two BEGINs would be closed
+  // by the first END and the content before the second END would leak.
+  const input = [
+    '-----BEGIN PRIVATE KEY-----X-----BEGIN PRIVATE KEY-----',
+    '-----END PRIVATE KEY-----',
+    'OUTERSECRET',
+    '-----END PRIVATE KEY-----',
+  ].join('\n')
+  const out = redact(input)
+  assert.doesNotMatch(out, /OUTERSECRET/, 'stacked BEGINs must need matching ENDs before content is emitted')
+})
+
 test('nested BEGIN markers across separate lines do not leak the outer block body', () => {
   // The block state is a depth counter, not a boolean: an inner BEGIN/END pair
   // on their own lines inside an outer block must not let the inner END close the
