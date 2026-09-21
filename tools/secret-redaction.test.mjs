@@ -273,6 +273,34 @@ test('text after a closing END marker on the same line survives, body does not',
   assert.match(out2, /"note":"keep"/, 'non-secret suffix content survives')
 })
 
+test('a close line that also starts the next block keeps the metadata between them', () => {
+  // When a block's closing END is followed on the same line by more content and
+  // a new BEGIN, the close rule must close at that END (not treat the trailing
+  // BEGIN as "still nested") so the metadata between the two keys survives and
+  // the second block is handled, rather than staying suppressed indefinitely.
+  const input = [
+    '-----BEGIN PRIVATE KEY-----',
+    'BODY1',
+    '-----END PRIVATE KEY-----","meta1":"keep1","key2":"-----BEGIN PRIVATE KEY-----',
+    'BODY2',
+    '-----END PRIVATE KEY-----","meta2":"keep2"',
+  ].join('\n')
+  const out = redact(input)
+  assert.doesNotMatch(out, /BODY1/, 'first key body must be suppressed')
+  assert.doesNotMatch(out, /BODY2/, 'second key body must be suppressed')
+  assert.match(out, /"meta1":"keep1"/, 'metadata between the two keys must survive')
+  assert.match(out, /"meta2":"keep2"/, 'trailing metadata after the last key must survive')
+  // A secret in that surviving between-key metadata is still masked downstream.
+  const withSecret = [
+    '-----BEGIN PRIVATE KEY-----',
+    'BODY',
+    '-----END PRIVATE KEY-----","password":"hunter2","k":"-----BEGIN PRIVATE KEY-----',
+    'B2',
+    '-----END PRIVATE KEY-----',
+  ].join('\n')
+  assert.doesNotMatch(redact(withSecret), /hunter2/, 'a secret between keys must still be redacted')
+})
+
 test('nested BEGIN markers on one line do not leak the outer block body', () => {
   // redact_inline_pairs took the FIRST END after a BEGIN. With stacked markers
   // (BEGIN…BEGIN…END…secret…END) that pairs the outer BEGIN with the inner END,

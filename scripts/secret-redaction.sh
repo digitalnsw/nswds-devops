@@ -85,15 +85,18 @@ redact_sensitive_diff() {
       return out s;
     }
     in_private_key {
-      if (/-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/ && $0 !~ /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/) {
-        # Close the block: drop the body and everything up to and including the
-        # closing END marker, but keep any legitimate suffix after it (e.g. a
-        # multi-line PEM inside JSON whose last line is `…END-----","f":"v"`).
-        # The close condition guarantees no BEGIN on this line, so the suffix
-        # cannot re-open a block; fall through so the remaining rules and the
-        # key/value sed still process (and mask) anything sensitive in it.
+      if (match($0, /-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/) && substr($0, 1, RSTART - 1) !~ /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/) {
+        # The FIRST END with no BEGIN before it closes the block: drop the body
+        # and everything up to and including that END, but keep any legitimate
+        # suffix after it (a multi-line PEM inside JSON whose last line is
+        # `…END-----","f":"v"`, or a line that also starts the next block). A
+        # BEGIN *before* the first END means nested/stacked markers, so this END
+        # is not ours and the line stays suppressed. The suffix may itself open a
+        # new block or carry a secret, so fall through and let the rules below
+        # (and the key/value sed) handle it. `substr(... RSTART-1)` reads before
+        # the END match; `~` does not disturb RSTART/RLENGTH, so they still point
+        # at that END for the substr below.
         in_private_key = 0;
-        match($0, /-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/);
         $0 = substr($0, RSTART + RLENGTH);
         if ($0 == "") next;
       } else {
@@ -111,8 +114,12 @@ redact_sensitive_diff() {
       next;
     }
     /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/ {
+      # A lone BEGIN opens a multi-line block. Keep any legitimate text before
+      # the marker (e.g. metadata that precedes an inline key on the same line),
+      # replacing only from the BEGIN onward.
+      match($0, /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/);
+      printf "%s[REDACTED_PRIVATE_KEY_BLOCK]\n", substr($0, 1, RSTART - 1);
       in_private_key = 1;
-      print "[REDACTED_PRIVATE_KEY_BLOCK]";
       next;
     }
     { print; }

@@ -294,10 +294,16 @@ if [[ "$ignored_paths_count" -gt 0 ]]; then
 fi
 
 # SENSITIVE_REGEX comes from secret-redaction.sh (sourced above).
-# A here-string (not a `... | grep -q` pipe) feeds grep: under `set -o pipefail`,
-# grep -q exits on the first match and SIGPIPEs the upstream printf, so a pipe
-# would return 141 for a large diff and silently skip this warning.
-if [[ "$USE_OPENAI_API" == "true" ]] && grep -Eqi "$SENSITIVE_REGEX" <<<"$full_diff"; then
+# Scan every gateway-bound source, not just the diff: build_prompt also sends
+# path-derived metadata (the changed/untracked file lists, the change-scope and
+# ignore-filter summaries incl. an ignored-path sample), so a secret in a file
+# path — e.g. `config/api_key=xyz` — would otherwise reach the prompt without
+# tripping this warning. Those summaries are derived from these raw path sources,
+# so scanning the sources here covers them (they are built later, after this
+# check). A here-string (not a `... | grep -q` pipe) feeds grep: under
+# `set -o pipefail`, grep -q exits on the first match and SIGPIPEs the upstream
+# printf, so a pipe would return 141 for a large diff and silently skip this.
+if [[ "$USE_OPENAI_API" == "true" ]] && grep -Eqi "$SENSITIVE_REGEX" <<<"$(printf '%s\n%s\n%s\n%s\n' "$full_diff" "$changed_files" "$untracked_files" "$ignored_paths")"; then
   printf "⚠️ Potential secrets detected in the diff.\n"
   printf "This script sends a diff preview to the OpenAI API.\n"
   proceed=""
