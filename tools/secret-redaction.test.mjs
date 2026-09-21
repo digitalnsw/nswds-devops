@@ -201,6 +201,37 @@ test('a single-line BEGIN/END PEM does not swallow following lines (finding 2)',
   assert.doesNotMatch(out, /BEGIN PRIVATE KEY/, 'the BEGIN marker must not survive')
 })
 
+test('a same-line PEM redacts every marker variant in place', () => {
+  // Parity with the multi-line variant matrix: the single-line (GCP-JSON) shape
+  // must handle ENCRYPTED and PGP too, not just plain — and the content that
+  // follows the closing quote on the same line must survive.
+  for (const [name, marker] of PEM_VARIANTS) {
+    const input = `{"k":"-----BEGIN ${marker}-----\\nBODYSECRET${name}\\n-----END ${marker}-----","keep":"me"}`
+    const out = redact(input)
+    assert.doesNotMatch(out, /BODYSECRET/, `${name}: same-line body must be redacted`)
+    assert.match(out, /"keep":"me"|keep/, `${name}: trailing same-line content must survive`)
+  }
+})
+
+test('an END marker before a BEGIN on one line does not bypass block redaction', () => {
+  // The same-line rule keys off the ordered BEGIN…END pattern, not BEGIN and END
+  // independently. A line where an END precedes the BEGIN that opens a real
+  // multi-line block must fall through to block mode — otherwise the body that
+  // follows leaks. (Regression: an earlier draft used `/BEGIN/ && /END/`, whose
+  // gsub could not match the reversed order, so block mode was never entered.)
+  const input = [
+    'prefix -----END PRIVATE KEY----- then -----BEGIN PRIVATE KEY-----',
+    'SECRETBODYXYZ',
+    'morebase64SECRET',
+    '-----END PRIVATE KEY-----',
+    'trailing line',
+  ].join('\n')
+  const out = redact(input)
+  assert.doesNotMatch(out, /SECRETBODYXYZ/, 'the key body must not leak')
+  assert.doesNotMatch(out, /morebase64SECRET/, 'the key body must not leak')
+  assert.match(out, /trailing line/, 'content after the closed block must survive')
+})
+
 // --- Newly covered key spellings (finding 3) -------------------------------
 
 test('redacts passwd, pwd, credentials, private_key and passphrase values', () => {

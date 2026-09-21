@@ -40,13 +40,16 @@ redact_sensitive_diff() {
   # purpose — [A-Z0-9 ]*PRIVATE KEY[A-Z ]* covers plain, RSA, OPENSSH, EC, DSA,
   # ENCRYPTED and "PGP … BLOCK" markers (and any future variant) rather than
   # enumerating algorithms, which is what let ENCRYPTED/PGP blocks slip through.
-  # A BEGIN and END on the SAME line (a GCP service-account JSON stores the key
-  # as one line with `\n` escapes) is redacted in place and does NOT enter block
-  # mode — otherwise `next` swallows every following line until an unrelated END
-  # appears, silently truncating the diff. The trailing sed catches any orphan
-  # BEGIN/END markers that weren't part of a complete block.
+  # A complete BEGIN…END pair on the SAME line (a GCP service-account JSON stores
+  # the key as one line with `\n` escapes) is redacted in place and does NOT
+  # enter block mode — otherwise `next` swallows every following line until an
+  # unrelated END appears, silently truncating the diff. The condition matches
+  # the ordered BEGIN…END pattern (not BEGIN and END independently): a line where
+  # an END precedes a BEGIN must fall through to the block-open rule so the block
+  # the trailing BEGIN opens is still redacted. The trailing sed catches any
+  # orphan BEGIN/END markers that weren't part of a complete block.
   redacted="$(printf '%s' "$redacted" | awk '
-    /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/ && /-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/ {
+    /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----.*-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/ {
       gsub(/-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----.*-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/, "[REDACTED_PRIVATE_KEY_BLOCK]");
       print;
       next;
