@@ -320,21 +320,27 @@ const ageHours = (value) => {
 }
 
 test('the npm release-age floor that fixes #132 is present and never undercut', () => {
-  // The floor is scoped to matchManagers ["npm"] on purpose: the strand is an
-  // npm-lockfile phenomenon, and a manager-agnostic (top-level) setting would
-  // also hold github-actions updates, which Snyk does not cover. So the guard
-  // looks for the npm-scoped rule specifically, not a top-level key.
-  const floor = rules.find(
-    (rule) =>
-      Array.isArray(rule.matchManagers) &&
-      rule.matchManagers.includes('npm') &&
-      rule.minimumReleaseAge !== undefined,
-  )
+  // Pin the EXACT scope, not just "some rule mentioning npm". A floor that also
+  // matched github-actions would reintroduce the action-security delay that
+  // npm-scoping avoids (Snyk does not cover workflow actions); a package- or
+  // repo-scoped npm rule would leave group:allNonMajor / storybook unprotected.
+  // Both would satisfy a loose check and silently re-open #132, so require
+  // matchManagers to be exactly ["npm"] with no other match* key — i.e. a
+  // catch-all across every npm update.
+  const matchKeys = (rule) => Object.keys(rule).filter((key) => key.startsWith('match'))
+  const isNpmFloor = (rule) =>
+    rule.minimumReleaseAge !== undefined &&
+    Array.isArray(rule.matchManagers) &&
+    rule.matchManagers.length === 1 &&
+    rule.matchManagers[0] === 'npm' &&
+    matchKeys(rule).length === 1
+  const floor = rules.find(isNpmFloor)
   assert.ok(
     floor,
-    'no packageRule sets minimumReleaseAge for matchManagers ["npm"] — the #132 storybook-strand ' +
-      'floor is gone. Restore it, or if the storybook group no longer inherits a --before, update ' +
-      'this test in the same diff.',
+    'no packageRule scopes minimumReleaseAge to exactly matchManagers ["npm"] (and nothing else) — ' +
+      'the #132 storybook-strand floor is gone or mis-scoped. A rule that also matches github-actions, ' +
+      'or narrows to specific packages/repos, is NOT the fleet-wide npm floor. Restore it, or if the ' +
+      'storybook group no longer inherits a --before, update this test in the same diff.',
   )
   assert.equal(
     ageHours(floor.minimumReleaseAge),
