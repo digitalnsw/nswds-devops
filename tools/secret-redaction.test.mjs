@@ -147,3 +147,308 @@ test('detection warns on compound keys but not on code identifiers', () => {
     assert.equal(detectsExit(input), false, `should not detect ${JSON.stringify(input)}`)
   }
 })
+
+// --- Private-key block path (findings 1 & 2) -------------------------------
+// The block path had no coverage at all, which is why ENCRYPTED/PGP blocks
+// leaked and a single-line PEM silently truncated the rest of the input.
+
+// Every PEM marker spelling the BEGIN/END class must cover. ENCRYPTED and PGP
+// are the two that the old `(RSA|OPENSSH|EC|DSA)? ?PRIVATE KEY` pattern missed.
+const PEM_VARIANTS = [
+  ['plain', 'PRIVATE KEY'],
+  ['RSA', 'RSA PRIVATE KEY'],
+  ['OPENSSH', 'OPENSSH PRIVATE KEY'],
+  ['EC', 'EC PRIVATE KEY'],
+  ['DSA', 'DSA PRIVATE KEY'],
+  ['ENCRYPTED', 'ENCRYPTED PRIVATE KEY'],
+  ['PGP', 'PGP PRIVATE KEY BLOCK'],
+]
+
+test('redacts every PEM block variant, body and all (finding 1)', () => {
+  for (const [name, marker] of PEM_VARIANTS) {
+    const input = `-----BEGIN ${marker}-----\nMIISECRETBODY${name}\n-----END ${marker}-----`
+    const out = redact(input)
+    assert.match(out, /\[REDACTED_PRIVATE_KEY_BLOCK\]/, `${name}: block placeholder`)
+    assert.doesNotMatch(out, /SECRETBODY/, `${name}: body must not survive`)
+    assert.doesNotMatch(out, /BEGIN .*PRIVATE KEY/, `${name}: BEGIN marker must not survive`)
+  }
+})
+
+test('detection warns on every PEM block variant (finding 1)', () => {
+  // Redaction and detection failed together for ENCRYPTED/PGP, so assert the
+  // DETECTION regex directly — a redaction-only test cannot tell them apart.
+  for (const [name, marker] of PEM_VARIANTS) {
+    assert.equal(detectsExit(`-----BEGIN ${marker}-----`), true, `should detect ${name}`)
+  }
+})
+
+test('a single-line BEGIN/END PEM does not swallow following lines (finding 2)', () => {
+  // The GCP service-account JSON shape: the whole key on one line with `\n`
+  // escapes. The old rule printed the placeholder and `next`ed, so `in_private
+  // _key` stayed set and every later line was dropped. Assert the SURVIVING
+  // content, not just the placeholder — that is the actual regression.
+  const input = [
+    '+ line one',
+    '+ "private_key": "-----BEGIN PRIVATE KEY-----\\nMIISECRETBODY\\n-----END PRIVATE KEY-----"',
+    '+ line three',
+    '+ line four',
+  ].join('\n')
+  const out = redact(input)
+  assert.match(out, /line one/)
+  assert.match(out, /line three/, 'lines after a single-line PEM must survive')
+  assert.match(out, /line four/, 'lines after a single-line PEM must survive')
+  assert.doesNotMatch(out, /MIISECRETBODY/, 'the key body must be redacted')
+  assert.doesNotMatch(out, /BEGIN PRIVATE KEY/, 'the BEGIN marker must not survive')
+})
+
+test('a same-line PEM redacts every marker variant in place', () => {
+  // Parity with the multi-line variant matrix: the single-line (GCP-JSON) shape
+  // must handle ENCRYPTED and PGP too, not just plain — and the content that
+  // follows the closing quote on the same line must survive.
+  for (const [name, marker] of PEM_VARIANTS) {
+    const input = `{"k":"-----BEGIN ${marker}-----\\nBODYSECRET${name}\\n-----END ${marker}-----","keep":"me"}`
+    const out = redact(input)
+    assert.doesNotMatch(out, /BODYSECRET/, `${name}: same-line body must be redacted`)
+    assert.match(out, /"keep":"me"|keep/, `${name}: trailing same-line content must survive`)
+  }
+})
+
+test('two independent same-line PEM pairs both redact, preserving text between them', () => {
+  // A single greedy `.*` would collapse from the first BEGIN to the LAST END,
+  // eating the field between the two keys. Each pair must be redacted up to its
+  // own END so the middle content survives.
+  const input =
+    '{"a":"-----BEGIN PRIVATE KEY-----\\nKEYONE\\n-----END PRIVATE KEY-----",' +
+    '"note":"keepme",' +
+    '"b":"-----BEGIN PRIVATE KEY-----\\nKEYTWO\\n-----END PRIVATE KEY-----"}'
+  const out = redact(input)
+  assert.doesNotMatch(out, /KEYONE/, 'first key body must be redacted')
+  assert.doesNotMatch(out, /KEYTWO/, 'second key body must be redacted')
+  assert.match(out, /"note":"keepme"/, 'content between the two pairs must survive')
+})
+
+test('a marker pair on a line inside an open block does not leak surrounding text', () => {
+  // The inline-pair path preserves text around each pair, which is correct
+  // OUTSIDE a block but must never run while a multi-line block is open: the
+  // line sits between the block's BEGIN and END, so it is key-body content and
+  // must be suppressed whole. Regression: an earlier draft ran the inline path
+  // before the block-state check, printing the text around a body-line pair.
+  const input = [
+    '-----BEGIN PRIVATE KEY-----',
+    '"leaked":"value", "inline":"-----BEGIN PRIVATE KEY-----\\nX\\n-----END PRIVATE KEY-----"',
+    'MORESECRETBODY',
+    '-----END PRIVATE KEY-----',
+  ].join('\n')
+  const out = redact(input)
+  assert.doesNotMatch(out, /"leaked":"value"/, 'in-block body text must not leak')
+  assert.doesNotMatch(out, /MORESECRETBODY/, 'in-block body must not leak')
+})
+
+test('text after a closing END marker on the same line survives, body does not', () => {
+  // A multi-line PEM whose closing physical line carries a suffix (e.g. inside a
+  // JSON value): the body and everything up to the END must be dropped, but the
+  // legitimate suffix after the END must survive — and any secret in that suffix
+  // must still be masked by the key/value stage.
+  const input = [
+    'before',
+    '-----BEGIN PRIVATE KEY-----',
+    'BASE64BODY',
+    'LEAKYPREFIX-----END PRIVATE KEY-----","field":"value"',
+    'after',
+  ].join('\n')
+  const out = redact(input)
+  assert.doesNotMatch(out, /BASE64BODY/, 'key body must be suppressed')
+  assert.doesNotMatch(out, /LEAKYPREFIX/, 'text before the closing END (still block body) must be suppressed')
+  assert.match(out, /"field":"value"/, 'legitimate suffix after the closing END must survive')
+  assert.match(out, /before/)
+  assert.match(out, /after/)
+  // A secret in the surviving suffix is still masked by the key/value stage.
+  const withSecret = [
+    '-----BEGIN PRIVATE KEY-----',
+    'BODY',
+    '-----END PRIVATE KEY-----","password":"hunter2","note":"keep"',
+  ].join('\n')
+  const out2 = redact(withSecret)
+  assert.doesNotMatch(out2, /hunter2/, 'a secret in the surviving suffix must still be redacted')
+  assert.match(out2, /"note":"keep"/, 'non-secret suffix content survives')
+})
+
+test('a close line that also starts the next block keeps the metadata between them', () => {
+  // When a block's closing END is followed on the same line by more content and
+  // a new BEGIN, the close rule must close at that END (not treat the trailing
+  // BEGIN as "still nested") so the metadata between the two keys survives and
+  // the second block is handled, rather than staying suppressed indefinitely.
+  const input = [
+    '-----BEGIN PRIVATE KEY-----',
+    'BODY1',
+    '-----END PRIVATE KEY-----","meta1":"keep1","key2":"-----BEGIN PRIVATE KEY-----',
+    'BODY2',
+    '-----END PRIVATE KEY-----","meta2":"keep2"',
+  ].join('\n')
+  const out = redact(input)
+  assert.doesNotMatch(out, /BODY1/, 'first key body must be suppressed')
+  assert.doesNotMatch(out, /BODY2/, 'second key body must be suppressed')
+  assert.match(out, /"meta1":"keep1"/, 'metadata between the two keys must survive')
+  assert.match(out, /"meta2":"keep2"/, 'trailing metadata after the last key must survive')
+  // A secret in that surviving between-key metadata is still masked downstream.
+  const withSecret = [
+    '-----BEGIN PRIVATE KEY-----',
+    'BODY',
+    '-----END PRIVATE KEY-----","password":"hunter2","k":"-----BEGIN PRIVATE KEY-----',
+    'B2',
+    '-----END PRIVATE KEY-----',
+  ].join('\n')
+  assert.doesNotMatch(redact(withSecret), /hunter2/, 'a secret between keys must still be redacted')
+})
+
+test('stacked BEGINs on the opening line do not leak the outer block body', () => {
+  // The opening rule seeds the depth counter with the number of unmatched BEGINs
+  // on the line. If it assumed 1, an opening line with two BEGINs would be closed
+  // by the first END and the content before the second END would leak.
+  const input = [
+    '-----BEGIN PRIVATE KEY-----X-----BEGIN PRIVATE KEY-----',
+    '-----END PRIVATE KEY-----',
+    'OUTERSECRET',
+    '-----END PRIVATE KEY-----',
+  ].join('\n')
+  const out = redact(input)
+  assert.doesNotMatch(out, /OUTERSECRET/, 'stacked BEGINs must need matching ENDs before content is emitted')
+})
+
+test('nested BEGIN markers across separate lines do not leak the outer block body', () => {
+  // The block state is a depth counter, not a boolean: an inner BEGIN/END pair
+  // on their own lines inside an outer block must not let the inner END close the
+  // outer block, or the content between the inner END and the outer END leaks.
+  const input = [
+    '-----BEGIN PRIVATE KEY-----',
+    '-----BEGIN PRIVATE KEY-----',
+    '-----END PRIVATE KEY-----',
+    'OUTERSECRET',
+    '-----END PRIVATE KEY-----',
+  ].join('\n')
+  const out = redact(input)
+  assert.doesNotMatch(out, /OUTERSECRET/, 'outer block body must not leak across a nested inner END')
+})
+
+test('nested BEGIN markers on one line do not leak the outer block body', () => {
+  // redact_inline_pairs took the FIRST END after a BEGIN. With stacked markers
+  // (BEGIN…BEGIN…END…secret…END) that pairs the outer BEGIN with the inner END,
+  // leaving the outer body ("OUTERSECRET") exposed. An intervening BEGIN before
+  // the selected END now aborts the inline path so the caller opens block mode
+  // and suppresses the rest.
+  const nested =
+    '-----BEGIN PRIVATE KEY-----AAA-----BEGIN PRIVATE KEY-----BBB' +
+    '-----END PRIVATE KEY-----OUTERSECRET-----END PRIVATE KEY-----'
+  assert.doesNotMatch(redact(nested), /OUTERSECRET/, 'outer block body must not leak')
+  // Legit content before the nested markers must still survive.
+  const withKeep = 'keep1 -----BEGIN PRIVATE KEY-----X-----END PRIVATE KEY----- keep2 ' + nested
+  const out = redact(withKeep)
+  assert.doesNotMatch(out, /OUTERSECRET/, 'outer block body must not leak')
+  assert.match(out, /keep1/, 'content before an independent pair must survive')
+  assert.match(out, /keep2/, 'content between pairs must survive')
+})
+
+test('an END marker before a BEGIN on one line does not bypass block redaction', () => {
+  // The same-line rule keys off the ordered BEGIN…END pattern, not BEGIN and END
+  // independently. A line where an END precedes the BEGIN that opens a real
+  // multi-line block must fall through to block mode — otherwise the body that
+  // follows leaks. (Regression: an earlier draft used `/BEGIN/ && /END/`, whose
+  // gsub could not match the reversed order, so block mode was never entered.)
+  const input = [
+    'prefix -----END PRIVATE KEY----- then -----BEGIN PRIVATE KEY-----',
+    'SECRETBODYXYZ',
+    'morebase64SECRET',
+    '-----END PRIVATE KEY-----',
+    'trailing line',
+  ].join('\n')
+  const out = redact(input)
+  assert.doesNotMatch(out, /SECRETBODYXYZ/, 'the key body must not leak')
+  assert.doesNotMatch(out, /morebase64SECRET/, 'the key body must not leak')
+  assert.match(out, /trailing line/, 'content after the closed block must survive')
+})
+
+// --- Newly covered key spellings (finding 3) -------------------------------
+
+test('redacts passwd, pwd, credentials, private_key and passphrase values', () => {
+  const cases = [
+    ['passwd=hunter2', 'passwd=[REDACTED]'],
+    ['pwd=hunter2', 'pwd=[REDACTED]'],
+    ['credential: hunter2', 'credential: [REDACTED]'],
+    ['credentials: hunter2', 'credentials: [REDACTED]'],
+    ['private_key: abc123', 'private_key: [REDACTED]'],
+    ['private-key=abc123', 'private-key=[REDACTED]'],
+    ['passphrase=letmein', 'passphrase=[REDACTED]'],
+    ['  "passphrase": "letmein",', '  "passphrase": "[REDACTED]",'],
+    ['  "private_key": "not-a-pem-just-an-id",', '  "private_key": "[REDACTED]",'],
+  ]
+  for (const [input, expected] of cases) {
+    assert.equal(redact(input).trimEnd(), expected, `redacting ${JSON.stringify(input)}`)
+  }
+})
+
+test('detection warns on the newly added key spellings (finding 3)', () => {
+  for (const input of [
+    'passwd=hunter2',
+    'pwd=hunter2',
+    'credentials: hunter2',
+    'private_key: abc123',
+    'passphrase=letmein',
+  ]) {
+    assert.equal(detectsExit(input), true, `should detect ${JSON.stringify(input)}`)
+  }
+})
+
+test('the pwd shell builtin is not redacted or detected as a secret', () => {
+  // `pwd` is now a matched word, but the key/value rules require a `:`/`=`
+  // after the key — so the builtin invocations `$(pwd)` and `pwd)` (which have
+  // neither) must pass through untouched and must not trip the warning.
+  const untouched = ['echo $(pwd)', 'DIR=$(pwd)', '  cd "$(pwd)"', 'esac; pwd)']
+  for (const input of untouched) {
+    assert.equal(redact(input).trimEnd(), input, `should not redact ${JSON.stringify(input)}`)
+    assert.equal(detectsExit(input), false, `should not detect ${JSON.stringify(input)}`)
+  }
+})
+
+/** True when contains_sensitive (from the sourced script) matches any argument. */
+function containsSensitive(args) {
+  try {
+    execFileSync(
+      'bash',
+      ['-c', 'source "$1"; shift; contains_sensitive "$@"', 'bash', script, ...args],
+      { stdio: 'ignore' },
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
+test('contains_sensitive warns on a secret in any argument, not just the first', () => {
+  // The callers pass the diff plus every gateway-bound metadata field; a secret
+  // in a later field (a branch name, a file path) must still trip the warning.
+  assert.equal(containsSensitive(['+ normal code', 'main', 'file.txt']), false)
+  assert.equal(containsSensitive(['+ AWS_SECRET_ACCESS_KEY=x', 'main', 'file.txt']), true)
+  assert.equal(containsSensitive(['+ normal', 'fix/AWS_SECRET_ACCESS_KEY=leaked', 'file.txt']), true)
+  assert.equal(containsSensitive(['+ normal', 'main', 'config/password=hunter2.env']), true)
+  assert.equal(containsSensitive(['+ normal code', 'src/app.ts', 'README.md']), false)
+})
+
+test('contains_sensitive stays SIGPIPE-safe on large early-match input', () => {
+  // The secret is at the very start, so a `... | grep -q` implementation would
+  // quit immediately and SIGPIPE the writer (exit 141 under `set -o pipefail`),
+  // read as "no match". The here-string implementation must still report it.
+  const bash = [
+    'set -o pipefail',
+    'source "$1"',
+    `big="AWS_SECRET_ACCESS_KEY=leaked"$'\\n'"$(printf 'padding line to exceed the pipe buffer\\n%.0s' {1..5000})"`,
+    'contains_sensitive "$big"',
+  ].join('; ')
+  let ok = false
+  try {
+    execFileSync('bash', ['-c', bash, 'bash', script], { stdio: 'ignore' })
+    ok = true
+  } catch {
+    ok = false
+  }
+  assert.equal(ok, true, 'large early-match input must still warn (no SIGPIPE miss)')
+})
