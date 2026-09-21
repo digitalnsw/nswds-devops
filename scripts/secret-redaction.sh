@@ -46,13 +46,20 @@ redact_sensitive_diff() {
   # unrelated END appears, silently truncating the diff. redact_inline_pairs
   # walks the pairs left to right, matching each up to the FIRST END after its
   # BEGIN, so content between two independent pairs on one line survives (a single
-  # greedy `.*` would collapse from the first BEGIN to the last END). The rule
-  # only fires on the ordered BEGIN…END pattern (not BEGIN and END independently):
-  # a line where an END precedes a BEGIN falls through to the block-open rule so
-  # the block the trailing BEGIN opens is still redacted. If a lone BEGIN with no
-  # END is left on the line after the inline pairs are redacted, it opens a real
-  # multi-line block, so enter block mode there. The trailing sed catches any
-  # orphan BEGIN/END markers that weren't part of a complete block.
+  # greedy `.*` would collapse from the first BEGIN to the last END). The inline
+  # path only fires on the ordered BEGIN…END pattern (not BEGIN and END
+  # independently): a line where an END precedes a BEGIN falls through to the
+  # block-open rule so the block the trailing BEGIN opens is still redacted. If a
+  # lone BEGIN with no END is left on the line after the inline pairs are
+  # redacted, it opens a real multi-line block, so enter block mode there.
+  #
+  # Block state is handled FIRST: while inside an open block every line is
+  # suppressed, and the block closes only on an END with no BEGIN — so a
+  # marker-bearing body line (adversarial or malformed input carrying an inline
+  # BEGIN…END while a block is open) is dropped whole rather than routed through
+  # the inline path, which would print the text surrounding the pair and leak
+  # block-body content. The trailing sed catches any orphan BEGIN/END markers
+  # that weren't part of a complete block.
   redacted="$(printf '%s' "$redacted" | awk '
     function redact_inline_pairs(s,   out, bstart, blen, rest) {
       out = "";
@@ -67,6 +74,12 @@ redact_sensitive_diff() {
         }
       }
       return out s;
+    }
+    in_private_key {
+      if (/-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/ && $0 !~ /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/) {
+        in_private_key = 0;
+      }
+      next;
     }
     /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----.*-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/ {
       $0 = redact_inline_pairs($0);
@@ -83,11 +96,6 @@ redact_sensitive_diff() {
       print "[REDACTED_PRIVATE_KEY_BLOCK]";
       next;
     }
-    in_private_key && /-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/ {
-      in_private_key = 0;
-      next;
-    }
-    in_private_key { next; }
     { print; }
   ' | sed -E \
     -e 's/-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/[REDACTED_PRIVATE_KEY]/g' \

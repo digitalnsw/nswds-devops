@@ -227,6 +227,23 @@ test('two independent same-line PEM pairs both redact, preserving text between t
   assert.match(out, /"note":"keepme"/, 'content between the two pairs must survive')
 })
 
+test('a marker pair on a line inside an open block does not leak surrounding text', () => {
+  // The inline-pair path preserves text around each pair, which is correct
+  // OUTSIDE a block but must never run while a multi-line block is open: the
+  // line sits between the block's BEGIN and END, so it is key-body content and
+  // must be suppressed whole. Regression: an earlier draft ran the inline path
+  // before the block-state check, printing the text around a body-line pair.
+  const input = [
+    '-----BEGIN PRIVATE KEY-----',
+    '"leaked":"value", "inline":"-----BEGIN PRIVATE KEY-----\\nX\\n-----END PRIVATE KEY-----"',
+    'MORESECRETBODY',
+    '-----END PRIVATE KEY-----',
+  ].join('\n')
+  const out = redact(input)
+  assert.doesNotMatch(out, /"leaked":"value"/, 'in-block body text must not leak')
+  assert.doesNotMatch(out, /MORESECRETBODY/, 'in-block body must not leak')
+})
+
 test('an END marker before a BEGIN on one line does not bypass block redaction', () => {
   // The same-line rule keys off the ordered BEGIN…END pattern, not BEGIN and END
   // independently. A line where an END precedes the BEGIN that opens a real
