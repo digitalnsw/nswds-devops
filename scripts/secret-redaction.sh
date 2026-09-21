@@ -60,6 +60,31 @@ redact_sensitive_diff() {
   # the inline path, which would print the text surrounding the pair and leak
   # block-body content. The trailing sed catches any orphan BEGIN/END markers
   # that weren't part of a complete block.
+  #
+  # ── State machine (awk rules run top-to-bottom per line; first `next` wins) ──
+  # Two states: OUT (in_private_key unset) and IN (a multi-line block is open).
+  #
+  #   Rule 1  IN only   suppress every line; close on the FIRST END that has no
+  #                     BEGIN before it, keep the suffix after that END and fall
+  #                     through (a BEGIN before that END = nested → stay IN).
+  #   Rule 2  OUT       a complete ordered BEGIN…END pair on the line: redact each
+  #                     pair in place (redact_inline_pairs), preserving text
+  #                     around/between pairs; a lone BEGIN left over → go IN.
+  #   Rule 3  OUT       a lone BEGIN with no closing END: go IN, preserving any
+  #                     text before the marker.
+  #   Rule 4            default: print the line unchanged.
+  #
+  # Invariants to preserve when editing:
+  #   • IN never prints block-body content; only a clean END (no BEGIN before it
+  #     on the line) closes the block.
+  #   • Text before a BEGIN and after a closing END (the "suffix") is kept and
+  #     re-run through the later rules and the key/value sed, so a secret there
+  #     is still masked — preserving it never leaks.
+  #   • When marker structure is ambiguous (nested/stacked BEGINs, a BEGIN before
+  #     the END), err toward staying IN / suppressing rather than emitting — the
+  #     whole file prefers over-redaction to a leak.
+  #   • Rule 1 must stay FIRST: routing an in-block line through Rule 2 would
+  #     print the text around an inline pair and leak block-body content.
   redacted="$(printf '%s' "$redacted" | awk '
     function redact_inline_pairs(s,   out, bstart, blen, rest, ep, el) {
       out = "";
