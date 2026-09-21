@@ -244,6 +244,35 @@ test('a marker pair on a line inside an open block does not leak surrounding tex
   assert.doesNotMatch(out, /MORESECRETBODY/, 'in-block body must not leak')
 })
 
+test('text after a closing END marker on the same line survives, body does not', () => {
+  // A multi-line PEM whose closing physical line carries a suffix (e.g. inside a
+  // JSON value): the body and everything up to the END must be dropped, but the
+  // legitimate suffix after the END must survive — and any secret in that suffix
+  // must still be masked by the key/value stage.
+  const input = [
+    'before',
+    '-----BEGIN PRIVATE KEY-----',
+    'BASE64BODY',
+    'LEAKYPREFIX-----END PRIVATE KEY-----","field":"value"',
+    'after',
+  ].join('\n')
+  const out = redact(input)
+  assert.doesNotMatch(out, /BASE64BODY/, 'key body must be suppressed')
+  assert.doesNotMatch(out, /LEAKYPREFIX/, 'text before the closing END (still block body) must be suppressed')
+  assert.match(out, /"field":"value"/, 'legitimate suffix after the closing END must survive')
+  assert.match(out, /before/)
+  assert.match(out, /after/)
+  // A secret in the surviving suffix is still masked by the key/value stage.
+  const withSecret = [
+    '-----BEGIN PRIVATE KEY-----',
+    'BODY',
+    '-----END PRIVATE KEY-----","password":"hunter2","note":"keep"',
+  ].join('\n')
+  const out2 = redact(withSecret)
+  assert.doesNotMatch(out2, /hunter2/, 'a secret in the surviving suffix must still be redacted')
+  assert.match(out2, /"note":"keep"/, 'non-secret suffix content survives')
+})
+
 test('nested BEGIN markers on one line do not leak the outer block body', () => {
   // redact_inline_pairs took the FIRST END after a BEGIN. With stacked markers
   // (BEGIN…BEGIN…END…secret…END) that pairs the outer BEGIN with the inner END,

@@ -86,9 +86,19 @@ redact_sensitive_diff() {
     }
     in_private_key {
       if (/-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/ && $0 !~ /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/) {
+        # Close the block: drop the body and everything up to and including the
+        # closing END marker, but keep any legitimate suffix after it (e.g. a
+        # multi-line PEM inside JSON whose last line is `…END-----","f":"v"`).
+        # The close condition guarantees no BEGIN on this line, so the suffix
+        # cannot re-open a block; fall through so the remaining rules and the
+        # key/value sed still process (and mask) anything sensitive in it.
         in_private_key = 0;
+        match($0, /-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/);
+        $0 = substr($0, RSTART + RLENGTH);
+        if ($0 == "") next;
+      } else {
+        next;
       }
-      next;
     }
     /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----.*-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/ {
       $0 = redact_inline_pairs($0);
