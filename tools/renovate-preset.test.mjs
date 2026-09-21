@@ -351,9 +351,15 @@ test('the npm release-age floor that fixes #132 is present and never undercut', 
   // Renovate applies packageRules in order and LATER MATCHES WIN, so a later
   // rule with a shorter age would re-open #132 while the floor above still reads
   // as though it holds. A LONGER age is fine — only a shorter one strands the
-  // storybook group.
+  // storybook group. Scope this to npm-affecting rules only: a rule whose
+  // matchManagers is present and excludes npm (e.g. a github-actions-only age)
+  // cannot undercut the npm floor, and policing it here would block a legitimate
+  // action-specific age — the "pressure to revert a correct change to satisfy a
+  // guard" this file's header warns against.
+  const affectsNpm = (rule) =>
+    !Array.isArray(rule.matchManagers) || rule.matchManagers.includes('npm')
   for (const [index, rule] of rules.entries()) {
-    if (rule.minimumReleaseAge === undefined) continue
+    if (rule.minimumReleaseAge === undefined || !affectsNpm(rule)) continue
     const hours = ageHours(rule.minimumReleaseAge)
     assert.notEqual(
       hours,
