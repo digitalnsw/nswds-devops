@@ -1,3 +1,9 @@
+## [1.25.7](https://github.com/digitalnsw/nswds-devops/compare/v1.25.6...v1.25.7) (2026-09-21)
+
+### Bug Fixes
+
+* **renovate:** add an npm release-age floor to stop the storybook strand ([2cb9d13](https://github.com/digitalnsw/nswds-devops/commit/2cb9d132e54d12f4f5fc2582cb4c4cc97808eee6)), closes [#132](https://github.com/digitalnsw/nswds-devops/issues/132)
+
 ## [1.25.6](https://github.com/digitalnsw/nswds-devops/compare/v1.25.5...v1.25.6) (2026-09-21)
 
 ### Bug Fixes
