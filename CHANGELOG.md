@@ -1,3 +1,9 @@
+## [1.25.6](https://github.com/digitalnsw/nswds-devops/compare/v1.25.5...v1.25.6) (2026-09-21)
+
+### Bug Fixes
+
+* **scripts:** close four gaps in the secret-redaction path ([#144](https://github.com/digitalnsw/nswds-devops/issues/144)) ([637caf8](https://github.com/digitalnsw/nswds-devops/commit/637caf8647d80b7bbac9ccb04111f61eec6472d5)), closes [#143](https://github.com/digitalnsw/nswds-devops/issues/143)
+
 ## [1.25.5](https://github.com/digitalnsw/nswds-devops/compare/v1.25.4...v1.25.5) (2026-09-16)
 
 ### Bug Fixes
