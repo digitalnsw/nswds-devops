@@ -149,7 +149,9 @@ fi
 
 # Basic sensitive-pattern detection to prevent accidental data/code leakage.
 # SENSITIVE_REGEX comes from secret-redaction.sh (sourced above).
-if git diff --cached | sed -n '1,5000p' | grep -Eqi "$SENSITIVE_REGEX"; then
+# Scan exactly what will be sent ("$DIFF"), not a fixed 5000-line window — a
+# larger OPENAI_DIFF_MAX_LINES would otherwise send lines the scan never saw.
+if printf '%s' "$DIFF" | grep -Eqi "$SENSITIVE_REGEX"; then
   printf "⚠️ Potential secrets detected in the staged diff.\n"
   printf "This script will send code to the OpenAI API.\n"
   read -r -p "Proceed anyway? (y/N) " _ans

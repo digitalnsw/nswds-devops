@@ -147,3 +147,98 @@ test('detection warns on compound keys but not on code identifiers', () => {
     assert.equal(detectsExit(input), false, `should not detect ${JSON.stringify(input)}`)
   }
 })
+
+// --- Private-key block path (findings 1 & 2) -------------------------------
+// The block path had no coverage at all, which is why ENCRYPTED/PGP blocks
+// leaked and a single-line PEM silently truncated the rest of the input.
+
+// Every PEM marker spelling the BEGIN/END class must cover. ENCRYPTED and PGP
+// are the two that the old `(RSA|OPENSSH|EC|DSA)? ?PRIVATE KEY` pattern missed.
+const PEM_VARIANTS = [
+  ['plain', 'PRIVATE KEY'],
+  ['RSA', 'RSA PRIVATE KEY'],
+  ['OPENSSH', 'OPENSSH PRIVATE KEY'],
+  ['EC', 'EC PRIVATE KEY'],
+  ['DSA', 'DSA PRIVATE KEY'],
+  ['ENCRYPTED', 'ENCRYPTED PRIVATE KEY'],
+  ['PGP', 'PGP PRIVATE KEY BLOCK'],
+]
+
+test('redacts every PEM block variant, body and all (finding 1)', () => {
+  for (const [name, marker] of PEM_VARIANTS) {
+    const input = `-----BEGIN ${marker}-----\nMIISECRETBODY${name}\n-----END ${marker}-----`
+    const out = redact(input)
+    assert.match(out, /\[REDACTED_PRIVATE_KEY_BLOCK\]/, `${name}: block placeholder`)
+    assert.doesNotMatch(out, /SECRETBODY/, `${name}: body must not survive`)
+    assert.doesNotMatch(out, /BEGIN .*PRIVATE KEY/, `${name}: BEGIN marker must not survive`)
+  }
+})
+
+test('detection warns on every PEM block variant (finding 1)', () => {
+  // Redaction and detection failed together for ENCRYPTED/PGP, so assert the
+  // DETECTION regex directly — a redaction-only test cannot tell them apart.
+  for (const [name, marker] of PEM_VARIANTS) {
+    assert.equal(detectsExit(`-----BEGIN ${marker}-----`), true, `should detect ${name}`)
+  }
+})
+
+test('a single-line BEGIN/END PEM does not swallow following lines (finding 2)', () => {
+  // The GCP service-account JSON shape: the whole key on one line with `\n`
+  // escapes. The old rule printed the placeholder and `next`ed, so `in_private
+  // _key` stayed set and every later line was dropped. Assert the SURVIVING
+  // content, not just the placeholder — that is the actual regression.
+  const input = [
+    '+ line one',
+    '+ "private_key": "-----BEGIN PRIVATE KEY-----\\nMIISECRETBODY\\n-----END PRIVATE KEY-----"',
+    '+ line three',
+    '+ line four',
+  ].join('\n')
+  const out = redact(input)
+  assert.match(out, /line one/)
+  assert.match(out, /line three/, 'lines after a single-line PEM must survive')
+  assert.match(out, /line four/, 'lines after a single-line PEM must survive')
+  assert.doesNotMatch(out, /MIISECRETBODY/, 'the key body must be redacted')
+  assert.doesNotMatch(out, /BEGIN PRIVATE KEY/, 'the BEGIN marker must not survive')
+})
+
+// --- Newly covered key spellings (finding 3) -------------------------------
+
+test('redacts passwd, pwd, credentials, private_key and passphrase values', () => {
+  const cases = [
+    ['passwd=hunter2', 'passwd=[REDACTED]'],
+    ['pwd=hunter2', 'pwd=[REDACTED]'],
+    ['credential: hunter2', 'credential: [REDACTED]'],
+    ['credentials: hunter2', 'credentials: [REDACTED]'],
+    ['private_key: abc123', 'private_key: [REDACTED]'],
+    ['private-key=abc123', 'private-key=[REDACTED]'],
+    ['passphrase=letmein', 'passphrase=[REDACTED]'],
+    ['  "passphrase": "letmein",', '  "passphrase": "[REDACTED]",'],
+    ['  "private_key": "not-a-pem-just-an-id",', '  "private_key": "[REDACTED]",'],
+  ]
+  for (const [input, expected] of cases) {
+    assert.equal(redact(input).trimEnd(), expected, `redacting ${JSON.stringify(input)}`)
+  }
+})
+
+test('detection warns on the newly added key spellings (finding 3)', () => {
+  for (const input of [
+    'passwd=hunter2',
+    'pwd=hunter2',
+    'credentials: hunter2',
+    'private_key: abc123',
+    'passphrase=letmein',
+  ]) {
+    assert.equal(detectsExit(input), true, `should detect ${JSON.stringify(input)}`)
+  }
+})
+
+test('the pwd shell builtin is not redacted or detected as a secret', () => {
+  // `pwd` is now a matched word, but the key/value rules require a `:`/`=`
+  // after the key — so the builtin invocations `$(pwd)` and `pwd)` (which have
+  // neither) must pass through untouched and must not trip the warning.
+  const untouched = ['echo $(pwd)', 'DIR=$(pwd)', '  cd "$(pwd)"', 'esac; pwd)']
+  for (const input of untouched) {
+    assert.equal(redact(input).trimEnd(), input, `should not redact ${JSON.stringify(input)}`)
+    assert.equal(detectsExit(input), false, `should not detect ${JSON.stringify(input)}`)
+  }
+})

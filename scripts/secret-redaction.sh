@@ -19,7 +19,7 @@
 # never bare letters — so code identifiers like `tokenizer` or `secretSauce`
 # don't trip it. Every caller greps this with `-i`, so the lowercase spellings
 # match any case; keep it that way (git-commit.sh, suggest-branch-name.sh).
-SENSITIVE_REGEX='(-----BEGIN (RSA|OPENSSH|EC|DSA)? ?PRIVATE KEY-----|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|xox[baprs]-[0-9A-Za-z-]{10,}|gh[pousr]_[0-9A-Za-z]{20,}|github_pat_[0-9A-Za-z_]{20,}|[a-z0-9_-]*(password|secret|token|api[_-]?key|authorization)([_-][a-z0-9]+)*[[:space:]]*[:=])'
+SENSITIVE_REGEX='(-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|xox[baprs]-[0-9A-Za-z-]{10,}|gh[pousr]_[0-9A-Za-z]{20,}|github_pat_[0-9A-Za-z_]{20,}|[a-z0-9_-]*(password|passwd|pwd|secret|token|api[_-]?key|authorization|credentials?|private[_-]?key|passphrase)([_-][a-z0-9]+)*[[:space:]]*[:=])'
 
 # Best-effort redaction of common secret patterns before sending text to the
 # API. Takes the text as $1 and prints the redacted version on stdout.
@@ -36,23 +36,35 @@ redact_sensitive_diff() {
     -e 's/github_pat_[0-9A-Za-z_]{20,}/[REDACTED_GITHUB_TOKEN]/g' \
   )"
 
-  # Private key blocks: redact the entire block. The trailing sed catches any
-  # orphan BEGIN/END markers that weren't part of a complete block.
+  # Private key blocks: redact the entire block. The BEGIN/END class is broad on
+  # purpose — [A-Z0-9 ]*PRIVATE KEY[A-Z ]* covers plain, RSA, OPENSSH, EC, DSA,
+  # ENCRYPTED and "PGP … BLOCK" markers (and any future variant) rather than
+  # enumerating algorithms, which is what let ENCRYPTED/PGP blocks slip through.
+  # A BEGIN and END on the SAME line (a GCP service-account JSON stores the key
+  # as one line with `\n` escapes) is redacted in place and does NOT enter block
+  # mode — otherwise `next` swallows every following line until an unrelated END
+  # appears, silently truncating the diff. The trailing sed catches any orphan
+  # BEGIN/END markers that weren't part of a complete block.
   redacted="$(printf '%s' "$redacted" | awk '
-    /-----BEGIN (RSA|OPENSSH|EC|DSA)? ?PRIVATE KEY-----/ {
+    /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/ && /-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/ {
+      gsub(/-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----.*-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/, "[REDACTED_PRIVATE_KEY_BLOCK]");
+      print;
+      next;
+    }
+    /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/ {
       in_private_key = 1;
       print "[REDACTED_PRIVATE_KEY_BLOCK]";
       next;
     }
-    in_private_key && /-----END (RSA|OPENSSH|EC|DSA)? ?PRIVATE KEY-----/ {
+    in_private_key && /-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/ {
       in_private_key = 0;
       next;
     }
     in_private_key { next; }
     { print; }
   ' | sed -E \
-    -e 's/-----BEGIN (RSA|OPENSSH|EC|DSA)? ?PRIVATE KEY-----/[REDACTED_PRIVATE_KEY]/g' \
-    -e 's/-----END (RSA|OPENSSH|EC|DSA)? ?PRIVATE KEY-----/[REDACTED_PRIVATE_KEY_END]/g' \
+    -e 's/-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/[REDACTED_PRIVATE_KEY]/g' \
+    -e 's/-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/[REDACTED_PRIVATE_KEY_END]/g' \
   )"
 
   # Common "key/value" secrets (env/ini/yaml/json), best-effort broad.
@@ -63,7 +75,9 @@ redact_sensitive_diff() {
   # A letter PREFIX is allowed, but the word may be followed only by
   # `_`/`-`-delimited segments (`suf`), never bare letters — so code identifiers
   # like `tokenizer = …` or `secretSauce = …` are left intact rather than having
-  # their right-hand side redacted across a whole diff. Case is handled with
+  # their right-hand side redacted across a whole diff. The same rule requires a
+  # `:`/`=` after the key, so the `pwd` shell builtin (`$(pwd)`, `pwd)`) is not
+  # touched even though `pwd` is now a matched word. Case is handled with
   # explicit classes because BSD/macOS sed has no /I flag. A double-quoted value
   # (JSON or YAML) is masked in place as "[REDACTED]" for clean output; its class
   # consumes escaped characters as units (`\\.`), so a `\"` inside the value does
@@ -73,7 +87,7 @@ redact_sensitive_diff() {
   # survive by hiding behind a space or a '#'. Over-redacting an innocuous
   # "*_token"/"*_secret" key (or a matched key's multi-token RHS in code) is
   # deliberate: it errs toward hiding a value rather than leaking one.
-  local word='([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii][_-]?[Kk][Ee][Yy])'
+  local word='([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Pp][Ww][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii][_-]?[Kk][Ee][Yy]|[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll][Ss]?|[Pp][Rr][Ii][Vv][Aa][Tt][Ee][_-]?[Kk][Ee][Yy]|[Pp][Aa][Ss][Ss][Pp][Hh][Rr][Aa][Ss][Ee])'
   local suf='([_-][A-Za-z0-9]+)*'
   # Authorization is handled separately from `word`: its value is a scheme plus
   # a credential (Bearer/Basic/…), or occasionally no scheme, so the whole value
