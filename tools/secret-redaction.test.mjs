@@ -408,3 +408,47 @@ test('the pwd shell builtin is not redacted or detected as a secret', () => {
     assert.equal(detectsExit(input), false, `should not detect ${JSON.stringify(input)}`)
   }
 })
+
+/** True when contains_sensitive (from the sourced script) matches any argument. */
+function containsSensitive(args) {
+  try {
+    execFileSync(
+      'bash',
+      ['-c', 'source "$1"; shift; contains_sensitive "$@"', 'bash', script, ...args],
+      { stdio: 'ignore' },
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
+test('contains_sensitive warns on a secret in any argument, not just the first', () => {
+  // The callers pass the diff plus every gateway-bound metadata field; a secret
+  // in a later field (a branch name, a file path) must still trip the warning.
+  assert.equal(containsSensitive(['+ normal code', 'main', 'file.txt']), false)
+  assert.equal(containsSensitive(['+ AWS_SECRET_ACCESS_KEY=x', 'main', 'file.txt']), true)
+  assert.equal(containsSensitive(['+ normal', 'fix/AWS_SECRET_ACCESS_KEY=leaked', 'file.txt']), true)
+  assert.equal(containsSensitive(['+ normal', 'main', 'config/password=hunter2.env']), true)
+  assert.equal(containsSensitive(['+ normal code', 'src/app.ts', 'README.md']), false)
+})
+
+test('contains_sensitive stays SIGPIPE-safe on large early-match input', () => {
+  // The secret is at the very start, so a `... | grep -q` implementation would
+  // quit immediately and SIGPIPE the writer (exit 141 under `set -o pipefail`),
+  // read as "no match". The here-string implementation must still report it.
+  const bash = [
+    'set -o pipefail',
+    'source "$1"',
+    `big="AWS_SECRET_ACCESS_KEY=leaked"$'\\n'"$(printf 'padding line to exceed the pipe buffer\\n%.0s' {1..5000})"`,
+    'contains_sensitive "$big"',
+  ].join('; ')
+  let ok = false
+  try {
+    execFileSync('bash', ['-c', bash, 'bash', script], { stdio: 'ignore' })
+    ok = true
+  } catch {
+    ok = false
+  }
+  assert.equal(ok, true, 'large early-match input must still warn (no SIGPIPE miss)')
+})
