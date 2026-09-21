@@ -149,10 +149,13 @@ fi
 
 # Basic sensitive-pattern detection to prevent accidental data/code leakage.
 # SENSITIVE_REGEX comes from secret-redaction.sh (sourced above).
-# Scan exactly what will be sent ("$DIFF"), not a fixed 5000-line window — a
-# larger OPENAI_DIFF_MAX_LINES would otherwise send lines the scan never saw.
-if printf '%s' "$DIFF" | grep -Eqi "$SENSITIVE_REGEX"; then
-  printf "⚠️ Potential secrets detected in the staged diff.\n"
+# Scan exactly what will be sent — the diff body ("$DIFF", not a fixed 5000-line
+# window, so a larger OPENAI_DIFF_MAX_LINES can't send unscanned lines) plus the
+# branch name and staged file list, which are sent as prompt metadata too and
+# would otherwise let a secret in a branch name or a key=value path slip past the
+# warning. A newline between each keeps a token from spanning the join.
+if printf '%s\n%s\n%s\n' "$DIFF" "$BRANCH" "$STAGED" | grep -Eqi "$SENSITIVE_REGEX"; then
+  printf "⚠️ Potential secrets detected in the staged diff or change metadata.\n"
   printf "This script will send code to the OpenAI API.\n"
   read -r -p "Proceed anyway? (y/N) " _ans
   if [[ ! "${_ans:-}" =~ ^[Yy]$ ]]; then

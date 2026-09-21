@@ -43,14 +43,38 @@ redact_sensitive_diff() {
   # A complete BEGIN…END pair on the SAME line (a GCP service-account JSON stores
   # the key as one line with `\n` escapes) is redacted in place and does NOT
   # enter block mode — otherwise `next` swallows every following line until an
-  # unrelated END appears, silently truncating the diff. The condition matches
-  # the ordered BEGIN…END pattern (not BEGIN and END independently): a line where
-  # an END precedes a BEGIN must fall through to the block-open rule so the block
-  # the trailing BEGIN opens is still redacted. The trailing sed catches any
+  # unrelated END appears, silently truncating the diff. redact_inline_pairs
+  # walks the pairs left to right, matching each up to the FIRST END after its
+  # BEGIN, so content between two independent pairs on one line survives (a single
+  # greedy `.*` would collapse from the first BEGIN to the last END). The rule
+  # only fires on the ordered BEGIN…END pattern (not BEGIN and END independently):
+  # a line where an END precedes a BEGIN falls through to the block-open rule so
+  # the block the trailing BEGIN opens is still redacted. If a lone BEGIN with no
+  # END is left on the line after the inline pairs are redacted, it opens a real
+  # multi-line block, so enter block mode there. The trailing sed catches any
   # orphan BEGIN/END markers that weren't part of a complete block.
   redacted="$(printf '%s' "$redacted" | awk '
+    function redact_inline_pairs(s,   out, bstart, blen, rest) {
+      out = "";
+      while (match(s, /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/)) {
+        bstart = RSTART; blen = RLENGTH;
+        rest = substr(s, bstart + blen);
+        if (match(rest, /-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/)) {
+          out = out substr(s, 1, bstart - 1) "[REDACTED_PRIVATE_KEY_BLOCK]";
+          s = substr(rest, RSTART + RLENGTH);
+        } else {
+          break;
+        }
+      }
+      return out s;
+    }
     /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----.*-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/ {
-      gsub(/-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----.*-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/, "[REDACTED_PRIVATE_KEY_BLOCK]");
+      $0 = redact_inline_pairs($0);
+      if (match($0, /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/)) {
+        printf "%s[REDACTED_PRIVATE_KEY_BLOCK]\n", substr($0, 1, RSTART - 1);
+        in_private_key = 1;
+        next;
+      }
       print;
       next;
     }

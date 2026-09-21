@@ -213,6 +213,20 @@ test('a same-line PEM redacts every marker variant in place', () => {
   }
 })
 
+test('two independent same-line PEM pairs both redact, preserving text between them', () => {
+  // A single greedy `.*` would collapse from the first BEGIN to the LAST END,
+  // eating the field between the two keys. Each pair must be redacted up to its
+  // own END so the middle content survives.
+  const input =
+    '{"a":"-----BEGIN PRIVATE KEY-----\\nKEYONE\\n-----END PRIVATE KEY-----",' +
+    '"note":"keepme",' +
+    '"b":"-----BEGIN PRIVATE KEY-----\\nKEYTWO\\n-----END PRIVATE KEY-----"}'
+  const out = redact(input)
+  assert.doesNotMatch(out, /KEYONE/, 'first key body must be redacted')
+  assert.doesNotMatch(out, /KEYTWO/, 'second key body must be redacted')
+  assert.match(out, /"note":"keepme"/, 'content between the two pairs must survive')
+})
+
 test('an END marker before a BEGIN on one line does not bypass block redaction', () => {
   // The same-line rule keys off the ordered BEGIN…END pattern, not BEGIN and END
   // independently. A line where an END precedes the BEGIN that opens a real
