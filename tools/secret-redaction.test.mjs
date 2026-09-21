@@ -301,6 +301,21 @@ test('a close line that also starts the next block keeps the metadata between th
   assert.doesNotMatch(redact(withSecret), /hunter2/, 'a secret between keys must still be redacted')
 })
 
+test('nested BEGIN markers across separate lines do not leak the outer block body', () => {
+  // The block state is a depth counter, not a boolean: an inner BEGIN/END pair
+  // on their own lines inside an outer block must not let the inner END close the
+  // outer block, or the content between the inner END and the outer END leaks.
+  const input = [
+    '-----BEGIN PRIVATE KEY-----',
+    '-----BEGIN PRIVATE KEY-----',
+    '-----END PRIVATE KEY-----',
+    'OUTERSECRET',
+    '-----END PRIVATE KEY-----',
+  ].join('\n')
+  const out = redact(input)
+  assert.doesNotMatch(out, /OUTERSECRET/, 'outer block body must not leak across a nested inner END')
+})
+
 test('nested BEGIN markers on one line do not leak the outer block body', () => {
   // redact_inline_pairs took the FIRST END after a BEGIN. With stacked markers
   // (BEGIN…BEGIN…END…secret…END) that pairs the outer BEGIN with the inner END,

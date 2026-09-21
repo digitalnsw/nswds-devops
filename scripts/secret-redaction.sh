@@ -62,11 +62,14 @@ redact_sensitive_diff() {
   # that weren't part of a complete block.
   #
   # ── State machine (awk rules run top-to-bottom per line; first `next` wins) ──
-  # Two states: OUT (in_private_key unset) and IN (a multi-line block is open).
+  # `in_private_key` is a DEPTH counter: 0 = OUT (no open block), >0 = IN, with
+  # the value tracking how many BEGINs are open (so stacked markers across lines
+  # need a matching number of ENDs to close).
   #
-  #   Rule 1  IN only   suppress every line; close on the FIRST END that has no
-  #                     BEGIN before it, keep the suffix after that END and fall
-  #                     through (a BEGIN before that END = nested → stay IN).
+  #   Rule 1  IN only   suppress the line's marker-bounded content; walk markers
+  #                     left to right adjusting depth, and only when depth hits 0
+  #                     does the block close — the remainder of that line is a
+  #                     suffix that falls through to the OUT rules.
   #   Rule 2  OUT       a complete ordered BEGIN…END pair on the line: redact each
   #                     pair in place (redact_inline_pairs), preserving text
   #                     around/between pairs; a lone BEGIN left over → go IN.
@@ -75,8 +78,8 @@ redact_sensitive_diff() {
   #   Rule 4            default: print the line unchanged.
   #
   # Invariants to preserve when editing:
-  #   • IN never prints block-body content; only a clean END (no BEGIN before it
-  #     on the line) closes the block.
+  #   • IN never prints block-body content; the block closes only when the
+  #     BEGIN/END depth returns to 0 (nested/stacked markers need balancing).
   #   • Text before a BEGIN and after a closing END (the "suffix") is kept and
   #     re-run through the later rules and the key/value sed, so a secret there
   #     is still masked — preserving it never leaks.
@@ -110,20 +113,33 @@ redact_sensitive_diff() {
       return out s;
     }
     in_private_key {
-      if (match($0, /-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/) && substr($0, 1, RSTART - 1) !~ /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/) {
-        # The FIRST END with no BEGIN before it closes the block: drop the body
-        # and everything up to and including that END, but keep any legitimate
-        # suffix after it (a multi-line PEM inside JSON whose last line is
-        # `…END-----","f":"v"`, or a line that also starts the next block). A
-        # BEGIN *before* the first END means nested/stacked markers, so this END
-        # is not ours and the line stays suppressed. The suffix may itself open a
-        # new block or carry a secret, so fall through and let the rules below
-        # (and the key/value sed) handle it. `substr(... RSTART-1)` reads before
-        # the END match; `~` does not disturb RSTART/RLENGTH, so they still point
-        # at that END for the substr below.
-        in_private_key = 0;
-        $0 = substr($0, RSTART + RLENGTH);
-        if ($0 == "") next;
+      # in_private_key is a DEPTH counter, not a boolean. Stacked BEGINs across
+      # lines (malformed/adversarial input — a real PEM body is marker-free
+      # base64) must not be closed by the first END, or body content between an
+      # inner END and the outer END would leak. Walk the line left to right: each
+      # BEGIN opens a level, each END closes one; the block is done only when the
+      # depth returns to 0, and the remainder of that line is a legitimate suffix
+      # to re-process (fall through). Everything consumed by the walk is
+      # suppressed. Capture bpos/blen from the BEGIN match before the END match
+      # overwrites RSTART/RLENGTH.
+      rest = $0;
+      while (1) {
+        if (match(rest, /-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/)) { bpos = RSTART; blen = RLENGTH; } else { bpos = 0; }
+        if (match(rest, /-----END [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----/)) { epos = RSTART; elen = RLENGTH; } else { epos = 0; }
+        if (bpos && (epos == 0 || bpos < epos)) {
+          in_private_key++;
+          rest = substr(rest, bpos + blen);
+        } else if (epos) {
+          in_private_key--;
+          rest = substr(rest, epos + elen);
+          if (in_private_key == 0) break;
+        } else {
+          rest = "";
+          break;
+        }
+      }
+      if (in_private_key == 0 && rest != "") {
+        $0 = rest;
       } else {
         next;
       }

@@ -300,10 +300,13 @@ fi
 # path — e.g. `config/api_key=xyz` — would otherwise reach the prompt without
 # tripping this warning. Those summaries are derived from these raw path sources,
 # so scanning the sources here covers them (they are built later, after this
-# check). A here-string (not a `... | grep -q` pipe) feeds grep: under
+# check). ignore_filter_description is also sent (it embeds $OPENCOMMIT_IGNORE_FILE
+# in ignore_filter_summary) and is not path-derived, so it is scanned explicitly.
+# NB: this list must mirror every dynamic value build_prompt sends — add new ones
+# here too. A here-string (not a `... | grep -q` pipe) feeds grep: under
 # `set -o pipefail`, grep -q exits on the first match and SIGPIPEs the upstream
 # printf, so a pipe would return 141 for a large diff and silently skip this.
-if [[ "$USE_OPENAI_API" == "true" ]] && grep -Eqi "$SENSITIVE_REGEX" <<<"$(printf '%s\n%s\n%s\n%s\n' "$full_diff" "$changed_files" "$untracked_files" "$ignored_paths")"; then
+if [[ "$USE_OPENAI_API" == "true" ]] && grep -Eqi "$SENSITIVE_REGEX" <<<"$(printf '%s\n%s\n%s\n%s\n%s\n' "$full_diff" "$changed_files" "$untracked_files" "$ignored_paths" "$ignore_filter_description")"; then
   printf "⚠️ Potential secrets detected in the diff.\n"
   printf "This script sends a diff preview to the OpenAI API.\n"
   proceed=""
