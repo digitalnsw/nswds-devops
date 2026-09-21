@@ -191,12 +191,17 @@ bypass a gate, and it can't merge on a subset. The exact context list varies
 per repo (see [ONBOARDING](../../ONBOARDING.md)), which is why it isn't
 enumerated here.
 
-devDependency patches and the lint/format group are additionally held by
-**`minimumReleaseAge`: 3 days** — automerge means nobody reads these, so a
-release that gets yanked or hot-patched within hours of publishing never
-becomes a merge in the first place. That hold applies to the two in-house
-packages too: an `@nswds/eslint-config` release is not special-cased just
-because we published it. Lock file maintenance carries no such hold and needs
+A fleet-wide **`minimumReleaseAge`: 3 days** (set at the top level)
+additionally holds **every non-major update**, for two reasons. For the
+automerged groups nobody reads the PR, so a release yanked or hot-patched
+within hours of publishing never becomes a merge. And a single shared window
+keeps the isolated `storybook` group from silently stranding when another
+group adopts a still-fresh, exact-pinned dependency ahead of the storybook
+group's `--before` cutoff — the group would otherwise regenerate no lockfile
+and Renovate would open no PR at all
+([#132](https://github.com/digitalnsw/nswds-devops/issues/132)). The two
+in-house packages aren't special-cased: an `@nswds/eslint-config` release
+waits like any other. Lock file maintenance carries no such hold and needs
 none: it regenerates against whatever the registry resolves at the time
 rather than adopting one specific new release.
 
@@ -389,7 +394,7 @@ scheduled window.
 | An expected update never appears as a PR | check the Dependency Dashboard "blocked"/rate-limited sections and the [blocked-updates table](#blocked-updates-packagerules--and-why) — it may be deliberately disabled |
 | Renovate PR is green but "branch is out of date" blocks the merge | expected — `rebaseWhen: "conflicted"` deliberately leaves behind-but-clean branches alone ([Rebasing and staying up to date](#rebasing-and-staying-up-to-date)). Press **Update branch** / `gh pr update-branch <n>` and merge when the run finishes |
 | A `dev dependencies (patch)`, `Lock file maintenance` or `lint and format tooling` PR isn't automerging | it's not green. Check every **required** context, including the two Snyk ones — Snyk occasionally never posts on a force-updated or reopened bot branch, and automerge waits forever on a status that never arrives ([Dependency Management](dependency-management.md)). Close and let the bot recreate the PR |
-| A devDependency patch didn't appear this week | `minimumReleaseAge` holds **devDependency patches** until the release is 3 days old ([Automerge](#automerge)) — a package published over the weekend waits for the following Monday. Lock file maintenance has no such hold |
+| A non-major update didn't appear this week | the fleet-wide **`minimumReleaseAge`: 3 days** holds **every non-major update** until the release is 3 days old ([Automerge](#automerge)) — a package published over the weekend waits for the following Monday. Lock file maintenance has no such hold |
 | Renovate stopped rebasing a PR | a human (or non-ignored bot) commit landed on the branch — tick the rebase checkbox to have it recreated, or take the upgrade over as a human PR. Note that a branch that is merely *behind* `main` is not a fault: see the row above |
 | Snyk check red on a Renovate lockfile change | usually Snyk re-baselining, not the bump — see [Dependency Management](dependency-management.md) |
 | Config change seems ignored | preset edits must be **merged to `main`** here (Renovate doesn't read branches); validate with `renovate-config-validator`, then check the repo's job log in the Mend portal for config-parse errors |
