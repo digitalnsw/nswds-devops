@@ -37,11 +37,12 @@ that style and every consumer's `format:check` stays green.
 
 ### Changing CI logic
 
-Applies to `reusable-*.yml` and `.github/scripts/test-mode.mjs` (fetched by
-the test gate at the same commit as the calling `reusable-ci.yml`, via
-`job.workflow_sha`, so `@v1` callers get the script at `v1`). Merge to `main`
-as usual; nothing reaches consumers yet, because stubs pin `@v1`. Ship it
-with the **Promote v1** workflow
+Applies to `reusable-*.yml` and `.github/scripts/test-mode.mjs`. The test
+gate fetches the script at the commit of the `reusable-ci.yml` being run
+(`job.workflow_sha`; not the consumer's calling workflow, whose commit is
+`github.workflow_sha`), so `@v1` callers get the script at `v1`. Merge to
+`main` as usual; nothing reaches consumers yet, because stubs pin `@v1`. Ship
+it with the **Promote v1** workflow
 (Actions → Promote v1 → run with the target SHA, or leave the input empty to
 promote the newest promotable commit among the last 10 on `main`;
 `chore(release): x.y.z [skip ci]` release commits are skipped automatically).
@@ -73,7 +74,7 @@ to the reusables never cut a release, so any green commit on `main`
 qualifies. Release commits themselves are `[skip ci]` and carry no check
 runs, so the workflow refuses them; promote the merge commit beneath. The
 weekly `v1 drift canary` opens a tracking issue when unpromoted
-reusable-workflow changes sit on `main` for over a week.
+reusable-workflow or `test-mode.mjs` changes sit on `main` for over a week.
 
 Emergency fallback if the promotion workflow itself is broken: temporarily
 disable the tag ruleset's enforcement, push the tag, re-enable. This is the
@@ -163,8 +164,9 @@ the reusables must be callable from anywhere. If this repo is ever made
 private, two things break: set Settings → Actions → General → Access to
 "Accessible from repositories owned by the organization" for the private
 repos, and the public consumers' CI stops resolving entirely. The test gate
-also fetches `.github/scripts/test-mode.mjs` from this repo (at the calling
-workflow's own commit) without a token, which relies on the repo being public.
+also fetches `.github/scripts/test-mode.mjs` from this repo (at the commit of
+the `reusable-ci.yml` being run) without a token, which relies on the repo
+being public.
 
 ### Pinned third-party actions
 
@@ -303,7 +305,7 @@ job, because a canary that fails every week gets muted.
 | `sync.yml` | push to `main` (synced paths), manual | The file-sync driver |
 | `snyk-policy-sync.yml` | push to `main` touching `snyk-policy/**` or the script, manual (with `dry_run`) | Fans the canonical Snyk block out as one PR per consumer, preserving each repo's tail byte-for-byte |
 | `ccc-v10-canary.yml` | Mondays 08:17 UTC | Probes whether the latest release-notes-generator renders real notes with conventional-changelog-conventionalcommits v10; opens a `ccc-v10-canary` issue the day the Renovate block can be lifted |
-| `v1-drift-canary.yml` | Mondays 08:23 UTC | Opens a `v1-drift` issue when unpromoted `reusable-*.yml` changes sit on `main` for over a week |
+| `v1-drift-canary.yml` | Mondays 08:23 UTC | Opens a `v1-drift` issue when unpromoted `reusable-*.yml` or `test-mode.mjs` changes sit on `main` for over a week |
 | `ccc-pin-drift-canary.yml` | Mondays 08:29 UTC | Scans every semantic-release repo for the root `conventional-changelog-conventionalcommits@^9` pin; opens a `ccc-pin-drift` issue on any repo missing it (a missing pin means silently blank release notes) |
 | `npm-self-override-canary.yml` | Mondays 08:35 UTC | Scans every repo for a package declared both as a direct dependency and as a literal-pinned `overrides` entry; opens an `npm-self-override` issue (that shape aborts Renovate for the whole repo with no visible error) |
 | `snyk-policy-canary.yml` | Mondays 08:44 UTC | Opens or refreshes a `snyk-policy-drift` issue when a consumer's canonical block no longer matches the base, or a repo in `repos.json` is unreadable or unmigrated |

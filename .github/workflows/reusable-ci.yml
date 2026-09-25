@@ -406,75 +406,81 @@ jobs:
 
       # A reusable workflow's `run` steps execute against the CALLER's checkout,
       # so for the 29 consumer repos .github/scripts/ is not there and the
-      # script has to be fetched. It is fetched at job.workflow_sha — the commit
-      # of THIS reusable workflow file as the caller resolved it — so script and
-      # workflow always come from the same commit. A caller on `@v1` gets the
-      # commit v1 points at, exactly as before; a caller that SHA-pins this
-      # workflow (Renovate digest pins, e.g. lau.ren) now gets the script from
-      # that same SHA. The previous `ref: v1` fetched the script at the moving
-      # tag even for SHA-pinned callers, so a Promote v1 changed what their
-      # `install / test` ran without their pin moving. nswds-devops is public,
-      # so no token is needed, and persist-credentials:false leaves no
-      # credential in the consumer's tree.
+      # script has to be fetched. It is fetched at job.workflow_sha: the commit
+      # of THIS reusable workflow file (the called workflow, not the consumer's
+      # calling ci.yml, whose commit is github.workflow_sha) as the caller
+      # resolved it. Script and workflow therefore always come from the same
+      # commit. A caller on `@v1` gets the commit v1 points at, exactly as
+      # before; a caller that SHA-pins this workflow (Renovate digest pins, e.g.
+      # lau.ren) gets the script from that same SHA. The previous `ref: v1`
+      # fetched the script at the moving tag even for SHA-pinned callers, so a
+      # Promote v1 changed what their `install / test` ran without their pin
+      # moving. nswds-devops is public, so no token is needed, and
+      # persist-credentials:false leaves no credential in the consumer's tree.
+      # The script imports only node: built-ins (tools/reusable-ci.test.mjs
+      # asserts it), so a sparse checkout of that one file is enough.
       #
-      # Skipped when the script is already in the workspace, which is the case
-      # for nswds-devops itself: its ci.yml calls `./.github/workflows/
-      # reusable-ci.yml`, so the caller's checkout IS this repo. That is not an
-      # optimisation. Fetching a released ref unconditionally deadlocks the very
-      # PR that introduces the script — v1 does not have it yet, the job dies
-      # with MODULE_NOT_FOUND, and v1 cannot be promoted past a red check. Using
-      # the local copy also means this repo's own `install / test` exercises the
-      # BRANCH's script rather than the released one, which is what you want
-      # from the repo that owns it. The flip side: this repo's CI never runs the
-      # fetch below, so a consumer's first run after Promote v1 is where it is
-      # exercised.
-      #
-      # job.workflow_* is read through toJSON(job) rather than as
+      # job.workflow_* is read as fromJSON(toJSON(job)).workflow_* rather than
       # `job.workflow_sha` because actionlint (1.7.12, and the 1.7.7 ci.yml
       # pins) predates those properties and rejects them as undefined; the
-      # whole-object read keeps the workflow lint-clean without an -ignore.
-      # Switch to the direct properties once actionlint knows them.
+      # round-trip types the object as `any` and keeps the workflow lint-clean
+      # without an -ignore. Switch to the direct properties once actionlint
+      # knows them.
       #
-      # They are github.com-only (absent on GHES). Anything but a well-formed
-      # owner/repo and a 40-hex SHA fails here: an empty `ref` would make
-      # checkout fall back to the default branch and silently reintroduce a
-      # moving ref, and the format check keeps the values safe to hand on as
-      # step outputs.
-      - name: Resolve this workflow's commit
-        id: self
-        if: ${{ hashFiles('.github/scripts/test-mode.mjs') == '' }}
+      # The properties are github.com-only (absent on GHES), so check them
+      # first, in every caller including this repo. Without the check, empty
+      # values would reach checkout, which falls back to the CALLER's repository
+      # at the triggering ref when `repository` and `ref` are both empty (and to
+      # the default branch when only `ref` is): the job would then die with a
+      # misleading "neither in this repo nor in the fetched copy" error, or run
+      # a script from a moving ref. Running it here too means this repo's own
+      # CI proves the context is populated before any consumer depends on it.
+      - name: Resolve this workflow's source commit
         env:
-          JOB_CONTEXT: ${{ toJSON(job) }}
+          WORKFLOW_REPOSITORY: ${{ fromJSON(toJSON(job)).workflow_repository }}
+          WORKFLOW_SHA: ${{ fromJSON(toJSON(job)).workflow_sha }}
         run: |
-          node -e '
-            const { workflow_repository: repo, workflow_sha: sha } = JSON.parse(process.env.JOB_CONTEXT)
-            if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo ?? "") || !/^[0-9a-f]{40}$/.test(sha ?? "")) {
-              console.log("::error::job.workflow_repository / job.workflow_sha are missing or malformed, so test-mode.mjs cannot be fetched at the commit this workflow runs from. Refusing to fall back to a moving ref.")
-              process.exit(1)
-            }
-            require("fs").appendFileSync(process.env.GITHUB_OUTPUT, `repository=${repo}\nsha=${sha}\n`)
-            console.log(`Fetching test-mode.mjs from ${repo}@${sha}`)
-          '
+          if [ -z "$WORKFLOW_REPOSITORY" ] || [ -z "$WORKFLOW_SHA" ]; then
+            echo "::error::job.workflow_repository or job.workflow_sha is empty, so the test gate cannot pin test-mode.mjs to the commit this workflow runs from."
+            exit 1
+          fi
+          echo "test-mode.mjs source: $WORKFLOW_REPOSITORY@$WORKFLOW_SHA"
 
+      # Skipped when the caller IS the repo that defines this workflow, which
+      # is nswds-devops itself: its ci.yml calls `./.github/workflows/
+      # reusable-ci.yml`, so the caller's checkout already holds the script.
+      # That is not an optimisation. Fetching a released ref unconditionally
+      # deadlocks the very PR that introduces the script — v1 does not have it
+      # yet, the job dies with MODULE_NOT_FOUND, and v1 cannot be promoted past
+      # a red check. Using the local copy also means this repo's own
+      # `install / test` exercises the BRANCH's script rather than the released
+      # one, which is what you want from the repo that owns it.
+      #
+      # The test is identity, not file presence: a consumer that happens to
+      # carry its own .github/scripts/test-mode.mjs still gets the pinned copy.
+      # "Decide what to run" keys off the same comparison, so the two cannot
+      # disagree about which script runs.
       - name: Fetch the shared test-mode script
-        if: ${{ hashFiles('.github/scripts/test-mode.mjs') == '' }}
+        if: ${{ fromJSON(toJSON(job)).workflow_repository != github.repository }}
         uses: actions/checkout@v7
         with:
-          repository: ${{ steps.self.outputs.repository }}
-          ref: ${{ steps.self.outputs.sha }}
+          repository: ${{ fromJSON(toJSON(job)).workflow_repository }}
+          ref: ${{ fromJSON(toJSON(job)).workflow_sha }}
           path: .nswds-ci
           persist-credentials: false
+          sparse-checkout: .github/scripts/test-mode.mjs
+          sparse-checkout-cone-mode: false
 
       - name: Decide what to run
         id: probe
+        env:
+          TEST_MODE_SCRIPT: ${{ fromJSON(toJSON(job)).workflow_repository == github.repository && '.github/scripts/test-mode.mjs' || '.nswds-ci/.github/scripts/test-mode.mjs' }}
         run: |
-          script=.github/scripts/test-mode.mjs
-          [ -f "$script" ] || script=.nswds-ci/.github/scripts/test-mode.mjs
-          if [ ! -f "$script" ]; then
-            echo "::error::test-mode.mjs is neither in this repo nor in the fetched copy, so the test gate cannot decide what to run."
+          if [ ! -f "$TEST_MODE_SCRIPT" ]; then
+            echo "::error::$TEST_MODE_SCRIPT is missing, so the test gate cannot decide what to run."
             exit 1
           fi
-          node "$script" "$RUNNER_TEMP/vitest-run-plan"
+          node "$TEST_MODE_SCRIPT" "$RUNNER_TEMP/vitest-run-plan"
 
       - name: Install dependencies
         if: ${{ steps.probe.outputs.mode != 'none' }}
