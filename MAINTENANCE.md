@@ -38,8 +38,10 @@ that style and every consumer's `format:check` stays green.
 ### Changing CI logic
 
 Applies to `reusable-*.yml` and `.github/scripts/test-mode.mjs` (fetched by
-consumers at `@v1`). Merge to `main` as usual; nothing reaches consumers yet,
-because stubs pin `@v1`. Ship it with the **Promote v1** workflow
+the test gate at the same commit as the calling `reusable-ci.yml`, via
+`job.workflow_sha`, so `@v1` callers get the script at `v1`). Merge to `main`
+as usual; nothing reaches consumers yet, because stubs pin `@v1`. Ship it
+with the **Promote v1** workflow
 (Actions → Promote v1 → run with the target SHA, or leave the input empty to
 promote the newest promotable commit among the last 10 on `main`;
 `chore(release): x.y.z [skip ci]` release commits are skipped automatically).
@@ -161,8 +163,8 @@ the reusables must be callable from anywhere. If this repo is ever made
 private, two things break: set Settings → Actions → General → Access to
 "Accessible from repositories owned by the organization" for the private
 repos, and the public consumers' CI stops resolving entirely. The test gate
-also fetches `.github/scripts/test-mode.mjs` from this repo at `v1` without a
-token, which relies on the repo being public.
+also fetches `.github/scripts/test-mode.mjs` from this repo (at the calling
+workflow's own commit) without a token, which relies on the repo being public.
 
 ### Pinned third-party actions
 

@@ -406,26 +406,62 @@ jobs:
 
       # A reusable workflow's `run` steps execute against the CALLER's checkout,
       # so for the 29 consumer repos .github/scripts/ is not there and the
-      # script has to be fetched. Pinned to v1 — the same ref they call this
-      # workflow at — so script and workflow move together under one Promote v1
-      # rather than skewing. nswds-devops is public, so no token is needed, and
-      # persist-credentials:false leaves no credential in the consumer's tree.
+      # script has to be fetched. It is fetched at job.workflow_sha — the commit
+      # of THIS reusable workflow file as the caller resolved it — so script and
+      # workflow always come from the same commit. A caller on `@v1` gets the
+      # commit v1 points at, exactly as before; a caller that SHA-pins this
+      # workflow (Renovate digest pins, e.g. lau.ren) now gets the script from
+      # that same SHA. The previous `ref: v1` fetched the script at the moving
+      # tag even for SHA-pinned callers, so a Promote v1 changed what their
+      # `install / test` ran without their pin moving. nswds-devops is public,
+      # so no token is needed, and persist-credentials:false leaves no
+      # credential in the consumer's tree.
       #
       # Skipped when the script is already in the workspace, which is the case
       # for nswds-devops itself: its ci.yml calls `./.github/workflows/
       # reusable-ci.yml`, so the caller's checkout IS this repo. That is not an
-      # optimisation. Fetching v1 unconditionally deadlocks the very PR that
-      # introduces the script — v1 does not have it yet, the job dies with
-      # MODULE_NOT_FOUND, and v1 cannot be promoted past a red check. Using the
-      # local copy also means this repo's own `install / test` exercises the
+      # optimisation. Fetching a released ref unconditionally deadlocks the very
+      # PR that introduces the script — v1 does not have it yet, the job dies
+      # with MODULE_NOT_FOUND, and v1 cannot be promoted past a red check. Using
+      # the local copy also means this repo's own `install / test` exercises the
       # BRANCH's script rather than the released one, which is what you want
-      # from the repo that owns it.
+      # from the repo that owns it. The flip side: this repo's CI never runs the
+      # fetch below, so a consumer's first run after Promote v1 is where it is
+      # exercised.
+      #
+      # job.workflow_* is read through toJSON(job) rather than as
+      # `job.workflow_sha` because actionlint (1.7.12, and the 1.7.7 ci.yml
+      # pins) predates those properties and rejects them as undefined; the
+      # whole-object read keeps the workflow lint-clean without an -ignore.
+      # Switch to the direct properties once actionlint knows them.
+      #
+      # They are github.com-only (absent on GHES). Anything but a well-formed
+      # owner/repo and a 40-hex SHA fails here: an empty `ref` would make
+      # checkout fall back to the default branch and silently reintroduce a
+      # moving ref, and the format check keeps the values safe to hand on as
+      # step outputs.
+      - name: Resolve this workflow's commit
+        id: self
+        if: ${{ hashFiles('.github/scripts/test-mode.mjs') == '' }}
+        env:
+          JOB_CONTEXT: ${{ toJSON(job) }}
+        run: |
+          node -e '
+            const { workflow_repository: repo, workflow_sha: sha } = JSON.parse(process.env.JOB_CONTEXT)
+            if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo ?? "") || !/^[0-9a-f]{40}$/.test(sha ?? "")) {
+              console.log("::error::job.workflow_repository / job.workflow_sha are missing or malformed, so test-mode.mjs cannot be fetched at the commit this workflow runs from. Refusing to fall back to a moving ref.")
+              process.exit(1)
+            }
+            require("fs").appendFileSync(process.env.GITHUB_OUTPUT, `repository=${repo}\nsha=${sha}\n`)
+            console.log(`Fetching test-mode.mjs from ${repo}@${sha}`)
+          '
+
       - name: Fetch the shared test-mode script
         if: ${{ hashFiles('.github/scripts/test-mode.mjs') == '' }}
         uses: actions/checkout@v7
         with:
-          repository: digitalnsw/nswds-devops
-          ref: v1
+          repository: ${{ steps.self.outputs.repository }}
+          ref: ${{ steps.self.outputs.sha }}
           path: .nswds-ci
           persist-credentials: false
 
