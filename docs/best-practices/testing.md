@@ -7,8 +7,10 @@
 ## The enforced floor (every repo)
 
 The required `install / install` check validates every PR's test merge:
-no conflict markers anywhere, `npm clean-install` succeeds (lockfile matches
-manifest), and the build compiles where enabled. That's integrity testing —
+no conflict markers anywhere, no literal npm self-overrides,
+`npm clean-install` succeeds (lockfile matches manifest), every installed
+package's registry signature and provenance attestation verifies
+(`npm audit signatures`), and the build compiles where enabled. That's integrity testing —
 it catches broken states, not wrong behaviour.
 
 ## The expectation
