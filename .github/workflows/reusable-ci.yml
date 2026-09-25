@@ -139,6 +139,22 @@ jobs:
       - name: Install dependencies
         run: npm clean-install
 
+      # The same check reusable-release runs before publishing, run here so a
+      # lockfile that fails it cannot merge. Until this step existed it ran
+      # only after merge: a Renovate PR locked whatwg-url@17.1.1, whose
+      # advertised provenance attestation the registry serves as a 404
+      # (jsdom/whatwg-url#338), merged green in nswds-email and engagement,
+      # and every release in both failed from 2026-09-21 until the lockfile
+      # was bumped by hand. This is also the gate the monthly lockFileMaintenance
+      # automerge waits on, so a regeneration that picks up a package with a
+      # broken attestation now stays open instead of breaking releases.
+      #
+      # A red step here means the registry could not verify a signature or
+      # attestation for a package in the lockfile. Move the lockfile to a
+      # version that verifies; never skip or soften this step.
+      - name: Verify registry signatures and provenance attestations
+        run: npm audit signatures
+
       # App repos whose builds need deploy-time env (Next.js page-data
       # collection hits auth/DB) opt out with a repo Actions variable:
       # Settings → Secrets and variables → Actions → Variables →
