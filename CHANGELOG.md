@@ -1,3 +1,9 @@
+## [1.25.8](https://github.com/digitalnsw/nswds-devops/compare/v1.25.7...v1.25.8) (2026-09-25)
+
+### Bug Fixes
+
+* **ci:** verify registry signatures in the install gate ([#152](https://github.com/digitalnsw/nswds-devops/issues/152)) ([5b91fa3](https://github.com/digitalnsw/nswds-devops/commit/5b91fa3084b664ea6a5f24777365e2a93ad59b49))
+
 ## [1.25.7](https://github.com/digitalnsw/nswds-devops/compare/v1.25.6...v1.25.7) (2026-09-21)
 
 ### Bug Fixes
