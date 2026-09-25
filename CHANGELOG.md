@@ -1,3 +1,9 @@
+## [1.25.9](https://github.com/digitalnsw/nswds-devops/compare/v1.25.8...v1.25.9) (2026-09-25)
+
+### Bug Fixes
+
+* **ci:** fetch test-mode.mjs at the reusable workflow's own commit ([#153](https://github.com/digitalnsw/nswds-devops/issues/153)) ([ee6015b](https://github.com/digitalnsw/nswds-devops/commit/ee6015b1c52cf79b622d7f8e8de5b08680b13b56)), closes [#141](https://github.com/digitalnsw/nswds-devops/issues/141)
+
 ## [1.25.8](https://github.com/digitalnsw/nswds-devops/compare/v1.25.7...v1.25.8) (2026-09-25)
 
 ### Bug Fixes
