@@ -183,7 +183,7 @@ else does.
 | Automerged | Group | Why it's safe |
 | --- | --- | --- |
 | **devDependency patches** | `dev dependencies (patch)` | Patch is bug-fix-by-convention, and devDependencies can't reach production. **Every required check** still has to pass first — `commitlint`, the required `install / …` jobs and both Snyk contexts included |
-| **Lock file maintenance** | `Lock file maintenance` | Touches `package-lock.json` only — no manifest, no source. `install / install` is precisely the gate that proves a regenerated lockfile is coherent |
+| **Lock file maintenance** | `Lock file maintenance` | Touches `package-lock.json` only — no manifest, no source. `install / install` is precisely the gate that proves a regenerated lockfile is coherent and that every package in it verifies (`npm audit signatures`) |
 | **Lint and format tooling**, minor and patch — `@nswds/eslint-config`, `@nswds/prettier-config`, `eslint`, `prettier` | `lint and format tooling` | These four are the only dependencies whose whole effect is measured by a check that already gates the merge: a formatting change fails `install / format`, a rule change fails `install / lint`. A bump that would change what the repo does **cannot** merge |
 
 Automerge waits on whatever that repo's ruleset marks **required** — it can't

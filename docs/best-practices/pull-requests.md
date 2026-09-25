@@ -12,7 +12,8 @@ only bypass actor; repository admins are deliberately not.
 ## What the gates buy us
 
 - `install / install` checks out the *test merge* of PR + base and runs the
-  conflict-marker grep, `npm clean-install`, and the build — so a bad
+  conflict-marker grep, the literal self-override check, `npm clean-install`,
+  `npm audit signatures`, and the build — so a bad
   conflict resolution or corrupted lockfile fails **before** it can land.
   This exists because a bot PR once merged committed conflict markers into a
   lockfile via the web "Resolve conflicts" editor; detection existed,
