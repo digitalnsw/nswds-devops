@@ -6,7 +6,9 @@
 # 2026-07-29: five action majors sat on main unpromoted, with the Release
 # job green). This probe opens a single tracking issue when main carries
 # week-old unpromoted changes to the executable surface
-# (.github/workflows/reusable-*.yml).
+# (.github/workflows/reusable-*.yml, plus .github/scripts/test-mode.mjs, which
+# the test gate fetches at the reusable workflow's own commit and so ships
+# through the same Promote v1).
 #
 # Repo-local to nswds-devops — NOT synced to consumers.
 name: v1 drift canary
@@ -37,10 +39,12 @@ jobs:
             echo '::error::v1 tag not found'
             exit 1
           fi
-          count="$(git rev-list --count v1..origin/main -- '.github/workflows/reusable-*.yml')"
+          # Keep in step with what consumers execute from this repo at v1.
+          surface=('.github/workflows/reusable-*.yml' '.github/scripts/test-mode.mjs')
+          count="$(git rev-list --count v1..origin/main -- "${surface[@]}")"
           drifted=false
           if [ "$count" -gt 0 ]; then
-            oldest="$(git log --reverse --format=%ct v1..origin/main -- '.github/workflows/reusable-*.yml' | head -n1)"
+            oldest="$(git log --reverse --format=%ct v1..origin/main -- "${surface[@]}" | head -n1)"
             age_days="$(( ($(date +%s) - oldest) / 86400 ))"
             if [ "$age_days" -ge 7 ]; then
               drifted=true
@@ -49,11 +53,11 @@ jobs:
             {
               echo 'v1 is behind main on the executable workflow surface:'
               echo
-              echo "- unpromoted commits touching \`reusable-*.yml\`: ${count} (oldest is ${age_days} days old)"
+              echo "- unpromoted commits touching \`reusable-*.yml\` or \`test-mode.mjs\`: ${count} (oldest is ${age_days} days old)"
               echo "- v1: \`$(git rev-parse v1)\` — main: \`$(git rev-parse origin/main)\`"
               echo
               echo '```'
-              git log --oneline v1..origin/main -- '.github/workflows/reusable-*.yml'
+              git log --oneline v1..origin/main -- "${surface[@]}"
               echo '```'
               echo
               echo 'Promote with the **Promote v1** workflow (Actions → Promote v1 → run with the target SHA).'

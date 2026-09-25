@@ -180,7 +180,7 @@ manual; see [MAINTENANCE.md](MAINTENANCE.md).
 ## Testing this repo
 
 ```sh
-npm test    # unit tests for tools/, release.config.mjs, .github/scripts/snyk-policy.mjs and test-mode.mjs
+npm test    # unit tests for tools/, release.config.mjs, .github/scripts/snyk-policy.mjs, test-mode.mjs and how reusable-ci.yml fetches it
 ```
 
 That suite includes `tools/fleet-docs.test.mjs`, which holds FLEET.md's fleet
