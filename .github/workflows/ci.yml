@@ -33,7 +33,7 @@ jobs:
           shellcheck -x -e SC1091 scripts/*.sh
           # Repo-local helpers (not synced), linted to the same standard.
           shellcheck -e SC1091 .github/scripts/*.sh
-          shellcheck -e SC1091 scripts/husky/pre-commit scripts/husky/commit-msg scripts/husky/prepare-commit-msg
+          shellcheck -e SC1091 repo-files/husky/pre-commit repo-files/husky/commit-msg repo-files/husky/prepare-commit-msg
 
   workflow-lint:
     runs-on: ubuntu-latest

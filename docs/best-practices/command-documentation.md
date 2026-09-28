@@ -51,7 +51,7 @@ Synced into every repo's `scripts/` from this repo. The user-facing ones:
 | `./scripts/suggest-branch-name.sh` | Proposes a compliant branch name for your change. |
 | `./scripts/git-commit.sh` | AI-generated Conventional Commit message from your staged diff (commits via `git commit -F -`, so the commit-msg hook still lints it). |
 | `./scripts/pull-request.sh` | Generates a Conventional-Commits PR title from your branch's commits, asks for confirmation, then opens the PR with `gh pr create`. |
-| `./scripts/setup-commitlint.sh` | Installs and wires commitlint + the husky hooks (`pre-commit`, `prepare-commit-msg`, `commit-msg`) in the current repo. Idempotent. |
+| `./scripts/setup-commitlint.sh` | Installs commitlint + husky in the current repo and wires husky to the hooks (`pre-commit`, `prepare-commit-msg`, `commit-msg`) that the sync delivers to `.husky/`. Idempotent. |
 
 Supporting pieces you rarely invoke directly: `branch-name-config.sh`
 (policy source of truth), `conventional-commit-config.sh` +
