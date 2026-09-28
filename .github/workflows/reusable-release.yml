@@ -84,6 +84,37 @@ jobs:
         # devDependency; a repo missing it should fail here, not have npx
         # fetch latest and run it with contents:write and the deploy key.
         run: npx --no-install semantic-release
+      # alert-on-failure keeps one release-failure issue open and comments on
+      # it for every later failure; nothing closed it once releases recovered,
+      # so a fixed repo still showed an open alert (digitalnsw/nswds-email#643
+      # sat open for days after its 14 failures were fixed). A green run closes it here.
+      #
+      # A step in this job, not a separate job: the job's concurrency group
+      # serialises it with every other release, so an older run's close always
+      # lands before a newer run's failure can file a fresh issue. Only the
+      # bot's own issues are closed; one labelled by hand stays open. A failure
+      # here must not fail a release that already succeeded (and file a false
+      # alarm), hence continue-on-error.
+      - name: Close release-failure issues superseded by this successful release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          issues="$(gh issue list --repo "$GITHUB_REPOSITORY" --label release-failure --state open --author app/github-actions --json number --jq '.[].number')"
+          if [ -z "$issues" ]; then
+            echo "No open release-failure issues"
+            exit 0
+          fi
+          body="Release run ${run_url} succeeded at ${GITHUB_SHA}, so the failures above are superseded.
+
+          A later success does not republish a version a failed run tagged but never released: if any failure above left a git tag without its release artefacts, that still needs checking by hand.
+
+          _Closed automatically by the release job in reusable-release.yml._"
+          for number in $issues; do
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" --reason completed --comment "$body"
+            echo "Closed issue #$number"
+          done
 
   # Release failures are easy to miss: they happen post-merge where nobody is
   # watching, and semantic-release may have already pushed the version tag so
