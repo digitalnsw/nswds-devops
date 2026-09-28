@@ -68,12 +68,12 @@ one-step rollout and rollback for CI logic.
 
 ```
 ├── scripts/                      # canonical shell tooling → synced to scripts/ in each repo
-│   └── husky/                    # hook sources (installed into .husky/ by setup-commitlint.sh)
 ├── commit-types.mjs              # the list of allowed commit types → synced to repo roots
 ├── commitlint.config.mjs         # imports commit-types.mjs → synced
 ├── git-conventional-commits.yaml # kept in lockstep with commit-types.mjs, CI-enforced → synced
 ├── release.config.mjs            # stock semantic-release config → synced (with exclusions)
 ├── repo-files/                   # .nvmrc, .npmrc (+ nswds-ui variant), renovate.json → synced to roots;
+│                                 # husky/ → synced to .husky/ (the hooks' single source of truth);
 │                                 # .gitignore / .prettierignore canonical bases (not yet synced)
 ├── workflow-stubs/               # the eight thin callers → synced to .github/workflows/ in each repo
 ├── default.json                  # Renovate org preset (read from main at run time)

@@ -207,11 +207,12 @@ Merge to `main`; the sync opens a `chore(ci): …` PR in the target repo
 
 Reviewing that first sync PR:
 
-- Only expected paths: `scripts/` shared files, the root configs, and
-  `.github/workflows/` stubs. Nothing repo-specific replaced.
-- Script file modes match central: everything under `scripts/` is `100755`
-  except `scripts/husky/pre-commit`, which is `100644` by design
-  (`git ls-tree -r` on the branch).
+- Only expected paths: `scripts/` shared files, the husky hooks in
+  `.husky/`, the root configs, and `.github/workflows/` stubs. Nothing
+  repo-specific replaced.
+- File modes match central: everything under `scripts/` is `100755`, and in
+  `.husky/` so are `commit-msg` and `prepare-commit-msg`; `pre-commit` is
+  `100644` by design (`git ls-tree -r` on the branch).
 - `check-branch-name` reports red on this one PR only. The check reads
   branch policy from the PR base, which gains the `chore/repo-sync`
   exemption when this PR merges. It is not a required check; merge past it.
