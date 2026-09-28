@@ -35,7 +35,9 @@ layout in `.github/sync.yml` encodes this.
 ## Practices
 
 - **Loud failures**: release failures happen post-merge where nobody is
-  watching. The bespoke pipelines file/bump a `release-failure` issue and
+  watching. The shared `reusable-release.yml` files/bumps a
+  `release-failure` issue and closes it on the next green release. The
+  bespoke pipelines file/bump a `release-failure` issue and
   verify npm actually matches the newest tag — copy that pattern anywhere a
   silent failure would strand consumers (three releases once failed
   unnoticed).
