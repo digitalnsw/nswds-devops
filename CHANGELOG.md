@@ -1,3 +1,9 @@
+## [1.26.0](https://github.com/digitalnsw/nswds-devops/compare/v1.25.9...v1.26.0) (2026-09-28)
+
+### Features
+
+* **ci:** close the release-failure issue on the next green release ([#155](https://github.com/digitalnsw/nswds-devops/issues/155)) ([0575c89](https://github.com/digitalnsw/nswds-devops/commit/0575c89540b0a709741a95c11801f2ba9be6014d))
+
 ## [1.25.9](https://github.com/digitalnsw/nswds-devops/compare/v1.25.8...v1.25.9) (2026-09-25)
 
 ### Bug Fixes
