@@ -31,6 +31,7 @@ group:
       digitalnsw/risk-guidance
       digitalnsw/agile
       digitalnsw/nswds-skills
+      digitalnsw/awesome-nswds
     files:
       - source: scripts/
         dest: scripts/

@@ -72,13 +72,17 @@
     "",
     "2026-09-16: nswds-skills was promoted from outside the fleet and enrolled",
     "as a plain key. It had no prior .snyk, so the sync creates the file with",
-    "the canonical block and an empty tail -- no migrate directive needed."
+    "the canonical block and an empty tail -- no migrate directive needed.",
+    "",
+    "2026-10-09: awesome-nswds was onboarded as a new repo and enrolled as a",
+    "plain key. It has no prior .snyk, so the sync creates the file."
   ],
 
   "owner": "digitalnsw",
 
   "repos": {
     "agile": {},
+    "awesome-nswds": {},
     "attestation": {},
     "awards": {},
     "data": {},

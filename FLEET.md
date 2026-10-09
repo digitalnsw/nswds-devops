@@ -24,8 +24,8 @@ Related documents: [README.md](README.md) (how the shared tooling works),
 
 | Measure | Value |
 |---|---|
-| Consumer repos in [.github/sync.yml](.github/sync.yml) | 27 |
-| Repos under the canonical Snyk policy ([snyk-policy/repos.json](snyk-policy/repos.json)) | 28 (every consumer plus this repo) |
+| Consumer repos in [.github/sync.yml](.github/sync.yml) | 28 |
+| Repos under the canonical Snyk policy ([snyk-policy/repos.json](snyk-policy/repos.json)) | 29 (every consumer plus this repo) |
 | Repos publishing to npm | 6 (`@nswds/ui`, `@nswds/tokens`, `@nswds/app`, `@nswds/eslint-config`, `@nswds/prettier-config`, `@nswds/metadata`) |
 | Repos deployed on Vercel (team "Digital NSW", Pro plan) | 15 repos, 20 projects |
 | Node baseline | `.nvmrc` `24.16.0`; `engines.node` `^22.22.2 \|\| >=24.15.0`; `engine-strict=true` |
@@ -96,6 +96,7 @@ All but `agile` deploy on Vercel; it has no Vercel project and no live URL.
 | `images` (local folder `nswds-images`) | Static image and icon assets | GitHub Pages (https://digitalnsw.github.io/images/) | 1 | `install / *` + `commitlint` + `code/snyk` only (see open issues) |
 | `share` | Static HTML hosting for proofs of concept; publishes `README.md` to Confluence | GitHub Pages (https://digitalnsw.github.io/share/) | 1 | standard |
 | `nswds-skills` (public) | Agent skills and multi-agent workflow packages for AI coding agents, installable via `npx skills add`; the source of the fleet's own review, onboarding and Snyk skills | — | 1 | + `install / typecheck` |
+| `awesome-nswds` (public) | Curated awesome list of resources for designers, developers and content people building NSW Government digital products. Markdown only; `awesome-lint` is its `lint` script, and a weekly `link-check.yml` (lychee) opens an issue for dead links | — | 1 | + `install / typecheck`; **no Snyk contexts yet** (finishing onboarding — Snyk import and Renovate selection pending) |
 | `nswds-devops` (public) | This repo: the shared tooling, reusable workflows, Renovate preset, Snyk policy and fleet documentation | — | source | standard + `shellcheck`, `workflow-lint`; second ruleset "Protect v tags" |
 
 ## Organisation repos outside the fleet
@@ -150,6 +151,18 @@ gh api -X PATCH repos/digitalnsw/<repo> -F allow_merge_commit=false -F allow_reb
 rulesets do not require `security/snyk (DigitalNSW)` or
 `code/snyk (DigitalNSW)`. `images` requires `code/snyk` only. Fix: add the
 missing contexts to each ruleset as in ONBOARDING.md step 10.
+
+**`awesome-nswds` onboarding is finishing.** It carries the baseline npm
+project and the `Protect main` ruleset (`commitlint` and the five `install / *`
+checks, including `install / typecheck`), plus `RELEASE_DEPLOY_KEY` and the fleet
+merge flags. The synced tooling and CI stubs arrive with the first sync PR once
+this repo's enrolment merges, and its `.snyk` policy block with the Snyk-policy
+fan-out. Still pending: selecting it in Renovate and importing it into the Snyk
+org (until then its ruleset does not require the two Snyk contexts). Fix:
+complete the two console steps, open a verification PR and confirm all three
+`…/snyk (DigitalNSW)` statuses post green on it, and only then add
+`security/snyk (DigitalNSW)` and `code/snyk (DigitalNSW)` to the ruleset
+(ONBOARDING.md step 10). Requiring them before they report blocks every merge.
 
 **Most repos do not require `install / typecheck`.** Only `agile`,
 `dtl-sandbox`, `nswds-email`, `nswds-email-design`, `nswds-skills` and `nswds-ui` require it,
