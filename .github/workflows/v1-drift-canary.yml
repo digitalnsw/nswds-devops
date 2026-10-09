@@ -8,7 +8,8 @@
 # week-old unpromoted changes to the executable surface
 # (.github/workflows/reusable-*.yml, plus .github/scripts/test-mode.mjs, which
 # the test gate fetches at the reusable workflow's own commit and so ships
-# through the same Promote v1).
+# through the same Promote v1), and closes it on the first run that finds no
+# week-old drift left.
 #
 # Repo-local to nswds-devops — NOT synced to consumers.
 name: v1 drift canary
@@ -65,6 +66,7 @@ jobs:
             echo "body_file=${body}" >>"$GITHUB_OUTPUT"
           fi
           echo "drifted=${drifted}" >>"$GITHUB_OUTPUT"
+          echo "v1=$(git rev-parse 'v1^{commit}')" >>"$GITHUB_OUTPUT"
 
       - name: Open tracking issue when v1 has drifted
         if: steps.drift.outputs.drifted == 'true'
@@ -84,3 +86,32 @@ jobs:
             --title 'v1 lags main on the reusable workflows — promote it' \
             --label v1-drift \
             --body-file "$BODY_FILE"
+
+      # Promote v1 moves the tag but leaves the tracking issue alone, and the
+      # step above stays silent while any v1-drift issue is open — so an issue
+      # nobody closed by hand would hide every later drift
+      # (digitalnsw/nswds-devops#157 had to be closed manually after its
+      # promotion). Close it from here instead, on the first run that no
+      # longer sees week-old drift. Every open v1-drift
+      # issue is closed, whoever filed it: the label means "v1 lags main", and
+      # any open one suppresses the alert above.
+      - name: Close the tracking issue once v1 has caught up
+        if: steps.drift.outputs.drifted != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V1_SHA: ${{ steps.drift.outputs.v1 }}
+        run: |
+          set -euo pipefail
+          issues="$(gh issue list --state open --label v1-drift --json number --jq '.[].number')"
+          if [ -z "$issues" ]; then
+            echo 'No open v1-drift issue; nothing to do.'
+            exit 0
+          fi
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          body="v1 is at \`${V1_SHA}\` and main has no unpromoted change to the reusable workflows or \`test-mode.mjs\` older than a week, so this is resolved (${run_url}).
+
+          _Closed automatically by the v1 drift canary._"
+          for number in $issues; do
+            gh issue close "$number" --reason completed --comment "$body"
+            echo "Closed issue #$number"
+          done
