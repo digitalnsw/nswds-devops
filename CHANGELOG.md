@@ -1,3 +1,9 @@
+## [1.27.0](https://github.com/digitalnsw/nswds-devops/compare/v1.26.0...v1.27.0) (2026-10-09)
+
+### Features
+
+* **ci:** close the v1-drift issue once the canary finds v1 caught up ([#159](https://github.com/digitalnsw/nswds-devops/issues/159)) ([20e98e4](https://github.com/digitalnsw/nswds-devops/commit/20e98e4c0654ad9fdb2bb5b9fb2f0a917e81a83c)), closes [#157](https://github.com/digitalnsw/nswds-devops/issues/157)
+
 ## [1.26.0](https://github.com/digitalnsw/nswds-devops/compare/v1.25.9...v1.26.0) (2026-09-28)
 
 ### Features
