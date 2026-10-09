@@ -13,7 +13,7 @@
 
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -112,7 +112,7 @@ function runDrift(commits) {
     git(['tag', 'v1'])
     for (const [index, { file, daysAgo }] of commits.entries()) {
       const target = path.join(repo, file)
-      execFileSync('mkdir', ['-p', path.dirname(target)])
+      mkdirSync(path.dirname(target), { recursive: true })
       writeFileSync(target, `change ${index}\n`)
       git(['add', file])
       const date = new Date(Date.now() - daysAgo * 86_400_000).toISOString()
@@ -136,9 +136,10 @@ function runDrift(commits) {
 /**
  * Runs the close step's body the way Actions does (`bash -e`) with a fake
  * `gh` that logs each call and answers `issue list` with `listOutput`.
- * `closeFails` makes every `gh issue close` exit 1.
+ * `listFails` makes `gh issue list` exit 1; `closeFails` makes every
+ * `gh issue close` exit 1.
  */
-function runClose({ listOutput, closeFails = false }) {
+function runClose({ listOutput, listFails = false, closeFails = false }) {
   assert.ok(closeStep, `probe job has no "${CLOSE_STEP}" step`)
   const dir = mkdtempSync(path.join(tmpdir(), 'v1-drift-canary-'))
   try {
@@ -150,6 +151,7 @@ function runClose({ listOutput, closeFails = false }) {
         // Args NUL-separated, calls separated by 0x1E: comments contain newlines.
         `printf '%s\\0' "$@" >> ${JSON.stringify(log)}`,
         `printf '\\036' >> ${JSON.stringify(log)}`,
+        'if [ "$1 $2" = "issue list" ] && [ "$GH_LIST_FAILS" = 1 ]; then exit 1; fi',
         'if [ "$1 $2" = "issue list" ]; then printf "%s" "$GH_LIST_OUTPUT"; fi',
         `if [ "$1 $2" = "issue close" ] && [ "$GH_CLOSE_FAILS" = 1 ]; then exit 1; fi`,
         'exit 0',
@@ -159,6 +161,7 @@ function runClose({ listOutput, closeFails = false }) {
     const env = {
       PATH: `${dir}:${process.env.PATH}`,
       GH_LIST_OUTPUT: listOutput,
+      GH_LIST_FAILS: listFails ? '1' : '0',
       GH_CLOSE_FAILS: closeFails ? '1' : '0',
       GITHUB_SERVER_URL: 'https://github.com',
       GITHUB_REPOSITORY: 'digitalnsw/nswds-devops',
@@ -262,4 +265,10 @@ test('it closes every open issue as completed, citing v1 and the run', () => {
 test('a failed close fails the run, so the canary shows red', () => {
   const { status } = runClose({ listOutput: '157\n', closeFails: true })
   assert.notEqual(status, 0)
+})
+
+test('a failed issue listing fails the run instead of reading as "no issue"', () => {
+  const { status, calls } = runClose({ listOutput: '', listFails: true })
+  assert.notEqual(status, 0)
+  assert.equal(calls.filter((args) => args[0] === 'issue' && args[1] === 'close').length, 0)
 })

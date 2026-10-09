@@ -75,8 +75,9 @@ qualifies. Release commits themselves are `[skip ci]` and carry no check
 runs, so the workflow refuses them; promote the merge commit beneath. The
 weekly `v1 drift canary` opens a tracking issue when unpromoted
 reusable-workflow or `test-mode.mjs` changes sit on `main` for over a week,
-and closes it on its next run after the promotion (the following Monday, or
-straight away if you dispatch the canary by hand).
+and closes it on the first run that finds no week-old drift left, which is
+normally the next run after a promotion (the following Monday, or straight
+away if you dispatch the canary by hand).
 
 Emergency fallback if the promotion workflow itself is broken: temporarily
 disable the tag ruleset's enforcement, push the tag, re-enable. This is the
