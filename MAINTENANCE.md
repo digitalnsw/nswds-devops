@@ -74,7 +74,9 @@ to the reusables never cut a release, so any green commit on `main`
 qualifies. Release commits themselves are `[skip ci]` and carry no check
 runs, so the workflow refuses them; promote the merge commit beneath. The
 weekly `v1 drift canary` opens a tracking issue when unpromoted
-reusable-workflow or `test-mode.mjs` changes sit on `main` for over a week.
+reusable-workflow or `test-mode.mjs` changes sit on `main` for over a week,
+and closes it on its next run after the promotion (the following Monday, or
+straight away if you dispatch the canary by hand).
 
 Emergency fallback if the promotion workflow itself is broken: temporarily
 disable the tag ruleset's enforcement, push the tag, re-enable. This is the
@@ -305,7 +307,7 @@ job, because a canary that fails every week gets muted.
 | `sync.yml` | push to `main` (synced paths), manual | The file-sync driver |
 | `snyk-policy-sync.yml` | push to `main` touching `snyk-policy/**` or the script, manual (with `dry_run`) | Fans the canonical Snyk block out as one PR per consumer, preserving each repo's tail byte-for-byte |
 | `ccc-v10-canary.yml` | Mondays 08:17 UTC | Probes whether the latest release-notes-generator renders real notes with conventional-changelog-conventionalcommits v10; opens a `ccc-v10-canary` issue the day the Renovate block can be lifted |
-| `v1-drift-canary.yml` | Mondays 08:23 UTC | Opens a `v1-drift` issue when unpromoted `reusable-*.yml` or `test-mode.mjs` changes sit on `main` for over a week |
+| `v1-drift-canary.yml` | Mondays 08:23 UTC | Opens a `v1-drift` issue when unpromoted `reusable-*.yml` or `test-mode.mjs` changes sit on `main` for over a week; closes it once a run finds no week-old drift left |
 | `ccc-pin-drift-canary.yml` | Mondays 08:29 UTC | Scans every semantic-release repo for the root `conventional-changelog-conventionalcommits@^9` pin; opens a `ccc-pin-drift` issue on any repo missing it (a missing pin means silently blank release notes) |
 | `npm-self-override-canary.yml` | Mondays 08:35 UTC | Scans every repo for a package declared both as a direct dependency and as a literal-pinned `overrides` entry; opens an `npm-self-override` issue (that shape aborts Renovate for the whole repo with no visible error) |
 | `snyk-policy-canary.yml` | Mondays 08:44 UTC | Opens or refreshes a `snyk-policy-drift` issue when a consumer's canonical block no longer matches the base, or a repo in `repos.json` is unreadable or unmigrated |
