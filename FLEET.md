@@ -159,8 +159,10 @@ merge flags. The synced tooling and CI stubs arrive with the first sync PR once
 this repo's enrolment merges, and its `.snyk` policy block with the Snyk-policy
 fan-out. Still pending: selecting it in Renovate and importing it into the Snyk
 org (until then its ruleset does not require the two Snyk contexts). Fix:
-complete the two console steps, then add `security/snyk (DigitalNSW)` and
-`code/snyk (DigitalNSW)` to the ruleset (ONBOARDING.md step 10).
+complete the two console steps, open a verification PR and confirm all three
+`…/snyk (DigitalNSW)` statuses post green on it, and only then add
+`security/snyk (DigitalNSW)` and `code/snyk (DigitalNSW)` to the ruleset
+(ONBOARDING.md step 10). Requiring them before they report blocks every merge.
 
 **Most repos do not require `install / typecheck`.** Only `agile`,
 `dtl-sandbox`, `nswds-email`, `nswds-email-design`, `nswds-skills` and `nswds-ui` require it,
