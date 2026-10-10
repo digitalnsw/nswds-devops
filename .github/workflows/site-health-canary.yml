@@ -1,0 +1,69 @@
+# Weekly canary for the fleet's public addresses.
+#
+# Fetches every site FLEET.md lists and checks that it answers, and that its
+# canonical and og:url name the host that served it; then checks every link in
+# every non-archived repo's README for hosts that no longer resolve and pages
+# that are gone. See .github/scripts/site-health-canary.mjs for what is and is
+# not reported.
+#
+# Needs the sync GitHub App because secrets.GITHUB_TOKEN is scoped to this repo
+# and cannot read sibling repos' READMEs.
+#
+# Repo-local to nswds-devops — NOT synced to consumers.
+name: site health canary
+
+on:
+  schedule:
+    - cron: '50 8 * * 1' # Mondays 08:50 UTC, after the Snyk policy canary
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Mint GitHub App token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.SYNC_APP_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          owner: digitalnsw
+
+      - name: Probe sites and README links
+        id: probe
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: node .github/scripts/site-health-canary.mjs
+
+      - name: Open tracking issue when an address is wrong or gone
+        if: steps.probe.outputs.drifted == 'true'
+        env:
+          # Deliberately the repo-scoped token: the issue is filed here, and
+          # this step needs no cross-repo access.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BODY_FILE: ${{ steps.probe.outputs.body_file }}
+        run: |
+          set -euo pipefail
+          # Idempotent: one open tracking issue at a time, keyed on the label.
+          gh label create site-health \
+            --description 'A fleet site declares the wrong canonical host, or a site or README link is dead' \
+            --color d93f0b --force
+          if [ "$(gh issue list --state open --label site-health --json number --jq 'length')" -gt 0 ]; then
+            echo 'Tracking issue already open; nothing to do.'
+            exit 0
+          fi
+          gh issue create \
+            --title 'Site health: a canonical host is wrong, or an address is dead' \
+            --label site-health \
+            --body-file "$BODY_FILE"

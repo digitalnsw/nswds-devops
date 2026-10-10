@@ -120,7 +120,7 @@ has auto-merge or branch auto-delete enabled.
 
 | Service | Scope | Notes |
 |---|---|---|
-| GitHub App `nswds-devops-sync` | Installed org-wide (all repositories) | Its token is minted by six workflows here: the file sync, the Snyk policy fan-out, `promote-v1` (to arm auto-merge on fan-out PRs), and three of the five weekly canaries. The other two canaries use `GITHUB_TOKEN`. Each workflow and its purpose is tabled in MAINTENANCE.md, which is the list to update when a workflow starts minting it. Credentials are repository secrets on this repo (`SYNC_APP_ID`, `SYNC_APP_PRIVATE_KEY`) |
+| GitHub App `nswds-devops-sync` | Installed org-wide (all repositories) | Its token is minted by seven workflows here: the file sync, the Snyk policy fan-out, `promote-v1` (to arm auto-merge on fan-out PRs), and four of the six weekly canaries. The other two canaries use `GITHUB_TOKEN`. Each workflow and its purpose is tabled in MAINTENANCE.md, which is the list to update when a workflow starts minting it. Credentials are repository secrets on this repo (`SYNC_APP_ID`, `SYNC_APP_PRIVATE_KEY`) |
 | GitHub App `renovate` (Mend) | Installed on **selected** repositories | The selection list cannot be read with a user token; confirm new repos are selected at https://developer.mend.io/github/digitalnsw |
 | GitHub App `snyk-io-au` | Installed org-wide | Posts `code/`, `security/` and `license/snyk (DigitalNSW)` statuses on PR heads for repos imported into the `digitalnsw` Snyk org |
 | GitHub App `ictds-export-bot` | Selected repositories | Power Platform solution export for `ictds-portal-flows` |
