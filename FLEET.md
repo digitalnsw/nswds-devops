@@ -50,7 +50,7 @@ issues), so it appears here as a `+` delta.
 
 ### Applications (Next.js)
 
-All but `agile` and `nswds-contrast` deploy on Vercel; neither has a Vercel project or a live URL yet.
+All but `agile` deploy on Vercel: `agile` has no Vercel project and no live URL, and `nswds-contrast` has its Vercel project but no live URL until the Cloudflare CNAME for its host lands.
 
 | Repo | Purpose | Live URL | Stack notes | Sync group | Required checks (delta) |
 |---|---|---|---|---|---|
