@@ -144,7 +144,7 @@ token as `GH_INSTALLATION_TOKEN` (App tokens do not work via `GH_PAT`).
 Because the App key equals org-wide write for anyone who can push to this
 repo's `main`: keep `main` here protected, and if the org ever gains a repo
 the sync must never touch, switch the App installation to selected repos.
-Six workflows here mint that App token, so all six act with the key's
+Seven workflows here mint that App token, so all seven act with the key's
 org-wide reach:
 
 | Workflow | Uses it to |
@@ -153,6 +153,7 @@ org-wide reach:
 | `snyk-policy-sync.yml` | open the `.snyk` block PRs in every consumer |
 | `promote-v1.yml` | arm auto-merge on waiting fan-out PRs after moving `v1` |
 | `ccc-pin-drift-canary.yml`, `npm-self-override-canary.yml`, `snyk-policy-canary.yml` | read every consumer's manifests and policy (the three fleet-scanning canaries) |
+| `site-health-canary.yml` | read every repo's README, including private ones |
 
 The other two canaries, `ccc-v10-canary.yml` and `v1-drift-canary.yml`, need
 nothing outside this repo and use the repo-scoped `GITHUB_TOKEN`. Any new
@@ -312,8 +313,9 @@ job, because a canary that fails every week gets muted.
 | `ccc-pin-drift-canary.yml` | Mondays 08:29 UTC | Scans every semantic-release repo for the root `conventional-changelog-conventionalcommits@^9` pin; opens a `ccc-pin-drift` issue on any repo missing it (a missing pin means silently blank release notes) |
 | `npm-self-override-canary.yml` | Mondays 08:35 UTC | Scans every repo for a package declared both as a direct dependency and as a literal-pinned `overrides` entry; opens an `npm-self-override` issue (that shape aborts Renovate for the whole repo with no visible error) |
 | `snyk-policy-canary.yml` | Mondays 08:44 UTC | Opens or refreshes a `snyk-policy-drift` issue when a consumer's canonical block no longer matches the base, or a repo in `repos.json` is unreadable or unmigrated |
+| `site-health-canary.yml` | Mondays 08:50 UTC | Fetches every site FLEET.md lists and opens a `site-health` issue when one does not answer or declares its canonical or `og:url` on another host; also reports README links whose host does not resolve or that answer 404/410 |
 
-The three fleet-scanning canaries mint the sync-App token because
+The four fleet-scanning canaries mint the sync-App token because
 `GITHUB_TOKEN` is scoped to this repo and cannot read sibling repos. The full
 list of workflows that mint it, and why, is under "The sync GitHub App" above.
 
@@ -349,6 +351,7 @@ Every entry is something that has actually happened.
 | Release run: `GH013` on `git push … https://github.com/<repo>.git` even with `RELEASE_DEPLOY_KEY` set | `package.json` `repository.url` was an `https://` URL, which semantic-release prefers over the SSH origin | use the `git+ssh://git@github.com/…` form in `repository.url` |
 | A release ships with an empty changelog body | the repo resolves conventional-changelog-conventionalcommits v10 at the root (the `^9` pin is missing or sits in a workspace instead of the root) | add `conventional-changelog-conventionalcommits@^9` to the root devDependencies; the ccc pin drift canary reports these weekly |
 | Renovate goes silent on a repo: no PRs, dashboard checkboxes stay ticked | a literal npm self-override made Renovate abort the whole repository run | convert the override to the `$` form; the npm self-override canary reports these weekly |
+| Site health canary: a site is "served on X but declares canonical Y" | the repo's `site.url` (its `lib/site` module, which becomes `metadataBase`) names a host the site is not served on: a domain that moved, or one set ahead of a DNS record | set `site.url` to the host the Vercel project serves; FLEET.md's live URL for the repo should match |
 | `install / test` green but the suite never ran | the vitest config sits in a workspace and the root has no `test` script; or the root `test` is the npm-init stub | `test-mode.mjs` now scans workspaces; confirm the run log shows a suite executed, and give the root a real `test` script |
 | nswds-ui release: git tag exists but npm has no matching version (E422) | provenance enabled on a private source repo | keep `provenance=false` in `.npmrc` while the repo is private (see the exceptions register) |
 
