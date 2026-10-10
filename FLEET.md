@@ -27,7 +27,7 @@ Related documents: [README.md](README.md) (how the shared tooling works),
 | Consumer repos in [.github/sync.yml](.github/sync.yml) | 29 |
 | Repos under the canonical Snyk policy ([snyk-policy/repos.json](snyk-policy/repos.json)) | 30 (every consumer plus this repo) |
 | Repos publishing to npm | 6 (`@nswds/ui`, `@nswds/tokens`, `@nswds/app`, `@nswds/eslint-config`, `@nswds/prettier-config`, `@nswds/metadata`) |
-| Repos deployed on Vercel (team "Digital NSW", Pro plan) | 15 repos, 20 projects |
+| Repos deployed on Vercel (team "Digital NSW", Pro plan) | 16 repos, 21 projects |
 | Node baseline | `.nvmrc` `24.16.0`; `engines.node` `^22.22.2 \|\| >=24.15.0`; `engine-strict=true` |
 | Org repos outside the fleet | 2 active (`ai-type-selector`, `commitments-dashboard`), 1 R package (`nswtheme`), 6 public learning/archive repos, 5 archived |
 
@@ -61,7 +61,7 @@ All but `agile` deploy on Vercel; it has no Vercel project and no live URL.
 | `reviewers` | ICT Project Assurance expert reviewer application | https://reviewers.digital.nsw.gov.au | Next 16, `@nswds/app`, Better Auth, Drizzle + Neon, Resend, Vercel Blob | 1 | standard |
 | `nswds-email` | NSW Email Toolkit documentation site, component showcase and signature builder | https://email.digital.nsw.gov.au | Next 16, `@nswds/app` + `@nswds/ui`, Better Auth, Drizzle + Neon, PostHog, Vercel Analytics; bespoke editorial, soft-404 and variant-HTML guard workflows | 1 | + `install / typecheck` |
 | `nswds-design` | NSW Design, the front door to the design system ecosystem: colour, typography, motion, layout, standards, content and agent skills, with doors to the sibling sites | https://design.nsw.gov.au (behind sign-in until launch) | Next 16, `@nswds/ui`, Better Auth, Drizzle + Neon, Vitest 5 | 1 | standard |
-| `nswds-contrast` | NSW Colour Contrast Checker: any two NSW Government colours measured against WCAG 2.2, on real chrome. Split out of `nswds-design` on 2026-10-10 | — (canonical host `contrast.design.nsw.gov.au`; no Vercel project yet; behind sign-in until launch) | Next 16, `@nswds/ui`, Better Auth, Drizzle + Neon, Vitest 5 | 1 | + `install / typecheck`, **no Snyk contexts yet** (console import pending, step 10 of ONBOARDING.md) |
+| `nswds-contrast` | NSW Colour Contrast Checker: any two NSW Government colours measured against WCAG 2.2, on real chrome. Split out of `nswds-design` on 2026-10-10 | https://contrast.design.nsw.gov.au (Vercel project `nswds-contrast`; the CNAME at Cloudflare is still to be added; public, no sign-in) | Next 16, `@nswds/ui`, Vitest 5; no database or auth | 1 | + `install / typecheck` |
 | `nswds-community` | Community site | https://community.digital.nsw.gov.au | Next 16 | 1 | standard |
 | `data` (local folder `nswds-data`) | Data site | https://data.digital.nsw.gov.au | Next 16 | 1 | standard |
 | `nswds-public-sans` | Download and specimen site for Public Sans, the NSW masterbrand typeface | — (Vercel project `nswds-public-sans`) | Next 16, `@nswds/ui`, PostHog, Vercel Analytics | 1 | standard |
