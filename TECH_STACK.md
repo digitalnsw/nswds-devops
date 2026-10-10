@@ -122,7 +122,7 @@ data, auth and email layer from nswds-app.
 | Reusable GitHub Actions workflows | CI logic lives here once, consumed via thin synced stubs pinned to the floating `v1` tag ([GitHub Actions](docs/best-practices/github-actions.md)) |
 | Renovate shared preset (`default.json`) | Read from `main` at run time by the Mend app ([Renovate](docs/best-practices/renovate.md)) |
 | Canonical Snyk policy (`snyk-policy/`) | Block-synced into every repo's `.snyk` with the repo-owned tail preserved |
-| Weekly canaries | v1 drift, ccc v10, ccc pin drift, npm self-override, Snyk policy drift ([MAINTENANCE.md](MAINTENANCE.md)) |
+| Weekly canaries | v1 drift, ccc v10, ccc pin drift, npm self-override, Snyk policy drift, site health ([MAINTENANCE.md](MAINTENANCE.md)) |
 | [mark](https://github.com/kovetskiy/mark) | Publishes mapped markdown to Confluence (read-only mirror; version and checksum pinned) |
 | `tools/renovate-fleet-dashboard.mjs` | Renders every repo's Dependency Dashboard into one HTML page |
 

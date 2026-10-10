@@ -1,3 +1,9 @@
+## [1.28.0](https://github.com/digitalnsw/nswds-devops/compare/v1.27.0...v1.28.0) (2026-10-10)
+
+### Features
+
+* **ci:** add a site health canary for canonical hosts and dead links ([#163](https://github.com/digitalnsw/nswds-devops/issues/163)) ([f8eb2e9](https://github.com/digitalnsw/nswds-devops/commit/f8eb2e98e1573b9575d2210ad6cca56d9817abc7))
+
 ## [1.27.0](https://github.com/digitalnsw/nswds-devops/compare/v1.26.0...v1.27.0) (2026-10-09)
 
 ### Features
