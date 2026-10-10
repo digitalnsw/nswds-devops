@@ -24,8 +24,8 @@ Related documents: [README.md](README.md) (how the shared tooling works),
 
 | Measure | Value |
 |---|---|
-| Consumer repos in [.github/sync.yml](.github/sync.yml) | 28 |
-| Repos under the canonical Snyk policy ([snyk-policy/repos.json](snyk-policy/repos.json)) | 29 (every consumer plus this repo) |
+| Consumer repos in [.github/sync.yml](.github/sync.yml) | 29 |
+| Repos under the canonical Snyk policy ([snyk-policy/repos.json](snyk-policy/repos.json)) | 30 (every consumer plus this repo) |
 | Repos publishing to npm | 6 (`@nswds/ui`, `@nswds/tokens`, `@nswds/app`, `@nswds/eslint-config`, `@nswds/prettier-config`, `@nswds/metadata`) |
 | Repos deployed on Vercel (team "Digital NSW", Pro plan) | 15 repos, 21 projects |
 | Node baseline | `.nvmrc` `24.16.0`; `engines.node` `^22.22.2 \|\| >=24.15.0`; `engine-strict=true` |
@@ -50,7 +50,7 @@ issues), so it appears here as a `+` delta.
 
 ### Applications (Next.js)
 
-All but `agile` deploy on Vercel; it has no Vercel project and no live URL.
+All but `agile` and `nswds-contrast` deploy on Vercel; neither has a Vercel project or a live URL yet.
 
 | Repo | Purpose | Live URL | Stack notes | Sync group | Required checks (delta) |
 |---|---|---|---|---|---|
@@ -60,7 +60,8 @@ All but `agile` deploy on Vercel; it has no Vercel project and no live URL.
 | `engagement` | Digital Assurance customer satisfaction surveys: post-review feedback from independent reviewers and project sponsors | https://engagement.digital.nsw.gov.au | Next 16, `@nswds/app`, Better Auth, Drizzle + Neon, Resend, Vitest | 1 | standard |
 | `reviewers` | ICT Project Assurance expert reviewer application | https://reviewers.digital.nsw.gov.au | Next 16, `@nswds/app`, Better Auth, Drizzle + Neon, Resend, Vercel Blob | 1 | standard |
 | `nswds-email` | NSW Email Toolkit documentation site, component showcase and signature builder | https://email.digital.nsw.gov.au | Next 16, `@nswds/app` + `@nswds/ui`, Better Auth, Drizzle + Neon, PostHog, Vercel Analytics; bespoke editorial, soft-404 and variant-HTML guard workflows | 1 | + `install / typecheck` |
-| `nswds-design` | NSW Design: documentation hub for design tokens and colour tools, React components, email and agent skills. Every page is behind sign-in | https://design.nsw.gov.au (`design.digital.nsw.gov.au` redirects there) | Next 16, `@nswds/ui`, Vitest 5 | 1 | standard |
+| `nswds-design` | NSW Design, the front door to the design system ecosystem: colour, typography, motion, layout, standards, content and agent skills, with doors to the sibling sites | https://design.nsw.gov.au (behind sign-in until launch; `design.digital.nsw.gov.au` redirects there) | Next 16, `@nswds/ui`, Better Auth, Drizzle + Neon, Vitest 5 | 1 | standard |
+| `nswds-contrast` | NSW Colour Contrast Checker: any two NSW Government colours measured against WCAG 2.2, on real chrome. Split out of `nswds-design` on 2026-10-10 | — (canonical host `contrast.design.nsw.gov.au`; no Vercel project yet; behind sign-in until launch) | Next 16, `@nswds/ui`, Better Auth, Drizzle + Neon, Vitest 5 | 1 | + `install / typecheck`, **no Snyk contexts yet** (console import pending, step 10 of ONBOARDING.md) |
 | `nswds-community` | Redirect only: every path goes to the NSW Design System community forum closure notice (`designsystem.nsw.gov.au/community-closure/`) | https://community.digital.nsw.gov.au | Next 16 | 1 | standard |
 | `data` (local folder `nswds-data`) | Placeholder for NSW Digital Data, a planned dashboard of spend, progress and risk across IT and digital projects; the home page renders nothing | https://data.digital.nsw.gov.au | Next 16 | 1 | standard |
 | `nswds-public-sans` | Download and specimen site for Public Sans, the NSW masterbrand typeface | https://public-sans.digital.nsw.gov.au | Next 16, `@nswds/ui`, PostHog, Vercel Analytics | 1 | standard |
@@ -71,7 +72,7 @@ All but `agile` deploy on Vercel; it has no Vercel project and no live URL.
 
 | Repo | Publishes | Purpose | Deploys | Sync group | Required checks (delta) |
 |---|---|---|---|---|---|
-| `nswds-ui` (public) | `@nswds/ui` [![npm](https://img.shields.io/npm/v/@nswds/ui?label=)](https://www.npmjs.com/package/@nswds/ui) | Design system source monorepo: the `@nswds/ui` package (Base UI primitives, shadcn pattern) plus a shadcn registry, Storybook and a docs site. Turborepo workspaces `apps/*`, `packages/*`; only `packages/ui` publishes | Vercel: `nswds-ui-web` (https://ui.digital.nsw.gov.au), `nswds-ui-storybook`, `nswds-ui-registry`, `nswds-ui-infographics` (root `apps/infographics`, not yet on `main`); Chromatic visual regression | 2a (own `release.yml` + release config, `.npmrc` variant) | + `install / typecheck`, `Lint, Typecheck & Storybook a11y` |
+| `nswds-ui` (public) | `@nswds/ui` [![npm](https://img.shields.io/npm/v/@nswds/ui?label=)](https://www.npmjs.com/package/@nswds/ui) | Design system source monorepo: the `@nswds/ui` package (Base UI primitives, shadcn pattern) plus a shadcn registry, Storybook and a docs site. Turborepo workspaces `apps/*`, `packages/*`; only `packages/ui` publishes | Vercel: `nswds-ui-web` (https://ui.digital.nsw.gov.au), `nswds-ui-storybook`, `nswds-ui-registry`, `nswds-ui-infographics` (root directory `apps/infographics`); Chromatic visual regression | 2a (own `release.yml` + release config, `.npmrc` variant) | + `install / typecheck`, `Lint, Typecheck & Storybook a11y` |
 | `nswds-tokens` (public) | `@nswds/tokens` [![npm](https://img.shields.io/npm/v/@nswds/tokens?label=)](https://www.npmjs.com/package/@nswds/tokens) | Design tokens (colour, spacing, typography, and so on) for CSS, SCSS, Less, JS/TS, JSON, Tailwind, Figma and DTCG; Figma sync workflows | — | 2b (own `release.yml`, release config and `ci.yml`; shared gate lands as `shared-ci.yml`) | + `Check dist artifacts`, `Lockfile`, `Package surface`, `Typecheck`, `Validate tokens` |
 | `nswds-app` | `@nswds/app` [![npm](https://img.shields.io/npm/v/@nswds/app?label=)](https://www.npmjs.com/package/@nswds/app) | Previous-generation application design system (Radix primitives, Storybook). Superseded by `@nswds/ui`; still consumed by attestation, awards, engagement, nswds-email and reviewers | Vercel: `nswds-app`, `nswds-app-storybook` | 3 (own release config, stock release stub) | standard |
 | `nswds-eslint-config` (public) | `@nswds/eslint-config` [![npm](https://img.shields.io/npm/v/@nswds/eslint-config?label=)](https://www.npmjs.com/package/@nswds/eslint-config) | Shared ESLint flat config: `.` entry point for Next.js apps, `./base` for everything else | — | 2c | + `Config smoke test` |
