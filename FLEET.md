@@ -27,7 +27,7 @@ Related documents: [README.md](README.md) (how the shared tooling works),
 | Consumer repos in [.github/sync.yml](.github/sync.yml) | 28 |
 | Repos under the canonical Snyk policy ([snyk-policy/repos.json](snyk-policy/repos.json)) | 29 (every consumer plus this repo) |
 | Repos publishing to npm | 6 (`@nswds/ui`, `@nswds/tokens`, `@nswds/app`, `@nswds/eslint-config`, `@nswds/prettier-config`, `@nswds/metadata`) |
-| Repos deployed on Vercel (team "Digital NSW", Pro plan) | 15 repos, 20 projects |
+| Repos deployed on Vercel (team "Digital NSW", Pro plan) | 15 repos, 21 projects |
 | Node baseline | `.nvmrc` `24.16.0`; `engines.node` `^22.22.2 \|\| >=24.15.0`; `engine-strict=true` |
 | Org repos outside the fleet | 2 active (`ai-type-selector`, `commitments-dashboard`), 1 R package (`nswtheme`), 6 public learning/archive repos, 5 archived |
 
@@ -54,24 +54,24 @@ All but `agile` deploy on Vercel; it has no Vercel project and no live URL.
 
 | Repo | Purpose | Live URL | Stack notes | Sync group | Required checks (delta) |
 |---|---|---|---|---|---|
-| `agile` | Next.js application using the Vercel AI SDK with Azure OpenAI. README is empty; purpose is not documented in the repo | — | Next 16, `@nswds/ui`, `@nswds/tokens`, `ai` + `@ai-sdk/azure` | 1 | + `install / typecheck` |
+| `agile` | Jira ticket creator: drafts ACME-framework Jira tickets with AI (Vercel AI SDK, Azure OpenAI) from a task description, repository history or pull request. README is empty | — (its `site.url`, `https://agile.digital.nsw.gov.au`, has no DNS record) | Next 16, `@nswds/ui`, `@nswds/tokens`, `ai` + `@ai-sdk/azure` | 1 | + `install / typecheck` |
 | `attestation` | Digital Restart Fund (DRF) attestation application | https://projects.digital.nsw.gov.au | Next 16, `@nswds/app` + `@nswds/ui`, Better Auth, Drizzle + Neon, Resend, Vitest | 1 | standard |
 | `awards` | Awards nomination and judging application | https://awards.digital.nsw.gov.au | Next 16, `@nswds/app`, Better Auth, Drizzle + Neon, Vercel Analytics | 1 | standard |
-| `engagement` | Engagement application | https://engagement.digital.nsw.gov.au | Next 16, `@nswds/app`, Better Auth, Drizzle + Neon, Resend, Vitest | 1 | standard |
+| `engagement` | Digital Assurance customer satisfaction surveys: post-review feedback from independent reviewers and project sponsors | https://engagement.digital.nsw.gov.au | Next 16, `@nswds/app`, Better Auth, Drizzle + Neon, Resend, Vitest | 1 | standard |
 | `reviewers` | ICT Project Assurance expert reviewer application | https://reviewers.digital.nsw.gov.au | Next 16, `@nswds/app`, Better Auth, Drizzle + Neon, Resend, Vercel Blob | 1 | standard |
 | `nswds-email` | NSW Email Toolkit documentation site, component showcase and signature builder | https://email.digital.nsw.gov.au | Next 16, `@nswds/app` + `@nswds/ui`, Better Auth, Drizzle + Neon, PostHog, Vercel Analytics; bespoke editorial, soft-404 and variant-HTML guard workflows | 1 | + `install / typecheck` |
-| `nswds-design` | Documentation site for `@nswds/tokens`: every token by name, value and use, with colour tools | https://design.digital.nsw.gov.au | Next 16, `@nswds/ui`, Vitest 5 | 1 | standard |
-| `nswds-community` | Community site | https://community.digital.nsw.gov.au | Next 16 | 1 | standard |
-| `data` (local folder `nswds-data`) | Data site | https://data.digital.nsw.gov.au | Next 16 | 1 | standard |
-| `nswds-public-sans` | Download and specimen site for Public Sans, the NSW masterbrand typeface | — (Vercel project `nswds-public-sans`) | Next 16, `@nswds/ui`, PostHog, Vercel Analytics | 1 | standard |
-| `nswds-signature` | Email signature generator | https://signature.digital.nsw.gov.au | Next 16 | 1 | standard |
-| `risk-guidance` | Risk assessment guidance tool | https://risk-guidance.vercel.app | Next 16, `@nswds/ui` | 1 | standard, **no Snyk contexts** (see open issues) |
+| `nswds-design` | NSW Design: documentation hub for design tokens and colour tools, React components, email and agent skills. Every page is behind sign-in | https://design.nsw.gov.au (`design.digital.nsw.gov.au` redirects there) | Next 16, `@nswds/ui`, Vitest 5 | 1 | standard |
+| `nswds-community` | Redirect only: every path goes to the NSW Design System community forum closure notice (`designsystem.nsw.gov.au/community-closure/`) | https://community.digital.nsw.gov.au | Next 16 | 1 | standard |
+| `data` (local folder `nswds-data`) | Placeholder for NSW Digital Data, a planned dashboard of spend, progress and risk across IT and digital projects; the home page renders nothing | https://data.digital.nsw.gov.au | Next 16 | 1 | standard |
+| `nswds-public-sans` | Download and specimen site for Public Sans, the NSW masterbrand typeface | https://public-sans.digital.nsw.gov.au | Next 16, `@nswds/ui`, PostHog, Vercel Analytics | 1 | standard |
+| `nswds-signature` | Redirect only: every path goes to the NSW Email Toolkit's signature page (`email.digital.nsw.gov.au/signature`) | https://signature.digital.nsw.gov.au | Next 16 | 1 | standard |
+| `risk-guidance` | NSW ICT Procurement Risk Screening Tool | https://ictrisk.digital.nsw.gov.au | Next 16, `@nswds/ui` | 1 | standard, **no Snyk contexts** (see open issues) |
 
 ### Design system and shared packages (publish to npm)
 
 | Repo | Publishes | Purpose | Deploys | Sync group | Required checks (delta) |
 |---|---|---|---|---|---|
-| `nswds-ui` (public) | `@nswds/ui` [![npm](https://img.shields.io/npm/v/@nswds/ui?label=)](https://www.npmjs.com/package/@nswds/ui) | Design system source monorepo: the `@nswds/ui` package (Base UI primitives, shadcn pattern) plus a shadcn registry, Storybook and a docs site. Turborepo workspaces `apps/*`, `packages/*`; only `packages/ui` publishes | Vercel: `nswds-ui-web`, `nswds-ui-storybook`, `nswds-ui-registry`; Chromatic visual regression | 2a (own `release.yml` + release config, `.npmrc` variant) | + `install / typecheck`, `Lint, Typecheck & Storybook a11y` |
+| `nswds-ui` (public) | `@nswds/ui` [![npm](https://img.shields.io/npm/v/@nswds/ui?label=)](https://www.npmjs.com/package/@nswds/ui) | Design system source monorepo: the `@nswds/ui` package (Base UI primitives, shadcn pattern) plus a shadcn registry, Storybook and a docs site. Turborepo workspaces `apps/*`, `packages/*`; only `packages/ui` publishes | Vercel: `nswds-ui-web` (https://ui.digital.nsw.gov.au), `nswds-ui-storybook`, `nswds-ui-registry`, `nswds-ui-infographics` (root `apps/infographics`, not yet on `main`); Chromatic visual regression | 2a (own `release.yml` + release config, `.npmrc` variant) | + `install / typecheck`, `Lint, Typecheck & Storybook a11y` |
 | `nswds-tokens` (public) | `@nswds/tokens` [![npm](https://img.shields.io/npm/v/@nswds/tokens?label=)](https://www.npmjs.com/package/@nswds/tokens) | Design tokens (colour, spacing, typography, and so on) for CSS, SCSS, Less, JS/TS, JSON, Tailwind, Figma and DTCG; Figma sync workflows | — | 2b (own `release.yml`, release config and `ci.yml`; shared gate lands as `shared-ci.yml`) | + `Check dist artifacts`, `Lockfile`, `Package surface`, `Typecheck`, `Validate tokens` |
 | `nswds-app` | `@nswds/app` [![npm](https://img.shields.io/npm/v/@nswds/app?label=)](https://www.npmjs.com/package/@nswds/app) | Previous-generation application design system (Radix primitives, Storybook). Superseded by `@nswds/ui`; still consumed by attestation, awards, engagement, nswds-email and reviewers | Vercel: `nswds-app`, `nswds-app-storybook` | 3 (own release config, stock release stub) | standard |
 | `nswds-eslint-config` (public) | `@nswds/eslint-config` [![npm](https://img.shields.io/npm/v/@nswds/eslint-config?label=)](https://www.npmjs.com/package/@nswds/eslint-config) | Shared ESLint flat config: `.` entry point for Next.js apps, `./base` for everything else | — | 2c | + `Config smoke test` |
@@ -82,7 +82,7 @@ All but `agile` deploy on Vercel; it has no Vercel project and no live URL.
 
 | Repo | Purpose | Deploys | Sync group | Required checks (delta) |
 |---|---|---|---|---|
-| `nswds-email-design` | Next-generation email toolkit monorepo: the `@nswds/email` Maizzle 6 framework (`packages/email`, not yet published), its docs site, the email builder and the signature app. Turborepo; Playwright + axe visual and accessibility suites | Vercel: `nswds-email-design-docs`, `nswds-email-design-builder`, `nswds-email-design-signature` | 2d (own `release.yml` + release config, `.npmrc` variant) | + `install / typecheck`, `license/snyk (DigitalNSW)` |
+| `nswds-email-design` | Next-generation email toolkit monorepo: the `@nswds/email` React + react-email framework (`packages/email`, not yet published), its docs site, the email builder and the signature app. Turborepo; Playwright + axe visual and accessibility suites | Vercel: `nswds-email-design-docs` and `nswds-email-design-builder` share https://email.design.nsw.gov.au (Vercel Microfrontends, builder at `/builder`); `nswds-email-design-signature` has no custom domain | 2d (own `release.yml` + release config, `.npmrc` variant) | + `install / typecheck`, `license/snyk (DigitalNSW)` |
 | `nswds-email-framework` | Maizzle 5 email framework with components, layouts and build tools; Playwright visual regression, axe and Lighthouse accessibility suites. Tailwind 3 by design (Maizzle 5); majors blocked in Renovate | — | 1 | standard |
 | `nswds-email-starter` | Maizzle 5 starter kit for NSW-branded HTML email. Tailwind 3 by design; majors blocked in Renovate | — | 1 | standard |
 
@@ -92,7 +92,7 @@ All but `agile` deploy on Vercel; it has no Vercel project and no live URL.
 |---|---|---|---|---|
 | `dtl-sandbox` | Azure sandbox stack in Pulumi TypeScript (Static Web App, storage, Application Insights) | Manual `pulumi up` from operator machines; `pulumi-preview.yml` is inert until the `PULUMI_PREVIEW_ENABLED` repo variable is set | 1 | + `install / typecheck`, `preview`; ruleset also has a `RepositoryRole` bypass actor (see open issues) |
 | `ictds-portal-flows` | Power Platform solution `ictdsportalflows` (Power Automate flows and admin canvas app for the ICT/DS Sourcing Portal). `release.yml` is the production deploy; `export.yml` pulls the solution from Dev via the `ictds-export-bot` App. Publishes `docs/` and `README.md` to Confluence | Power Platform | 4 (release stub lands as `semantic-release.yml`) | standard |
-| `digitalnsw` | Scraped static mirror of digital.nsw.gov.au with a forms API backend (`api/`, Neon, Resend, optional Cloudflare Turnstile) | GitHub Pages and Vercel project `digitalnsw` | 1 | standard |
+| `digitalnsw` | Scraped static mirror of digital.nsw.gov.au with a forms API backend (`api/`, Neon, Resend, optional Cloudflare Turnstile) | Vercel project `digitalnsw` serves https://digital.nsw.gov.au; also GitHub Pages | 1 | standard |
 | `images` (local folder `nswds-images`) | Static image and icon assets | GitHub Pages (https://digitalnsw.github.io/images/) | 1 | `install / *` + `commitlint` + `code/snyk` only (see open issues) |
 | `share` | Static HTML hosting for proofs of concept; publishes `README.md` to Confluence | GitHub Pages (https://digitalnsw.github.io/share/) | 1 | standard |
 | `nswds-skills` (public) | Agent skills and multi-agent workflow packages for AI coding agents, installable via `npx skills add`; the source of the fleet's own review, onboarding and Snyk skills | — | 1 | + `install / typecheck` |
@@ -124,7 +124,7 @@ has auto-merge or branch auto-delete enabled.
 | GitHub App `snyk-io-au` | Installed org-wide | Posts `code/`, `security/` and `license/snyk (DigitalNSW)` statuses on PR heads for repos imported into the `digitalnsw` Snyk org |
 | GitHub App `ictds-export-bot` | Selected repositories | Power Platform solution export for `ictds-portal-flows` |
 | GitHub Apps `vercel`, `vercel-nswds-integration` | Org-wide | Preview and production deployments |
-| Vercel team "Digital NSW" | 20 projects | See the Deploys columns above |
+| Vercel team "Digital NSW" | 21 projects | See the Deploys columns above |
 | Confluence (GDS space, https://dsia.atlassian.net/wiki) | Opt-in per repo | Manifests exist in `nswds-devops`, `ictds-portal-flows` and `share` |
 | Org secrets | `AI_GATEWAY_API_KEY`, `AZURE_OPENAI_API_KEY` (all repos); `CONFLUENCE_USER`, `CONFLUENCE_TOKEN` (selected repos) | Org variable `AZURE_OPENAI_ENDPOINT` is set; `AZURE_OPENAI_DEPLOYMENT`, `AI_MODEL` and `AI_PROVIDER` fall back to workflow defaults |
 
