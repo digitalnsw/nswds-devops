@@ -123,11 +123,16 @@ What the base contains:
   the lightningcss platform binaries via Tailwind, axe-core, npm bundled
   inside semantic-release, and the `@nswds/*` packages.
 - Scoped, expiring vulnerability acceptances, each for a package with no fix
-  that the fleet can reach. Each scope names a route, so the same package
-  arriving by a different route is still reported. How narrow the route is
-  varies: the braces scopes name only the immediate parent, so they also cover
-  any runtime path through micromatch or chokidar. `base.snyk` records the
-  reasoning for each entry.
+  that the fleet can reach. Each scope names a route, which decides the
+  PROJECTS an entry applies to, not the paths within one. A repo with no path
+  matching any scope still has the advisory reported. Within a project where
+  one path matches, the Snyk CLI suppresses the advisory on every path,
+  including routes no scope names (verified 2026-10-14, CLI 1.1308.0), so a
+  new route in an already-matched repo goes unreported. Re-check matched
+  repos when an entry is reviewed. How narrow the route is varies: the braces
+  scopes name only the immediate parent, so they also cover any runtime path
+  through micromatch or chokidar. `base.snyk` records the reasoning for each
+  entry.
   - **Bundled inside the npm CLI**, which `overrides` cannot reach:
     - undici and postcss-selector-parser (`* > npm > * > …`);
     - http-cache-semantics (`* > @semantic-release/npm > * > …`).
@@ -139,6 +144,9 @@ What the base contains:
     developer-authored props, not untrusted input.
   - **gray-matter**, scoped to the `@maizzle/framework` edge, which only the
     two Maizzle 5 repos have today.
+  - **js-beautify**, scoped to Maizzle 5's `pretty` (prettify is off in both
+    Maizzle repos) and to mjml-core in nswds-email-design's tests (`beautify`
+    is never set).
 
   `base.snyk` is the authority for the exact entries, their reasons and
   their expiries; this list only says what kinds of acceptance it holds.
