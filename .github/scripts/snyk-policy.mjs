@@ -377,31 +377,52 @@ const readExpiry = (raw) => {
 }
 
 // YAML features that parsing would resolve silently. Checked on the text
-// outside quoted scalars and comments.
+// that is YAML structure, not on scalar content: quoted scalars (which may
+// span lines), the body of a block scalar (`reason: |`), the continuation
+// lines of a plain scalar, and comments are all skipped. A quote only opens a
+// quoted scalar at the start of a value, as in YAML itself, so an apostrophe
+// inside plain text ("developer's") stays plain text.
 const findYamlIndirection = (content) => {
   const problems = []
+  let quote = null // an open quoted scalar, which may span lines
+  let scalarIndent = -1 // deeper-indented lines continue this scalar value
   content.split(/\r?\n/).forEach((raw, i) => {
-    let quote = null
+    const indent = raw.match(/^ */)[0].length
+    if (!quote && scalarIndent >= 0) {
+      if (!raw.trim() || indent > scalarIndent) return
+      scalarIndent = -1
+    }
     let bare = ''
+    let atValueStart = !quote // only a value's first character can open a quote
     for (let j = 0; j < raw.length; j++) {
       const c = raw[j]
       if (quote === '"') {
         if (c === '\\') j++
         else if (c === '"') quote = null
-      } else if (quote === "'") {
+        continue
+      }
+      if (quote === "'") {
         if (c === "'" && raw[j + 1] === "'") j++
         else if (c === "'") quote = null
-      } else if (c === '#' && (j === 0 || /\s/.test(raw[j - 1]))) {
-        break
-      } else if ((c === '"' || c === "'") && (j === 0 || /[\s:,[{-]/.test(raw[j - 1]))) {
+        continue
+      }
+      if (c === '#' && (j === 0 || /\s/.test(raw[j - 1]))) break
+      if ((c === '"' || c === "'") && atValueStart) {
         quote = c
         bare += ' '
-      } else {
-        bare += c
+        continue
       }
+      bare += c
+      if (/[:\-,[{]/.test(c) && (j + 1 >= raw.length || /[\s[{]/.test(raw[j + 1]) || c === '[' || c === '{' || c === ',')) atValueStart = true
+      else if (!/\s/.test(c)) atValueStart = false
     }
     if (/(^|[\s,[{:-])[&*!][^\s,\]}]/.test(bare) || /(^|\s)<<\s*:/.test(bare)) {
       problems.push(`line ${i + 1}: anchors, aliases, merge keys and tags are not allowed: ${raw.trim()}`)
+    }
+    // A `key: value` line whose value is a block scalar or a plain scalar: any
+    // deeper-indented lines that follow are that value's content.
+    if (!quote && (/:\s+[|>][0-9+-]*\s*$/.test(bare) || /:\s+[^\s|>&*!#[{\]},]/.test(bare))) {
+      scalarIndent = indent
     }
   })
   return problems
@@ -436,6 +457,10 @@ export const findLooseAcceptances = (content, { now = new Date(), maxDays = 550 
     for (const rule of rules) {
       if (!rule || typeof rule !== 'object' || Array.isArray(rule)) {
         problems.push(`${id}: each list item must map a scope to its properties`)
+        continue
+      }
+      if (!Object.keys(rule).length) {
+        problems.push(`${id}: a list item names no scope`)
         continue
       }
       for (const [path, props] of Object.entries(rule)) {

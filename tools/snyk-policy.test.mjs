@@ -1007,3 +1007,25 @@ test('findDuplicateKeys sees a key that carries an inline comment', () => {
   assert.deepEqual(findDuplicateKeys(text), ['ignore.SNYK-JS-A-1'])
 })
 
+test('findLooseAcceptances reads YAML indirection only in structure, not in scalar text', () => {
+  const head = ['  SNYK-JS-PKG-1:', "    - '@a/parent > pkg':"]
+  const exp = '        expires: 2026-12-31T00:00:00.000Z'
+  for (const reason of [
+    ['        reason: |', '          matches *wildcard routes only, see &notes'],
+    ['        reason: "spans', '          *wildcard text"'],
+    ['        reason: a plain reason that', '          continues with *wildcard text'],
+    ["        reason: developer's package is not shipped"],
+  ]) {
+    assert.deepEqual(findLooseAcceptances(policy([...head, ...reason, exp]), { now: NOW }), [], reason.join(' | '))
+  }
+  // A stray apostrophe in plain text must not hide a real alias later on.
+  const later = [...head, "        reason: see 'notes", exp, '  SNYK-JS-UNDICI-1:', '    - *any :', exp]
+  assert.ok(findLooseAcceptances(policy(later), { now: NOW }).some((p) => /anchors, aliases/.test(p)))
+})
+
+test('findLooseAcceptances rejects a list item that names no scope', () => {
+  for (const entry of [['  SNYK-JS-PKG-1: [ {} ]'], ['  SNYK-JS-PKG-1:', '    - {}']]) {
+    assert.ok(findLooseAcceptances(policy(entry), { now: NOW }).some((p) => /names no scope/.test(p)), entry.join(' | '))
+  }
+})
+
