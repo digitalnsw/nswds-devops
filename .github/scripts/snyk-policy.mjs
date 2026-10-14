@@ -381,72 +381,38 @@ const readExpiry = (raw) => {
   return Number.isNaN(when.getTime()) ? null : when
 }
 
-// YAML features that parsing would resolve silently. Checked on the text
-// that is YAML structure, not on scalar content: quoted scalars (which may
-// span lines), the body of a block scalar (`reason: |`), the continuation
-// lines of a plain scalar, and comments are all skipped. A quote only opens a
-// quoted scalar at the start of a value, as in YAML itself, so an apostrophe
-// inside plain text ("developer's") stays plain text.
+// YAML features that parsing would resolve silently: anchors (&a), aliases
+// (*a), tags (!t) and merge keys (<<). Rather than re-scan the text, ask the
+// parser: js-yaml reports each node as it opens, positioned at the node's
+// first character, which is exactly where &, * or ! would mean anchor, alias
+// or tag. The same characters inside a plain or quoted value are never a
+// node start, so prose such as "affects *all* versions" is unaffected.
+// CORE_SCHEMA has no merge type, so a merge key survives as a literal "<<"
+// key wherever and however it is written; walk the result for one.
+const hasMergeKey = (node) =>
+  node !== null &&
+  typeof node === 'object' &&
+  (Object.prototype.hasOwnProperty.call(node, '<<') || Object.values(node).some(hasMergeKey))
+
 const findYamlIndirection = (content) => {
-  const problems = []
-  let quote = null // an open quoted scalar, which may span lines
-  let flow = 0 // depth of open [ ] / { } flow collections, which may span lines
-  let scalarIndent = -1 // deeper-indented lines continue this scalar value
-  content.split(/\r?\n/).forEach((raw, i) => {
-    const indent = raw.match(/^ */)[0].length
-    if (!quote && scalarIndent >= 0) {
-      if (!raw.trim() || indent > scalarIndent) return
-      scalarIndent = -1
-    }
-    let bare = ''
-    let indirection = false
-    let atValueStart = !quote // only a value's first character can open a quote
-    for (let j = 0; j < raw.length; j++) {
-      const c = raw[j]
-      if (quote === '"') {
-        if (c === '\\') j++
-        else if (c === '"') quote = null
-        continue
-      }
-      if (quote === "'") {
-        if (c === "'" && raw[j + 1] === "'") j++
-        else if (c === "'") quote = null
-        continue
-      }
-      if (c === '#' && (j === 0 || /\s/.test(raw[j - 1]))) break
-      if ((c === '"' || c === "'") && atValueStart) {
-        quote = c
-        bare += ' '
-        continue
-      }
-      // &anchor, *alias and !tag only mean something where a node starts.
-      if (atValueStart && /[&*!]/.test(c) && j + 1 < raw.length && !/[\s,\]}]/.test(raw[j + 1])) indirection = true
-      bare += c
-      // A node can start after "key: ", "- ", or inside a flow collection
-      // after "[", "{" or ",". In a plain block value, a comma is just text.
-      if ((c === '[' || c === '{') && (atValueStart || flow)) {
-        flow++
-        atValueStart = true
-      } else if ((c === ']' || c === '}') && flow) {
-        flow--
-        atValueStart = false
-      } else if (c === ',' && flow) {
-        atValueStart = true
-      } else if ((c === ':' || c === '-') && (j + 1 >= raw.length || /\s/.test(raw[j + 1]))) {
-        atValueStart = true
-      } else if (!/\s/.test(c)) {
-        atValueStart = false
-      }
-    }
-    if (indirection || /(^|[\s{,])<<\s*:/.test(bare)) {
-      problems.push(`line ${i + 1}: anchors, aliases, merge keys and tags are not allowed: ${raw.trim()}`)
-    }
-    // A `key: value` line whose value is a block scalar or a plain scalar: any
-    // deeper-indented lines that follow are that value's content.
-    if (!quote && (/:\s+[|>][0-9+-]*\s*$/.test(bare) || /:\s+[^\s|>&*!#[{\]},]/.test(bare))) {
-      scalarIndent = indent
-    }
-  })
+  const lines = new Set()
+  let doc
+  try {
+    doc = yaml.load(content, {
+      schema: yaml.CORE_SCHEMA,
+      listener(event, state) {
+        if (event !== 'open') return
+        // Skip separation whitespace and comments up to the node itself.
+        const lead = state.input.slice(state.position).match(/^(?:\s|#[^\n]*)*/)[0]
+        const at = state.position + lead.length
+        if (/[&*!]/.test(state.input[at] ?? '')) lines.add(state.input.slice(0, at).split('\n').length)
+      },
+    })
+  } catch {
+    return [] // findLooseAcceptances reports the YAML error itself
+  }
+  const problems = [...lines].map((n) => `line ${n}: anchors, aliases and tags are not allowed`)
+  if (hasMergeKey(doc)) problems.push('merge keys are not allowed (<<)')
   return problems
 }
 
@@ -486,10 +452,6 @@ export const findLooseAcceptances = (content, { now = new Date(), maxDays = 550 
         continue
       }
       for (const [path, props] of Object.entries(rule)) {
-        if (path === '<<' || (props && typeof props === 'object' && '<<' in props)) {
-          problems.push(`${id}: merge keys are not allowed`)
-          continue
-        }
         const segments = path.split('>').map((x) => x.trim())
         const named = segments.filter((x) => x && x !== '*')
         const wildcard = named.length !== segments.length

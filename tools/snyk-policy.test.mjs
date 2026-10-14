@@ -1020,7 +1020,9 @@ test('findLooseAcceptances reads YAML indirection only in structure, not in scal
     assert.deepEqual(findLooseAcceptances(policy([...head, ...reason, exp]), { now: NOW }), [], reason.join(' | '))
   }
   // A stray apostrophe in plain text must not hide a real alias later on.
-  const later = [...head, "        reason: see 'notes", exp, '  SNYK-JS-UNDICI-1:', '    - *any :', exp]
+  // The anchor is defined, so the alias resolves and the file parses.
+  const later = ['  snyk:lic:npm:x:MIT:', "    - &any '@a/parent > pkg':", '        reason: licence',
+    ...head, "        reason: see 'notes", exp, '  SNYK-JS-UNDICI-1:', '    - *any :', exp]
   assert.ok(findLooseAcceptances(policy(later), { now: NOW }).some((p) => /anchors, aliases/.test(p)))
 })
 
@@ -1060,5 +1062,25 @@ test('findDuplicateKeys sees a key whatever follows its colon', () => {
   }
   const licence = ['ignore:', '  snyk:lic:npm:sharp:LGPL-3.0:', "    - '*':", '  snyk:lic:npm:sharp:LGPL-3.0: # again'].join('\n')
   assert.deepEqual(findDuplicateKeys(licence), ['ignore.snyk:lic:npm:sharp:LGPL-3.0'])
+})
+
+test('findLooseAcceptances asks the parser where anchors, aliases and tags are', () => {
+  const exp = '        expires: 2026-12-31T00:00:00.000Z'
+  const flagged = (text) => findLooseAcceptances(text, { now: NOW }).some((p) => /anchors, aliases|merge keys/.test(p))
+  // A hyphen and an apostrophe in a plain reason do not hide a later anchor and alias.
+  assert.ok(flagged(policy(['  SNYK-JS-PKG-1:', "    - '@a/parent > pkg':", "        reason: safe - 'note", exp,
+    '  snyk:lic:npm:x:MIT:', '    - &s "@b/parent > pkg":', '        reason: licence',
+    '  SNYK-JS-PKG-2:', '    - *s :', exp])), 'hyphen then apostrophe')
+  // An anchor after the explicit-key marker.
+  assert.ok(flagged("version: v1.25.0\nignore: {? &id SNYK-JS-PKG-1 : [{'@a/parent > pkg': {expires: 2026-12-31}}]}\n"), 'explicit key')
+  // Anchors and aliases on the continuation lines of a multi-line flow mapping.
+  assert.ok(flagged(policy(['  SNYK-JS-PKG-1:', "    - {'@a/parent > pkg': {reason: x,", '        note: &a foo,', '        other: *a,',
+    '        expires: 2026-12-31T00:00:00.000Z}}'])), 'multi-line flow')
+  // A merge key split over two lines.
+  assert.ok(flagged(policy(['  SNYK-JS-PKG-1:', '    - ? <<', "      : {'@a/parent > pkg': {expires: 2026-12-31T00:00:00Z}}"])), 'split merge key')
+  // js-yaml can open a node before a comment, so an alias after one must still be seen.
+  const afterComment = policy(['  snyk:lic:npm:x:MIT:', '    - &s "@a/parent > pkg":', '        reason: licence',
+    '  SNYK-JS-PKG-1:', '    - "@a/parent > pkg":', '        expires: # note', '          *s'])
+  assert.ok(findLooseAcceptances(afterComment, { now: NOW }).some((p) => /^line 9: anchors, aliases/.test(p)), 'alias after a comment')
 })
 
