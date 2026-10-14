@@ -306,7 +306,8 @@ ignore:
   #       front matter included) has a truthy `prettify`, and both repos set
   #       `prettify: false` in production, leave it unset in dev, and no
   #       template sets it; and the exported prettify() helper, which neither
-  #       repo calls. Any input it formatted would be the repos' own templates.
+  #       repo calls. The build route would only ever format the repos' own
+  #       templates.
   #   '* > mjml-core > js-beautify' (2.0.3)
   #       nswds-email-design apps/builder, via its mjml devDependency. mjml is
   #       a test oracle only (unit and e2e tests); mjml-core calls js-beautify
