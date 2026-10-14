@@ -145,9 +145,9 @@ ignore:
   # @npmcli/arborist > @npmcli/query). Verified 2026-10-14: npm 11.21.0 and
   # 12.2.0, then the latest, both still bundle it. That is below the 7.1.6
   # fix for SNYK-JS-POSTCSSSELECTORPARSER-20510276. The copy is `inBundle`,
-  # so neither `npm update` nor `overrides`
-  # can move it. The reasoning matches the undici entries above: release
-  # tooling reached only through semantic-release, run in CI, never shipped.
+  # so neither `npm update` nor `overrides` can move it. The reasoning matches
+  # the undici entries above: release tooling reached only through
+  # semantic-release, run in CI, never shipped.
   #
   # The scope fails CLOSED. The `npm` segment is required, so this accepts
   # only the bundled copy. Any other copy (one a repo installs itself) is
@@ -291,6 +291,53 @@ ignore:
     - '@maizzle/framework > gray-matter':
         reason: gray-matter@4.0.3 via the Maizzle 5 CLI (build/serve) over developer-authored templates only; no upstream fix; the repos stay on Maizzle 5 by decision.
         expires: 2027-03-31T00:00:00.000Z
+
+  # ── js-beautify Memory Allocation with Excessive Size Value (no fix) ────
+  # Availability only (CVSS A:L): a crafted input can make the formatter
+  # allocate without bound. Snyk marks every version vulnerable (>=0.0.0) and
+  # lists no fix; upstream is beautifier/js-beautify#2522. Verified 2026-10-14
+  # on main of each repo below. Three routes, each scoped on its own:
+  #
+  #   '@maizzle/framework > pretty > js-beautify' (1.15.4)
+  #       nswds-email-framework and nswds-email-starter, the gray-matter repos
+  #       above. Maizzle runs `pretty` only when `config.prettify` is truthy;
+  #       both repos set `prettify: false` in production and leave it unset
+  #       in dev, so the formatter never runs. When it did, its input would be
+  #       the repos' own templates, as for gray-matter.
+  #   'js-beautify' (2.0.3, a direct dependency)
+  #       nswds-email-framework only. Its sole importer is the developer script
+  #       scripts/extract-email-content.js (`npm run extracted`), as a
+  #       fallback when Prettier cannot load. Prettier is a devDependency, so
+  #       the fallback is normally dead. Its input is the repo's own build
+  #       output under docs/ or build_local/.
+  #   '* > mjml-core > js-beautify' (2.0.3)
+  #       nswds-email-design apps/builder, via its mjml devDependency. mjml is
+  #       a test oracle only (unit and e2e tests); mjml-core calls js-beautify
+  #       only with `beautify: true`, which defaults to false and no caller
+  #       sets. Dev-only, so only `snyk test --dev` reports it.
+  #
+  # None of these reaches a deployed runtime or a published package, and the
+  # input is always developer-authored. js-beautify arriving by any other
+  # route is still reported.
+  #
+  # The bare 'js-beautify' scope accepts a DIRECT js-beautify in any enrolled
+  # repo. A repo that adds one, or turns on Maizzle's `prettify` or mjml's
+  # `beautify` over input it does not author, invalidates the reasoning:
+  # re-review this entry first.
+  #
+  # ON EXPIRY: delete it if js-beautify has a fixed release (then bump), or if
+  # every route above is gone. Otherwise re-check the three conditions and
+  # extend.
+  SNYK-JS-JSBEAUTIFY-20883334:
+    - '@maizzle/framework > pretty > js-beautify':
+        reason: js-beautify via Maizzle 5's `pretty`, which runs only with config.prettify; both repos leave it off. No upstream fix; availability-only.
+        expires: 2026-12-31T00:00:00.000Z
+    - 'js-beautify':
+        reason: Direct js-beautify in nswds-email-framework, used only as a fallback formatter by a developer script over the repo's own build output. No upstream fix; availability-only.
+        expires: 2026-12-31T00:00:00.000Z
+    - '* > mjml-core > js-beautify':
+        reason: js-beautify via mjml in nswds-email-design tests only; mjml-core calls it only with beautify:true, which nothing sets. No upstream fix; availability-only.
+        expires: 2026-12-31T00:00:00.000Z
 
   # ── Licence acceptances ─────────────────────────────────────────────────
   # Weak-copyleft (MPL-2.0 / LGPL-3.0) and permissive (Artistic-2.0) licences
