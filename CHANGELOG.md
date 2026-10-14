@@ -1,3 +1,9 @@
+## [1.28.2](https://github.com/digitalnsw/nswds-devops/compare/v1.28.1...v1.28.2) (2026-10-14)
+
+### Bug Fixes
+
+* **snyk:** close the remaining fail-open paths in findLooseAcceptances ([#170](https://github.com/digitalnsw/nswds-devops/issues/170)) ([94792dc](https://github.com/digitalnsw/nswds-devops/commit/94792dcf9046a7b3db60cb66665c9280804cbc4b)), closes [#168](https://github.com/digitalnsw/nswds-devops/issues/168)
+
 ## [1.28.1](https://github.com/digitalnsw/nswds-devops/compare/v1.28.0...v1.28.1) (2026-10-14)
 
 ### Bug Fixes
