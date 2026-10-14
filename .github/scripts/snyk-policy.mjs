@@ -338,35 +338,72 @@ export const findDuplicateKeys = (content) => {
 // rules allow (snyk-policy/README.md, "Rules that are load-bearing"). Returns
 // one message per problem; an empty array means the policy is acceptable.
 //
-// - Every scope must name the vulnerable package as its LAST segment, plus at
-//   least one named parent. '*' or '* > pkg' accepts the advisory on every
-//   route, including a genuinely exposed one arriving later.
-// - Every scope must expire, no further ahead than `maxDays`. An entry that
-//   never comes back for re-review is the failure this exists to stop.
-//   A date already in the past is NOT flagged: Snyk stops honouring it by
+// - Every scope must name the vulnerable package as its LAST segment, and
+//   that must be the package the advisory id names (SNYK-JS-<PKG>-n). A scope
+//   containing '*' must also name at least one parent; a fully explicit path
+//   ('gray-matter', '@maizzle/framework > gray-matter') is already narrow.
+//   '*', '* > pkg' or a path that stops at a parent accepts the advisory on
+//   every route below it, including a genuinely exposed one arriving later.
+// - Every scope must expire, as an ISO 8601 date, no further ahead than
+//   `maxDays`. Snyk compares `expires` as a string against an ISO timestamp,
+//   so a date written any other way ('31 Dec 2026') would never lapse. A
+//   date already in the past is NOT flagged: Snyk stops honouring it by
 //   itself, and flagging it would fail the suite on the calendar alone.
-// - Licence keys (snyk:lic:…) legitimately use '*' and are skipped.
+// - Licence keys (snyk:lic:…) legitimately use '*' and are not scope-checked,
+//   but they are parsed like everything else, so nothing can hide under one.
 //
 // The same structural scan as findDuplicateKeys rather than a YAML parse,
-// for the same reason. It fails CLOSED: comment lines are skipped without
-// losing its place, and any other line inside an ignore entry that it
-// cannot classify is itself reported. A shape it does not understand
+// for the same reason. It fails CLOSED: comments are stripped quote-aware,
+// and any line it cannot classify (top level, inside the ignore block, or
+// inside any entry) is itself reported. That includes a quoted value split
+// over several lines; write multi-line reasons as a `reason: |` block. A shape it does not understand
 // therefore cannot slip an acceptance past it.
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/
+const packageOf = (id) => id.match(/^SNYK-[A-Z0-9]+-(.+)-\d+$/i)?.[1]
+const normalisePackage = (name) => name.replace(/^@[^/]+\//, '').replace(/@[^@]*$/, '').replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+// Strip a `#` comment that starts outside quotes and after whitespace. Returns
+// null when quotes are unbalanced, so the caller reports the line instead of
+// guessing where the value ends.
+const stripComment = (raw) => {
+  let quote = null
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i]
+    if (quote) {
+      if (c === quote) quote = null
+    } else if (c === "'" || c === '"') {
+      quote = c
+    } else if (c === '#' && (i === 0 || /\s/.test(raw[i - 1]))) {
+      return raw.slice(0, i).replace(/\s+$/, '')
+    }
+  }
+  return quote ? null : raw.replace(/\s+$/, '')
+}
+
 export const findLooseAcceptances = (content, { now = new Date(), maxDays = 550 } = {}) => {
   const problems = []
   const limit = now.getTime() + maxDays * 24 * 60 * 60 * 1000
+  let sawIgnore = false
   let inIgnore = false
   let entry = null // { id, licence, scopes: [{ path, expires }] }
   let scope = null
+  let blockScalar = false // inside a `reason: |` (or >) block
 
   const close = () => {
     if (!entry || entry.licence) return
     if (!entry.scopes.length) problems.push(`${entry.id}: no scope`)
+    const pkg = packageOf(entry.id)
     for (const s of entry.scopes) {
+      if (/[\\&!]/.test(s.path)) {
+        problems.push(`${entry.id}: scope '${s.path}' uses an escape, anchor or tag`)
+        continue
+      }
       const segments = s.path.split('>').map((x) => x.trim())
       const named = segments.filter((x) => x && x !== '*')
-      if (segments.at(-1) === '*' || named.length < 2) {
+      const wildcard = named.length !== segments.length
+      if (segments.at(-1) === '*' || (wildcard && named.length < 2) || !named.length) {
         problems.push(`${entry.id}: scope '${s.path}' must name the package and at least one parent`)
+      } else if (pkg && normalisePackage(segments.at(-1)) !== normalisePackage(pkg)) {
+        problems.push(`${entry.id}: scope '${s.path}' must end in the package the advisory names`)
       }
       if (!s.expires) problems.push(`${entry.id}: scope '${s.path}' has no expiry`)
       else if (s.expires.getTime() > limit) {
@@ -376,16 +413,32 @@ export const findLooseAcceptances = (content, { now = new Date(), maxDays = 550 
   }
   const unquote = (s) => s.replace(/^(['"])(.*)\1$/, '$2')
 
-  for (const raw of content.split('\n')) {
-    // Drop an inline comment that sits outside quotes, then trailing space.
-    const line = raw.replace(/\s+#[^'"]*$/, '').replace(/\s+$/, '')
-    if (!line.trim() || line.trimStart().startsWith('#')) continue
+  for (const raw of content.replace(/^﻿/, '').split(/\r?\n/)) {
+    if (blockScalar) {
+      if (!raw.trim() || /^ {9,}/.test(raw)) continue
+      blockScalar = false
+    }
+    if (!raw.trim() || raw.trimStart().startsWith('#')) continue
+    const line = stripComment(raw)
+    if (line === null) {
+      problems.push(`unparseable line (unbalanced quotes): ${raw.trim()}`)
+      continue
+    }
 
-    const top = line.match(/^([A-Za-z_][\w.-]*):/)
-    if (top) {
+    if (!/^\s/.test(line)) {
       close()
       entry = scope = null
+      const top = line.match(/^([A-Za-z_][\w.-]*):(?:\s+(.*))?$/)
+      if (!top) {
+        problems.push(`unparseable top-level line: ${line}`)
+        inIgnore = false
+        continue
+      }
       inIgnore = top[1] === 'ignore'
+      if (inIgnore) {
+        sawIgnore = true
+        if (top[2]) problems.push(`ignore must be a block mapping, not '${top[2]}'`)
+      }
       continue
     }
     if (!inIgnore) continue
@@ -393,8 +446,7 @@ export const findLooseAcceptances = (content, { now = new Date(), maxDays = 550 
     const key = line.match(/^ {2}(\S.*):$/)
     if (key) {
       close()
-      const id = unquote(key[1])
-      entry = { id, licence: /^snyk:lic:/i.test(id), scopes: [] }
+      entry = { id: unquote(key[1]), licence: /^snyk:lic:/i.test(unquote(key[1])), scopes: [] }
       scope = null
       continue
     }
@@ -411,18 +463,21 @@ export const findLooseAcceptances = (content, { now = new Date(), maxDays = 550 
       entry.scopes.push(scope)
       continue
     }
-    const prop = line.match(/^ {8}([a-z]+):\s*(.*)$/)
+    const prop = line.match(/^ {8}([A-Za-z]+):(?:\s+(.*))?$/)
     if (prop && scope) {
-      if (prop[1] === 'expires') {
-        const date = new Date(unquote(prop[2]))
-        if (Number.isNaN(date.getTime())) problems.push(`${entry.id}: unreadable expiry '${prop[2]}'`)
-        else scope.expires = date
+      const value = prop[2] ?? ''
+      if (/^[|>][-+]?$/.test(value)) blockScalar = true
+      else if (prop[1] === 'expires') {
+        const text = unquote(value)
+        if (!ISO_DATE.test(text)) problems.push(`${entry.id}: expiry '${value}' is not an ISO 8601 date`)
+        else scope.expires = new Date(text)
       }
       continue
     }
-    if (!entry.licence) problems.push(`${entry.id}: unparseable line: ${line.trim()}`)
+    problems.push(`${entry.id}: unparseable line: ${line.trim()}`)
   }
   close()
+  if (!sawIgnore) problems.push('no ignore section found')
   return problems
 }
 
@@ -677,7 +732,9 @@ const main = async () => {
 
   // Refuse to fan out an over-broad or never-expiring acceptance. The unit
   // suite checks the same thing, but snyk-policy-sync.yml can also be run by
-  // hand from an unmerged branch, which skips CI.
+  // hand from an unmerged branch, which skips CI. That branch runs its own copy
+  // of this script, so this catches a bad base, not a branch that also edits
+  // the check away.
   const loose = findLooseAcceptances(blockOf(base))
   if (loose.length) {
     console.error(`::error::snyk-policy/base.snyk has acceptances that are too broad or too long-lived: ${loose.join('; ')}`)
