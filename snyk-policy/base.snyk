@@ -141,8 +141,10 @@ ignore:
         expires: 2026-12-31T00:00:00.000Z
 
   # ── postcss-selector-parser bundled inside the npm CLI (no reachable fix) ─
-  # npm 11.19.1 bundles postcss-selector-parser 7.1.4 (via @npmcli/arborist >
-  # @npmcli/query), below the 7.1.6 fix for SNYK-JS-POSTCSSSELECTORPARSER-
+  # Every npm the fleet resolves bundles postcss-selector-parser 7.1.4 (via
+  # @npmcli/arborist > @npmcli/query). Verified 2026-10-14: npm 11.21.0 and
+  # 12.2.0, then the latest, both still bundle it. That is below the 7.1.6
+  # fix for SNYK-JS-POSTCSSSELECTORPARSER-
   # 20510276. The copy is `inBundle`, so neither `npm update` nor `overrides`
   # can move it. The reasoning matches the undici entries above: release
   # tooling reached only through semantic-release, run in CI, never shipped.
@@ -158,12 +160,18 @@ ignore:
   # rejects the lockfile as out of sync. `snyk test --dev` reports nothing at
   # all for that repo.
   #
-  # ON EXPIRY, check which postcss-selector-parser the newest npm 11.x bundles
-  # and DELETE this entry if it is >= 7.1.6.
+  # EXPIRY is staggered with the gray-matter entry, away from the 2026-12-31
+  # batch. npm has shipped no fix yet, so this one will almost certainly
+  # need extending too.
+  #
+  # ON EXPIRY, DELETE this entry once EVERY enrolled lockfile resolves an npm
+  # that bundles postcss-selector-parser >= 7.1.6. A fixed npm release is not
+  # enough on its own: each lockfile keeps its older npm until refreshed.
+  # Until then, extend it.
   SNYK-JS-POSTCSSSELECTORPARSER-20510276:
     - '* > npm > * > postcss-selector-parser':
         reason: postcss-selector-parser 7.1.4 bundled inside the npm CLI, reached only via semantic-release; not overridable and absent from every published artifact
-        expires: 2026-12-31T00:00:00.000Z
+        expires: 2027-03-31T00:00:00.000Z
 
   # ── deepmerge Prototype Pollution (no fix) ──────────────────────────────
   # deepmerge@4.3.1 via react-email. No fixed release. Low reachability:
@@ -241,12 +249,16 @@ ignore:
   # the configured templatePaths:
   #   - the request URL only selects an existing template;
   #   - its 404 page renders Maizzle's own view;
+  #   - it also statically serves every project subdirectory except
+  #     node_modules and the build output (scripts/, templates/ and so on;
+  #     dot-directories and root files are not served);
   #   - its websocket JSON-parses any client message and relays it to every
   #     connected client (that is how scroll sync works).
-  # So while `npm run dev` runs, anyone on the network can push content into
-  # an open preview, or crash the server with a malformed frame. That is a
-  # dev-server exposure, not a gray-matter path: nothing a client sends
-  # reaches gray-matter. The evaluated input is always developer-authored
+  # So while `npm run dev` runs, anyone on the network can read those project
+  # folders, push content into an open preview, or crash the server with a
+  # malformed frame. That is a dev-server exposure, not a gray-matter path:
+  # nothing a client sends reaches gray-matter. The evaluated input is always
+  # developer-authored
   # source, whose author can already run arbitrary build code.
   #
   # Scoped to the direct @maizzle/framework edge (the path `snyk test`
