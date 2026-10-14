@@ -1,3 +1,9 @@
+## [1.28.3](https://github.com/digitalnsw/nswds-devops/compare/v1.28.2...v1.28.3) (2026-10-14)
+
+### Bug Fixes
+
+* **snyk-policy:** accept js-beautify's no-fix memory advisory on its three tooling routes ([#171](https://github.com/digitalnsw/nswds-devops/issues/171)) ([60ce385](https://github.com/digitalnsw/nswds-devops/commit/60ce385f054eb2487a8fb0103bf872093aca0bcb))
+
 ## [1.28.2](https://github.com/digitalnsw/nswds-devops/compare/v1.28.1...v1.28.2) (2026-10-14)
 
 ### Bug Fixes
