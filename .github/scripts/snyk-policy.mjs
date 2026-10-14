@@ -311,8 +311,7 @@ export const findDuplicateKeys = (content) => {
   let section = null
 
   for (const raw of content.split('\n')) {
-    // Drop a trailing comment outside quotes, so `  KEY: # note` is still a key.
-    const line = raw.replace(/\s+#[^'"]*$/, '').replace(/\s+$/, '')
+    const line = raw.replace(/\s+$/, '')
     if (!line.trim() || line.trimStart().startsWith('#')) continue
 
     const top = line.match(/^([A-Za-z_][\w.-]*):/)
@@ -325,9 +324,12 @@ export const findDuplicateKeys = (content) => {
 
     // Two-space indent, ending in a colon: an ignore key. Take everything
     // before the FINAL colon so licence ids survive intact.
-    const entry = line.match(/^ {2}(\S.*):$/)
+    // A trailing comment may follow the colon (`  KEY: # don't widen`), and may
+    // itself contain quotes. The lazy match keeps licence ids, which contain
+    // colons, whole.
+    const entry = line.match(/^ {2}(['"]?)(\S.*?)\1\s*:(?:\s+#.*)?$/)
     if (entry && section) {
-      const key = entry[1].replace(/^['"]|['"]$/g, '')
+      const key = entry[2]
       if (!seenIn.has(section)) seenIn.set(section, new Set())
       const seen = seenIn.get(section)
       if (seen.has(key)) duplicates.push(`${section}.${key}`)
@@ -365,7 +367,10 @@ const npmPackageOf = (id) => (id.match(/^SNYK-JS-(.+)-\d+$/i) || id.match(/^npm:
 const normalisePackage = (name) => name.replace(/(.)@[^@/]*$/, '$1').replace(/[^A-Za-z0-9]/g, '').toUpperCase()
 
 const readExpiry = (raw) => {
-  const text = raw instanceof Date ? raw.toISOString() : String(raw ?? '')
+  // CORE_SCHEMA leaves a timestamp as the string written. Anything else (a
+  // list, a mapping, a number) is not an expiry Snyk can compare.
+  if (typeof raw !== 'string') return null
+  const text = raw
   const m = text.match(ISO_DATE)
   if (!m) return null
   // Reject impossible calendar dates (2099-13-45) rather than letting them roll over.
@@ -385,6 +390,7 @@ const readExpiry = (raw) => {
 const findYamlIndirection = (content) => {
   const problems = []
   let quote = null // an open quoted scalar, which may span lines
+  let flow = 0 // depth of open [ ] / { } flow collections, which may span lines
   let scalarIndent = -1 // deeper-indented lines continue this scalar value
   content.split(/\r?\n/).forEach((raw, i) => {
     const indent = raw.match(/^ */)[0].length
@@ -393,6 +399,7 @@ const findYamlIndirection = (content) => {
       scalarIndent = -1
     }
     let bare = ''
+    let indirection = false
     let atValueStart = !quote // only a value's first character can open a quote
     for (let j = 0; j < raw.length; j++) {
       const c = raw[j]
@@ -412,11 +419,26 @@ const findYamlIndirection = (content) => {
         bare += ' '
         continue
       }
+      // &anchor, *alias and !tag only mean something where a node starts.
+      if (atValueStart && /[&*!]/.test(c) && j + 1 < raw.length && !/[\s,\]}]/.test(raw[j + 1])) indirection = true
       bare += c
-      if (/[:\-,[{]/.test(c) && (j + 1 >= raw.length || /[\s[{]/.test(raw[j + 1]) || c === '[' || c === '{' || c === ',')) atValueStart = true
-      else if (!/\s/.test(c)) atValueStart = false
+      // A node can start after "key: ", "- ", or inside a flow collection
+      // after "[", "{" or ",". In a plain block value, a comma is just text.
+      if ((c === '[' || c === '{') && (atValueStart || flow)) {
+        flow++
+        atValueStart = true
+      } else if ((c === ']' || c === '}') && flow) {
+        flow--
+        atValueStart = false
+      } else if (c === ',' && flow) {
+        atValueStart = true
+      } else if ((c === ':' || c === '-') && (j + 1 >= raw.length || /\s/.test(raw[j + 1]))) {
+        atValueStart = true
+      } else if (!/\s/.test(c)) {
+        atValueStart = false
+      }
     }
-    if (/(^|[\s,[{:-])[&*!][^\s,\]}]/.test(bare) || /(^|\s)<<\s*:/.test(bare)) {
+    if (indirection || /(^|[\s{,])<<\s*:/.test(bare)) {
       problems.push(`line ${i + 1}: anchors, aliases, merge keys and tags are not allowed: ${raw.trim()}`)
     }
     // A `key: value` line whose value is a block scalar or a plain scalar: any
@@ -464,6 +486,10 @@ export const findLooseAcceptances = (content, { now = new Date(), maxDays = 550 
         continue
       }
       for (const [path, props] of Object.entries(rule)) {
+        if (path === '<<' || (props && typeof props === 'object' && '<<' in props)) {
+          problems.push(`${id}: merge keys are not allowed`)
+          continue
+        }
         const segments = path.split('>').map((x) => x.trim())
         const named = segments.filter((x) => x && x !== '*')
         const wildcard = named.length !== segments.length

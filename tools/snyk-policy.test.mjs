@@ -956,8 +956,9 @@ test('findLooseAcceptances rejects impossible and zone-less dates', () => {
 test('findLooseAcceptances checks the package for every npm id shape', () => {
   const legacy = ok("'* > x > debug'", undefined, 'npm:ms:20170412')
   assert.match(findLooseAcceptances(policy(legacy), { now: NOW })[0], /must end in the package/)
-  const spaced = ok("'* > semantic-release > npm'", undefined, 'SNYK-JS-UNDICI-1 ')
-  assert.match(findLooseAcceptances(policy(spaced), { now: NOW })[0], /must end in the package/)
+  // A quoted key keeps its trailing space, so the package cannot be read.
+  const spaced = ok(undefined, undefined, "'SNYK-JS-UNDICI-1 '")
+  assert.ok(findLooseAcceptances(policy(spaced), { now: NOW }).some((p) => /cannot read the package/.test(p)))
   const unreadable = ok(undefined, undefined, 'SNYK-JS-')
   assert.ok(findLooseAcceptances(policy(unreadable), { now: NOW }).some((p) => /cannot read the package/.test(p)))
 })
@@ -1027,5 +1028,37 @@ test('findLooseAcceptances rejects a list item that names no scope', () => {
   for (const entry of [['  SNYK-JS-PKG-1: [ {} ]'], ['  SNYK-JS-PKG-1:', '    - {}']]) {
     assert.ok(findLooseAcceptances(policy(entry), { now: NOW }).some((p) => /names no scope/.test(p)), entry.join(' | '))
   }
+})
+
+test('findLooseAcceptances accepts only a string expiry', () => {
+  for (const expires of ['[2026-12-31]', '{at: 2026-12-31}', '20261231']) {
+    assert.match(findLooseAcceptances(policy(ok(undefined, expires)), { now: NOW })[0], /not a valid ISO 8601 date/, expires)
+  }
+})
+
+test('findLooseAcceptances treats &, * and ! in plain prose as text', () => {
+  for (const reason of ['affects *all* versions', 'low risk, !important', 'see https://x.io/?a=1&b=2 and &c']) {
+    const entry = [...ok().slice(0, 2), `        reason: ${reason}`, '        expires: 2026-12-31T00:00:00.000Z']
+    assert.deepEqual(findLooseAcceptances(policy(entry), { now: NOW }), [], reason)
+  }
+})
+
+test('findLooseAcceptances refuses merge keys in any form', () => {
+  const flow = ['  SNYK-JS-PKG-1:', "    - {<<: {'*': {reason: x}}, '@a/parent > pkg': {expires: 2026-12-31T00:00:00.000Z}}"]
+  assert.ok(findLooseAcceptances(policy(flow), { now: NOW }).length > 0, 'flow merge key')
+  const block = ['  SNYK-JS-PKG-1:', '    - <<: {x: 1}', "      '@a/parent > pkg':", '        expires: 2026-12-31T00:00:00.000Z']
+  assert.ok(findLooseAcceptances(policy(block), { now: NOW }).length > 0, 'block merge key')
+  // Quoted, so the text pass sees only a string: the parsed check must catch it.
+  const quoted = ['  SNYK-JS-PKG-1:', '    - "<<": {x: 1}', "      '@a/parent > pkg':", '        expires: 2026-12-31T00:00:00.000Z']
+  assert.ok(findLooseAcceptances(policy(quoted), { now: NOW }).some((p) => /merge keys are not allowed/.test(p)), 'quoted merge key')
+})
+
+test('findDuplicateKeys sees a key whatever follows its colon', () => {
+  for (const variant of ["  SNYK-JS-A-1: # don't widen", '  SNYK-JS-A-1 :', "  'SNYK-JS-A-1': # \"quoted\""]) {
+    const text = ['ignore:', '  SNYK-JS-A-1:', "    - 'x > a':", '  # repo-specific', variant, "    - 'y > a':"].join('\n')
+    assert.deepEqual(findDuplicateKeys(text), ['ignore.SNYK-JS-A-1'], variant)
+  }
+  const licence = ['ignore:', '  snyk:lic:npm:sharp:LGPL-3.0:', "    - '*':", '  snyk:lic:npm:sharp:LGPL-3.0: # again'].join('\n')
+  assert.deepEqual(findDuplicateKeys(licence), ['ignore.snyk:lic:npm:sharp:LGPL-3.0'])
 })
 
