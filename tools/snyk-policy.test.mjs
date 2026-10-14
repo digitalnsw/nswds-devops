@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs'
 process.env.SNYK_POLICY_LIB = '1'
 const {
   blockOf, renderBlock, splitAtMarker, migrateTail, compose, isConverted, selectTail,
-  findDuplicateKeys, reconcileBranch,
+  findDuplicateKeys, findLooseAcceptances, reconcileBranch,
 } = await import(
   '../.github/scripts/snyk-policy.mjs'
 )
@@ -210,46 +210,57 @@ test('the real base.snyk carries the sentinel isConverted depends on', () => {
   assert.ok(blockOf(realBase).includes('Canonical base (generated from nswds-devops'))
 })
 
-test('every vulnerability acceptance in the real base.snyk is path-scoped and expiring', () => {
-  // A scope that names only the package ('*', or '* > pkg') accepts the
-  // advisory on every route, including a genuinely exposed one arriving
-  // later. Every scope must name the package AND at least one parent, so the
-  // acceptance stays tied to the route it was reasoned about. An entry with
-  // no expiry never comes back for re-review. Licence keys (snyk:lic:…)
-  // legitimately use '*' and are not checked here.
+// findLooseAcceptances: every vulnerability acceptance must name its route and
+// expire. The real base must pass; each synthetic shape below must not, so a
+// regression in the guard fails the suite rather than passing silently.
+const NOW = new Date('2026-10-14T00:00:00Z')
+const policy = (entries) => ['version: v1.25.0', 'ignore:', ...entries].join('\n') + '\n'
+const ok = (scope = "'@a/parent > pkg'", expires = '2026-12-31T00:00:00.000Z') =>
+  ['  SNYK-JS-PKG-1:', `    - ${scope}:`, '        reason: test', `        expires: ${expires}`]
+
+test('findLooseAcceptances passes the real base.snyk', () => {
   const realBase = readFileSync(new URL('../snyk-policy/base.snyk', import.meta.url), 'utf8')
-  const entries = []
-  let current = null
-  for (const line of realBase.split('\n')) {
-    // Keys may be quoted, as findDuplicateKeys in snyk-policy.mjs allows.
-    const key = line.match(/^ {2}(['"]?)(SNYK-JS-[A-Z0-9-]+)\1:\s*$/)
-    if (key) {
-      current = { id: key[2], scopes: [] }
-      entries.push(current)
-      continue
-    }
-    if (/^ {2}\S/.test(line)) current = null // next key or comment at key depth
-    if (!current) continue
-    if (/^ {4}-/.test(line)) {
-      // Fail on any scope line this cannot parse, rather than skipping it and
-      // crediting its expiry to the previous scope.
-      const scope = line.match(/^ {4}- (['"])(.*)\1:\s*$/)
-      assert.ok(scope, `${current.id} has a scope line the guard cannot parse: ${line.trim()}`)
-      current.scopes.push({ path: scope[2], expires: false })
-    }
-    if (/^ {8}expires: ['"]?\d{4}-\d{2}-\d{2}T/.test(line) && current.scopes.length > 0) {
-      current.scopes.at(-1).expires = true
-    }
+  assert.deepEqual(findLooseAcceptances(blockOf(realBase)), [])
+})
+
+test('findLooseAcceptances accepts a named, expiring route and skips licence keys', () => {
+  assert.deepEqual(findLooseAcceptances(policy([...ok(), ...ok("'* > npm > * > undici'")]), { now: NOW }), [])
+  const licence = ['  snyk:lic:npm:sharp:LGPL-3.0:', "    - '*':", '        reason: licence']
+  assert.deepEqual(findLooseAcceptances(policy(licence), { now: NOW }), [])
+})
+
+test('findLooseAcceptances rejects scopes that do not name the route', () => {
+  for (const scope of ["'*'", "'* > pkg'", "'* > semantic-release > npm > *'", '"*"']) {
+    const problems = findLooseAcceptances(policy(ok(scope)), { now: NOW })
+    assert.equal(problems.length, 1, scope)
+    assert.match(problems[0], /must name the package and at least one parent/)
   }
-  assert.ok(entries.length > 0, 'expected vulnerability acceptances in base.snyk')
-  for (const { id, scopes } of entries) {
-    assert.ok(scopes.length > 0, `${id} has no scope`)
-    for (const { path, expires } of scopes) {
-      const named = path.split('>').map((s) => s.trim()).filter((s) => s && s !== '*')
-      assert.ok(named.length >= 2, `${id} scope '${path}' must name the package and at least one parent`)
-      assert.ok(expires, `${id} scope '${path}' has no expiry`)
-    }
+})
+
+test('findLooseAcceptances rejects missing and far-future expiries, not past ones', () => {
+  const noExpiry = ['  SNYK-JS-PKG-1:', "    - '@a/parent > pkg':", '        reason: test']
+  assert.match(findLooseAcceptances(policy(noExpiry), { now: NOW })[0], /has no expiry/)
+  assert.match(findLooseAcceptances(policy(ok(undefined, '9999-12-31T00:00:00.000Z')), { now: NOW })[0], /days ahead/)
+  assert.deepEqual(findLooseAcceptances(policy(ok(undefined, '2020-01-01T00:00:00.000Z')), { now: NOW }), [])
+})
+
+test('findLooseAcceptances cannot be bypassed by formatting', () => {
+  const cases = {
+    'quoted key': ["  'SNYK-JS-PKG-1':", "    - '*':", '        expires: 2026-12-31T00:00:00.000Z'],
+    'lower-case key': ['  snyk-js-pkg-1:', "    - '*':", '        expires: 2026-12-31T00:00:00.000Z'],
+    'inline comment on the key': ['  SNYK-JS-PKG-1: # temp', "    - '*':", '        expires: 2026-12-31T00:00:00.000Z'],
+    'comment between scopes': [...ok(), '  # temp', "    - '*':", '        expires: 2026-12-31T00:00:00.000Z'],
+    'second key in the same item': [...ok(), "      '*':", '        reason: sneaky'],
+    'unquoted scope': ['  SNYK-JS-PKG-1:', '    - *:', '        expires: 2026-12-31T00:00:00.000Z'],
   }
+  for (const [name, entry] of Object.entries(cases)) {
+    assert.ok(findLooseAcceptances(policy(entry), { now: NOW }).length > 0, name)
+  }
+})
+
+test('findLooseAcceptances reports lines it cannot classify instead of skipping them', () => {
+  const odd = [...ok(), '     - weird indent']
+  assert.match(findLooseAcceptances(policy(odd), { now: NOW })[0], /unparseable line/)
 })
 
 test('isConverted requires BOTH the marker and the generated-header sentinel', () => {

@@ -144,8 +144,8 @@ ignore:
   # Every npm the fleet resolves bundles postcss-selector-parser 7.1.4 (via
   # @npmcli/arborist > @npmcli/query). Verified 2026-10-14: npm 11.21.0 and
   # 12.2.0, then the latest, both still bundle it. That is below the 7.1.6
-  # fix for SNYK-JS-POSTCSSSELECTORPARSER-
-  # 20510276. The copy is `inBundle`, so neither `npm update` nor `overrides`
+  # fix for SNYK-JS-POSTCSSSELECTORPARSER-20510276. The copy is `inBundle`,
+  # so neither `npm update` nor `overrides`
   # can move it. The reasoning matches the undici entries above: release
   # tooling reached only through semantic-release, run in CI, never shipped.
   #
@@ -250,16 +250,17 @@ ignore:
   #   - the request URL only selects an existing template;
   #   - its 404 page renders Maizzle's own view;
   #   - it also statically serves every project subdirectory except
-  #     node_modules and the build output (scripts/, templates/ and so on;
-  #     dot-directories and root files are not served);
+  #     node_modules and `build_*` folders: scripts/, templates/, tests/ and
+  #     so on, and in nswds-email-framework also docs/, where its production
+  #     build is written (dot-directories and root files are not served);
   #   - its websocket JSON-parses any client message and relays it to every
   #     connected client (that is how scroll sync works).
   # So while `npm run dev` runs, anyone on the network can read those project
   # folders, push content into an open preview, or crash the server with a
   # malformed frame. That is a dev-server exposure, not a gray-matter path:
   # nothing a client sends reaches gray-matter. The evaluated input is always
-  # developer-authored
-  # source, whose author can already run arbitrary build code.
+  # developer-authored source, whose author can already run arbitrary build
+  # code.
   #
   # Scoped to the direct @maizzle/framework edge (the path `snyk test`
   # reports), so gray-matter arriving any other way is still reported.
