@@ -263,9 +263,9 @@ test('findLooseAcceptances cannot be bypassed by formatting', () => {
   }
 })
 
-test('findLooseAcceptances reports lines it cannot classify instead of skipping them', () => {
+test('findLooseAcceptances reports policy that is not valid YAML', () => {
   const odd = [...ok(), '     - weird indent']
-  assert.match(findLooseAcceptances(policy(odd), { now: NOW })[0], /unparseable line/)
+  assert.match(findLooseAcceptances(policy(odd), { now: NOW })[0], /not valid YAML/)
 })
 
 test('isConverted requires BOTH the marker and the generated-header sentinel', () => {
@@ -890,7 +890,7 @@ test('findLooseAcceptances: nothing hides under a licence key', () => {
 
 test('findLooseAcceptances requires ISO 8601 expiry dates', () => {
   for (const date of ['31 Dec 2026', 'Dec 31 2026', '0', '1']) {
-    assert.match(findLooseAcceptances(policy(ok(undefined, date)), { now: NOW })[0], /not an ISO 8601 date/, date)
+    assert.match(findLooseAcceptances(policy(ok(undefined, date)), { now: NOW })[0], /not a valid ISO 8601 date/, date)
   }
   assert.deepEqual(findLooseAcceptances(policy(ok(undefined, "'2026-12-31'")), { now: NOW }), [])
 })
@@ -908,20 +908,30 @@ test('findLooseAcceptances rejects escapes, anchors and tags in scopes', () => {
   }
 })
 
-test('findLooseAcceptances refuses an ignore section it cannot walk', () => {
-  for (const top of ["'ignore':", 'ignore :', "ignore: {SNYK-X: [{'*': {reason: x}}]}"]) {
-    const text = ['version: v1.25.0', top, ...ok()].join('\n') + '\n'
-    assert.ok(findLooseAcceptances(text, { now: NOW }).length > 0, top)
+test('findLooseAcceptances walks every spelling of the ignore section', () => {
+  // These are all valid YAML for the key `ignore`: each must be read, so a
+  // loose scope inside is caught, and a good one passes.
+  for (const top of ["'ignore':", 'ignore :']) {
+    const loose = ['version: v1.25.0', top, ...ok("'*'")].join('\n') + '\n'
+    assert.ok(findLooseAcceptances(loose, { now: NOW }).length > 0, top)
+    const good = ['version: v1.25.0', top, ...ok()].join('\n') + '\n'
+    assert.deepEqual(findLooseAcceptances(good, { now: NOW }), [], top)
   }
-  assert.ok(findLooseAcceptances('\uFEFF' + policy(ok("'*'")), { now: NOW }).length > 0, 'BOM')
+  const flow = "version: v1.25.0\nignore: {SNYK-JS-PKG-1: [{'*': {reason: x}}]}\n"
+  assert.ok(findLooseAcceptances(flow, { now: NOW }).length > 0, 'flow style')
+  assert.ok(findLooseAcceptances('\uFEFF' + policy(ok("'*'")), { now: NOW }).length > 0, 'BOM, loose')
+  assert.deepEqual(findLooseAcceptances('\uFEFF' + policy(ok()), { now: NOW }), [], 'BOM, good')
   assert.deepEqual(findLooseAcceptances('version: v1.25.0\n', { now: NOW }), ['no ignore section found'])
 })
 
-test('findLooseAcceptances reports a quoted value split over lines instead of reading into it', () => {
+test('findLooseAcceptances reads a quoted value split over lines as YAML does', () => {
   const spill = ['  SNYK-JS-PKG-1:', "    - '@a/parent > pkg':", '        reason: "starts here',
     '        expires: 2026-12-31T00:00:00.000Z', '        ends here"']
-  const problems = findLooseAcceptances(policy(spill), { now: NOW })
-  assert.ok(problems.some((p) => /unbalanced quotes/.test(p)), problems.join('; '))
+  // The "expires" line is inside the quoted reason, so there is no expiry.
+  assert.match(findLooseAcceptances(policy(spill), { now: NOW })[0], /has no expiry/)
+  const escaped = ['  SNYK-JS-PKG-1:', "    - '@a/parent > pkg':", '        reason: "a \\" b',
+    '        expires: 2026-12-31T00:00:00.000Z', '        note: \\" end"']
+  assert.match(findLooseAcceptances(policy(escaped), { now: NOW })[0], /has no expiry/)
 })
 
 test('findLooseAcceptances accepts valid policy shapes', () => {
@@ -932,5 +942,68 @@ test('findLooseAcceptances accepts valid policy shapes', () => {
     [...ok().slice(0, 3), "        expires: 2026-12-31T00:00:00.000Z # don't extend"],
   ]
   for (const entry of shapes) assert.deepEqual(findLooseAcceptances(policy(entry), { now: NOW }), [], entry.join(' | '))
+})
+
+test('findLooseAcceptances rejects impossible and zone-less dates', () => {
+  for (const date of ['2099-13-45', '9999-99-99', '2026-02-30', '2027-01-31T00:00']) {
+    assert.match(findLooseAcceptances(policy(ok(undefined, date)), { now: NOW })[0], /not a valid ISO 8601 date/, date)
+  }
+  for (const date of ['2026-12-31', '2026-12-31T00:00:00Z', '2026-12-31T10:00:00+11:00']) {
+    assert.deepEqual(findLooseAcceptances(policy(ok(undefined, date)), { now: NOW }), [], date)
+  }
+})
+
+test('findLooseAcceptances checks the package for every npm id shape', () => {
+  const legacy = ok("'* > x > debug'", undefined, 'npm:ms:20170412')
+  assert.match(findLooseAcceptances(policy(legacy), { now: NOW })[0], /must end in the package/)
+  const spaced = ok("'* > semantic-release > npm'", undefined, 'SNYK-JS-UNDICI-1 ')
+  assert.match(findLooseAcceptances(policy(spaced), { now: NOW })[0], /must end in the package/)
+  const unreadable = ok(undefined, undefined, 'SNYK-JS-')
+  assert.ok(findLooseAcceptances(policy(unreadable), { now: NOW }).some((p) => /cannot read the package/.test(p)))
+})
+
+test('findLooseAcceptances keeps npm scopes when matching the package', () => {
+  for (const [id, scope] of [['SNYK-JS-VERCELOIDC-1234567', "'* > @vercel/functions > @vercel/oidc'"],
+    ['SNYK-JS-BABELTRAVERSE-5962462', "'* > @babel/core > @babel/traverse'"],
+    ['SNYK-JS-UNDICI-1', "'* > npm > undici@6.28.0'"]]) {
+    assert.deepEqual(findLooseAcceptances(policy(ok(scope, undefined, id)), { now: NOW }), [], id)
+  }
+  const impostor = ok("'* > npm > @evil/undici'", undefined, 'SNYK-JS-UNDICI-1')
+  assert.match(findLooseAcceptances(policy(impostor), { now: NOW })[0], /must end in the package/)
+})
+
+test('findLooseAcceptances does not apply the npm package rule to other ecosystems', () => {
+  for (const [id, scope] of [['SNYK-JAVA-ORGAPACHELOGGINGLOG4J-1', "'app > org.apache.logging.log4j:log4j-core'"],
+    ['SNYK-GOLANG-GITHUBCOMGOLANGJWTJWT-1', "'app > github.com/golang-jwt/jwt/v4'"],
+    ['SNYK-PYTHON-TYPINGEXTENSIONS-1', "'app > typing_extensions'"]]) {
+    assert.deepEqual(findLooseAcceptances(policy(ok(scope, undefined, id)), { now: NOW }), [], id)
+  }
+})
+
+test('findLooseAcceptances refuses anchors, aliases, merge keys and tags', () => {
+  const alias = ["  snyk:lic:npm:x:MIT:", "    - &any '*':", '        reason: licence',
+    '  SNYK-JS-UNDICI-1:', '    - *any :', '        expires: 2026-12-31T00:00:00.000Z']
+  assert.ok(findLooseAcceptances(policy(alias), { now: NOW }).some((p) => /anchors, aliases/.test(p)))
+  for (const scope of ["!!str '* > undici'", "&s '@a/parent > pkg'"]) {
+    assert.ok(findLooseAcceptances(policy(ok(scope)), { now: NOW }).some((p) => /anchors, aliases/.test(p)), scope)
+  }
+  // A '*' or '&' inside a quoted scope or reason is just text.
+  assert.deepEqual(findLooseAcceptances(policy([...ok("'* > npm > * > undici'", undefined, 'SNYK-JS-UNDICI-1'),
+    "        note: 'R&D * check'"]), { now: NOW }), [])
+})
+
+test('findLooseAcceptances accepts more valid shapes YAML allows', () => {
+  const shapes = [
+    [...ok().slice(0, 2), "        reason: npm's bundled copy", '        expires: 2026-12-31T00:00:00.000Z'],
+    [...ok().slice(0, 2), '        reason: |2', '            indented two more', '        expires: 2026-12-31T00:00:00.000Z'],
+    ['  SNYK-JS-PKG-1:', "    -   '@a/parent > pkg':", '          reason: extra spaces after the dash', '          expires: 2026-12-31T00:00:00.000Z'],
+    [...ok().slice(0, 2), '        reason: "6\\" display"', '        expires: 2026-12-31T00:00:00.000Z'],
+  ]
+  for (const entry of shapes) assert.deepEqual(findLooseAcceptances(policy(entry), { now: NOW }), [], entry.join(' | '))
+})
+
+test('findDuplicateKeys sees a key that carries an inline comment', () => {
+  const text = ['ignore:', '  SNYK-JS-A-1:', "    - 'x > a':", '  # repo-specific', '  SNYK-JS-A-1: # again', "    - 'y > a':"].join('\n')
+  assert.deepEqual(findDuplicateKeys(text), ['ignore.SNYK-JS-A-1'])
 })
 

@@ -81,15 +81,17 @@ GH_TOKEN=$(gh auth token) node .github/scripts/snyk-policy.mjs --apply --dry-run
   paths with `npx snyk test --ignore-policy --json` — an incomplete path set
   does not error, the advisory just comes back.
 - **Every vulnerability acceptance names its route and expires.** Each scope
-  must end in the package the advisory id names, and a scope containing `*`
-  must also name a parent. Every scope must expire, as an ISO 8601 date,
-  within about 18 months. `findLooseAcceptances` in
+  must end in the vulnerable package (for npm advisories, the package the id
+  names, scope included), and a scope containing `*` must also name a parent.
+  Every scope must expire on a real ISO 8601 date (a time needs `Z` or an
+  offset), within about 18 months. `findLooseAcceptances` in
   `.github/scripts/snyk-policy.mjs` enforces this twice: in the unit suite,
   and in the fan-out itself, which refuses to run on a bad base. The second
   check catches a hand-dispatched run from an unmerged branch, unless that
-  branch also edits the script, which is a matter for code review. Licence
-  keys are exempt from the scope rules but are parsed like everything else.
-  The scan fails closed: write multi-line reasons as `reason: |` blocks.
+  branch also edits the script, which is a matter for code review. It parses
+  the policy with js-yaml, as Snyk does, and refuses YAML anchors, aliases,
+  merge keys and tags, which parsing would otherwise resolve silently.
+  Licence keys are exempt from the scope rules.
 - **Do not re-add the nanoid CWE-835 ignores.** They are obsolete, not expired;
   the reasoning is in `base.snyk` and in the Mechanism C section of the config
   doc.
