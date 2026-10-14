@@ -122,8 +122,20 @@ What the base contains:
   build and runtime libraries: the sharp/libvips platform binaries via next,
   the lightningcss platform binaries via Tailwind, axe-core, npm bundled
   inside semantic-release, and the `@nswds/*` packages.
-- Scoped vulnerability acceptances for the npm-vendored undici advisories,
-  scoped `* > npm > * > undici` and expiring 2026-12-31.
+- Scoped, expiring vulnerability acceptances, each for a package with no fix
+  that the fleet can reach. All of them fail closed: the scope names the
+  route, so the same package arriving any other way is still reported.
+  - **Bundled inside the npm CLI**, which `overrides` cannot reach: undici and
+    postcss-selector-parser (`* > npm > * > …`).
+  - **Build, CI and dev tooling only:**
+    - deepmerge via react-email
+    - http-cache-semantics via `@pulumi/pulumi` and `@semantic-release/npm`
+    - braces via micromatch and chokidar
+    - uri-js via eslint
+  - **gray-matter**, via `@maizzle/framework` in the two Maizzle 5 repos only.
+
+  `base.snyk` is the authority for the exact entries, their reasons and
+  their expiries; this list only says what kinds of acceptance it holds.
 - **No `'*:lic:*'` catch-all.** Snyk matches ignore keys as exact issue IDs
   and does not support globs, so a catch-all is dead config that reads as
   protection. Licence findings must be enumerated.

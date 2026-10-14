@@ -140,6 +140,21 @@ ignore:
         reason: undici vendored inside the npm CLI, reached only via semantic-release; no upstream fix (npm 11.19.1 still ships undici 6.28.0) and absent from every published artifact
         expires: 2026-12-31T00:00:00.000Z
 
+  # postcss-selector-parser, bundled inside the npm CLI exactly like undici
+  # above: npm 11.19.1 ships 7.1.4 (via @npmcli/arborist > @npmcli/query),
+  # below the 7.1.6 fix for SNYK-JS-POSTCSSSELECTORPARSER-20510276. It is
+  # `inBundle`, so `overrides` cannot reach it; every other copy in the fleet
+  # is already on 7.1.6. Same blast radius and same fail-closed scope as the
+  # undici entries: release tooling only, never shipped. Do NOT try to reach it
+  # with a repo-wide override: that rewrites the bundled copy's spec and makes
+  # `snyk test --dev` reject the lockfile (MAINTENANCE.md exceptions register).
+  # ON EXPIRY, check which postcss-selector-parser the newest npm 11.x bundles
+  # and DELETE this if it is >= 7.1.6.
+  SNYK-JS-POSTCSSSELECTORPARSER-20510276:
+    - '* > npm > * > postcss-selector-parser':
+        reason: postcss-selector-parser 7.1.4 bundled inside the npm CLI, reached only via semantic-release; not overridable and absent from every published artifact
+        expires: 2026-12-31T00:00:00.000Z
+
   # ── deepmerge Prototype Pollution (no fix) ──────────────────────────────
   # deepmerge@4.3.1 via react-email. No fixed release. Low reachability:
   # react-email deep-merges developer-authored props/styles at render, not
@@ -208,17 +223,30 @@ ignore:
   # exceptions register), and Maizzle 6 is the release that drops gray-matter.
   #
   # Maizzle calls gray-matter only in parseFrontMatter() on the HTML it
-  # renders. Verified 2026-10-14: both repos invoke Maizzle solely via its CLI
-  # (build/serve) over their own templates, never call render() themselves,
-  # and run no server. So the evaluated input is developer-authored source,
-  # whose author can already run arbitrary build code. Scoped to the direct
-  # @maizzle/framework edge (the path `snyk test` reports), so gray-matter
-  # arriving any other way is still reported. ON EXPIRY, delete this if both
-  # repos are archived (nswds-email-design replaces them) rather than extend it.
+  # renders. Verified 2026-10-14: both repos invoke Maizzle solely via its
+  # CLI, `maizzle build` and (as `npm run dev`) `maizzle serve`, and never call
+  # render() themselves. The dev server binds all interfaces, but it renders
+  # only files found in the configured templatePaths: the request URL picks an
+  # existing template, its 404 page renders Maizzle's own view, and its
+  # websocket only rebroadcasts scroll/reload messages. Nothing a client sends
+  # reaches gray-matter, so the evaluated input is always developer-authored
+  # source, whose author can already run arbitrary build code. Scoped to the
+  # direct @maizzle/framework edge (the path `snyk test` reports), so
+  # gray-matter arriving any other way is still reported.
+  #
+  # This sits in the base, although only two repos reach it, because the base
+  # is the single source of truth for fleet .snyk policy: an acceptance written
+  # into a repo's tail is invisible to fleet review. Elsewhere the scope is inert.
+  #
+  # ON EXPIRY: delete it if both repos are archived (nswds-email-design
+  # replaces them). Otherwise re-check that gray-matter still has no fixed
+  # release, that Maizzle is still reached only through the CLI over the
+  # repos' own templates, and that they are still on Maizzle 5; extend only if
+  # all three hold.
   SNYK-JS-GRAYMATTER-20532010:
     - '@maizzle/framework > gray-matter':
-        reason: gray-matter@4.0.3 via Maizzle 5 CLI builds of developer-authored templates only; no upstream fix; the repos stay on Maizzle 5 by decision.
-        expires: 2027-04-30T00:00:00.000Z
+        reason: gray-matter@4.0.3 via the Maizzle 5 CLI (build/serve) over developer-authored templates only; no upstream fix; the repos stay on Maizzle 5 by decision.
+        expires: 2026-12-31T00:00:00.000Z
 
   # ── Licence acceptances ─────────────────────────────────────────────────
   # Weak-copyleft (MPL-2.0 / LGPL-3.0) and permissive (Artistic-2.0) licences
