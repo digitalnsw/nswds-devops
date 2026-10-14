@@ -210,6 +210,39 @@ test('the real base.snyk carries the sentinel isConverted depends on', () => {
   assert.ok(blockOf(realBase).includes('Canonical base (generated from nswds-devops'))
 })
 
+test('every vulnerability acceptance in the real base.snyk is path-scoped and expiring', () => {
+  // A bare '*' scope accepts the advisory on every route, including a
+  // genuinely exposed one arriving later. An entry with no expiry never comes
+  // back for re-review. Licence keys (snyk:lic:…) legitimately use '*' and
+  // are not checked here.
+  const realBase = readFileSync(new URL('../snyk-policy/base.snyk', import.meta.url), 'utf8')
+  const entries = []
+  let current = null
+  for (const line of realBase.split('\n')) {
+    const key = line.match(/^ {2}(SNYK-JS-[A-Z0-9-]+):\s*$/)
+    if (key) {
+      current = { id: key[1], scopes: [] }
+      entries.push(current)
+      continue
+    }
+    if (/^ {2}\S/.test(line)) current = null // next key or comment at key depth
+    if (!current) continue
+    const scope = line.match(/^ {4}- '(.*)':\s*$/)
+    if (scope) current.scopes.push({ path: scope[1], expires: false })
+    if (/^ {8}expires: \d{4}-\d{2}-\d{2}T/.test(line) && current.scopes.length > 0) {
+      current.scopes.at(-1).expires = true
+    }
+  }
+  assert.ok(entries.length > 0, 'expected vulnerability acceptances in base.snyk')
+  for (const { id, scopes } of entries) {
+    assert.ok(scopes.length > 0, `${id} has no scope`)
+    for (const { path, expires } of scopes) {
+      assert.notEqual(path, '*', `${id} uses a bare '*' scope`)
+      assert.ok(expires, `${id} scope '${path}' has no expiry`)
+    }
+  }
+})
+
 test('isConverted requires BOTH the marker and the generated-header sentinel', () => {
   const converted = [SENTINEL_LINE, 'ignore:', '  # repo-specific', ''].join('\n')
   assert.equal(isConverted(converted), true)
