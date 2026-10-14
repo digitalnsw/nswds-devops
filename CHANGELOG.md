@@ -1,3 +1,9 @@
+## [1.28.1](https://github.com/digitalnsw/nswds-devops/compare/v1.28.0...v1.28.1) (2026-10-14)
+
+### Bug Fixes
+
+* **snyk:** accept npm-bundled postcss-selector-parser and correct [#165](https://github.com/digitalnsw/nswds-devops/issues/165) ([#168](https://github.com/digitalnsw/nswds-devops/issues/168)) ([531f5ac](https://github.com/digitalnsw/nswds-devops/commit/531f5ac93b1effe3addded132c6830ac8bb1b452))
+
 ## [1.28.0](https://github.com/digitalnsw/nswds-devops/compare/v1.27.0...v1.28.0) (2026-10-10)
 
 ### Features
