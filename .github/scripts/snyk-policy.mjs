@@ -42,6 +42,7 @@
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import yaml from 'js-yaml'
 
 const MARKER = '  # repo-specific'
 const BRANCH = 'chore/repo-sync/snyk-policy'
@@ -298,8 +299,9 @@ export const compose = (block, tail) => {
 // regression guards against, reachable by a different route: promoting an
 // ignore out of one repo's tail into base.snyk without removing it there.
 //
-// Deliberately a structural scan rather than a YAML parse: this repo has no
-// YAML dependency, and the shape is narrow — top-level keys at column 0 and
+// Deliberately a structural scan rather than a YAML parse: a parser either
+// keeps the last duplicate silently or throws on the first, and this has to
+// report every collision by name. The shape is narrow — top-level keys at column 0 and
 // ignore entries at two spaces, whose keys legitimately contain colons
 // (snyk:lic:npm:...:MPL-2.0). Anything deeper is a value, not a key.
 export const findDuplicateKeys = (content) => {
@@ -322,9 +324,12 @@ export const findDuplicateKeys = (content) => {
 
     // Two-space indent, ending in a colon: an ignore key. Take everything
     // before the FINAL colon so licence ids survive intact.
-    const entry = line.match(/^ {2}(\S.*):$/)
+    // A trailing comment may follow the colon (`  KEY: # don't widen`), and may
+    // itself contain quotes. The lazy match keeps licence ids, which contain
+    // colons, whole.
+    const entry = line.match(/^ {2}(['"]?)(\S.*?)\1\s*:(?:\s+#.*)?$/)
     if (entry && section) {
-      const key = entry[1].replace(/^['"]|['"]$/g, '')
+      const key = entry[2]
       if (!seenIn.has(section)) seenIn.set(section, new Set())
       const seen = seenIn.get(section)
       if (seen.has(key)) duplicates.push(`${section}.${key}`)
@@ -338,91 +343,134 @@ export const findDuplicateKeys = (content) => {
 // rules allow (snyk-policy/README.md, "Rules that are load-bearing"). Returns
 // one message per problem; an empty array means the policy is acceptable.
 //
-// - Every scope must name the vulnerable package as its LAST segment, plus at
-//   least one named parent. '*' or '* > pkg' accepts the advisory on every
-//   route, including a genuinely exposed one arriving later.
-// - Every scope must expire, no further ahead than `maxDays`. An entry that
-//   never comes back for re-review is the failure this exists to stop.
-//   A date already in the past is NOT flagged: Snyk stops honouring it by
-//   itself, and flagging it would fail the suite on the calendar alone.
-// - Licence keys (snyk:lic:…) legitimately use '*' and are skipped.
+// - Every scope must name the vulnerable package as its LAST segment. For npm
+//   advisories (SNYK-JS-<PKG>-n, or legacy npm:<pkg>:<date>) that must be the
+//   package the id names. A scope containing '*' must also name a parent; a
+//   fully explicit path ('gray-matter', '@maizzle/framework > gray-matter')
+//   is already narrow. '*', '* > pkg' or a path that stops at a parent
+//   accepts the advisory on every route below it.
+// - Every scope must expire, as a real ISO 8601 date (a time needs Z or an
+//   offset), no further ahead than `maxDays`. A date already in the past is
+//   NOT flagged: Snyk stops honouring it by itself, and flagging it would fail
+//   the suite on the calendar alone.
+// - Licence keys (snyk:lic:…) legitimately use '*' and are not scope-checked.
 //
-// The same structural scan as findDuplicateKeys rather than a YAML parse,
-// for the same reason. It fails CLOSED: comment lines are skipped without
-// losing its place, and any other line inside an ignore entry that it
-// cannot classify is itself reported. A shape it does not understand
-// therefore cannot slip an acceptance past it.
+// The policy is PARSED (js-yaml, the parser family Snyk itself uses), so
+// quoting, comments, block scalars and indentation mean exactly what they
+// mean to Snyk. Parsing would silently resolve YAML anchors, aliases, merge
+// keys and tags, though, so those are refused by a text pass first: no
+// legitimate policy needs them, and an alias can smuggle a '*' into a scope.
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2}))?$/
+const npmPackageOf = (id) => (id.match(/^SNYK-JS-(.+)-\d+$/i) || id.match(/^npm:(.+):\d+$/i))?.[1]
+// Drop a trailing @version, keep any @scope/, and compare alphanumerics only:
+// Snyk keeps the scope in its ids (@babel/traverse -> BABELTRAVERSE).
+const normalisePackage = (name) => name.replace(/(.)@[^@/]*$/, '$1').replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+
+const readExpiry = (raw) => {
+  // CORE_SCHEMA leaves a timestamp as the string written. Anything else (a
+  // list, a mapping, a number) is not an expiry Snyk can compare.
+  if (typeof raw !== 'string') return null
+  const text = raw
+  const m = text.match(ISO_DATE)
+  if (!m) return null
+  // Reject impossible calendar dates (2099-13-45) rather than letting them roll over.
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  const day = new Date(Date.UTC(y, mo - 1, d))
+  if (day.getUTCFullYear() !== y || day.getUTCMonth() !== mo - 1 || day.getUTCDate() !== d) return null
+  const when = new Date(text)
+  return Number.isNaN(when.getTime()) ? null : when
+}
+
+// YAML features that parsing would resolve silently: anchors (&a), aliases
+// (*a), tags (!t) and merge keys (<<). Rather than re-scan the text, ask the
+// parser: js-yaml reports each node as it opens, positioned at the node's
+// first character, which is exactly where &, * or ! would mean anchor, alias
+// or tag. The same characters inside a plain or quoted value are never a
+// node start, so prose such as "affects *all* versions" is unaffected.
+// CORE_SCHEMA has no merge type, so a merge key survives as a literal "<<"
+// key wherever and however it is written; walk the result for one.
+const hasMergeKey = (node) =>
+  node !== null &&
+  typeof node === 'object' &&
+  (Object.prototype.hasOwnProperty.call(node, '<<') || Object.values(node).some(hasMergeKey))
+
+const findYamlIndirection = (content) => {
+  const lines = new Set()
+  let doc
+  try {
+    doc = yaml.load(content, {
+      schema: yaml.CORE_SCHEMA,
+      listener(event, state) {
+        if (event !== 'open') return
+        // Skip separation whitespace and comments up to the node itself.
+        const lead = state.input.slice(state.position).match(/^(?:\s|#[^\n]*)*/)[0]
+        const at = state.position + lead.length
+        if (/[&*!]/.test(state.input[at] ?? '')) lines.add(state.input.slice(0, at).split('\n').length)
+      },
+    })
+  } catch {
+    return [] // findLooseAcceptances reports the YAML error itself
+  }
+  const problems = [...lines].map((n) => `line ${n}: anchors, aliases and tags are not allowed`)
+  if (hasMergeKey(doc)) problems.push('merge keys are not allowed (<<)')
+  return problems
+}
+
 export const findLooseAcceptances = (content, { now = new Date(), maxDays = 550 } = {}) => {
-  const problems = []
+  const problems = findYamlIndirection(content)
   const limit = now.getTime() + maxDays * 24 * 60 * 60 * 1000
-  let inIgnore = false
-  let entry = null // { id, licence, scopes: [{ path, expires }] }
-  let scope = null
 
-  const close = () => {
-    if (!entry || entry.licence) return
-    if (!entry.scopes.length) problems.push(`${entry.id}: no scope`)
-    for (const s of entry.scopes) {
-      const segments = s.path.split('>').map((x) => x.trim())
-      const named = segments.filter((x) => x && x !== '*')
-      if (segments.at(-1) === '*' || named.length < 2) {
-        problems.push(`${entry.id}: scope '${s.path}' must name the package and at least one parent`)
+  let doc
+  try {
+    // CORE_SCHEMA keeps timestamps as the strings written, so an impossible
+    // date is checked as written instead of being rolled over to a real one.
+    doc = yaml.load(content, { schema: yaml.CORE_SCHEMA })
+  } catch (err) {
+    return [...problems, `not valid YAML: ${err.reason ?? err.message}`]
+  }
+  if (!doc || typeof doc !== 'object' || !('ignore' in doc)) return [...problems, 'no ignore section found']
+  if (!doc.ignore || typeof doc.ignore !== 'object' || Array.isArray(doc.ignore)) {
+    return [...problems, 'ignore must be a mapping of issue ids']
+  }
+
+  for (const [id, rules] of Object.entries(doc.ignore)) {
+    if (!Array.isArray(rules) || !rules.length) {
+      problems.push(`${id}: must be a non-empty list of scopes`)
+      continue
+    }
+    if (/^snyk:lic:/i.test(id)) continue
+    const pkg = npmPackageOf(id)
+    if (/^(SNYK-JS-|npm:)/i.test(id) && !pkg) problems.push(`${id}: cannot read the package from this id`)
+
+    for (const rule of rules) {
+      if (!rule || typeof rule !== 'object' || Array.isArray(rule)) {
+        problems.push(`${id}: each list item must map a scope to its properties`)
+        continue
       }
-      if (!s.expires) problems.push(`${entry.id}: scope '${s.path}' has no expiry`)
-      else if (s.expires.getTime() > limit) {
-        problems.push(`${entry.id}: scope '${s.path}' expires more than ${maxDays} days ahead`)
+      if (!Object.keys(rule).length) {
+        problems.push(`${id}: a list item names no scope`)
+        continue
+      }
+      for (const [path, props] of Object.entries(rule)) {
+        const segments = path.split('>').map((x) => x.trim())
+        const named = segments.filter((x) => x && x !== '*')
+        const wildcard = named.length !== segments.length
+        if (segments.at(-1) === '*' || !named.length || (wildcard && named.length < 2)) {
+          problems.push(`${id}: scope '${path}' must name the package and at least one parent`)
+        } else if (pkg && normalisePackage(segments.at(-1)) !== normalisePackage(pkg)) {
+          problems.push(`${id}: scope '${path}' must end in the package the advisory names`)
+        }
+        const raw = props && typeof props === 'object' ? props.expires : undefined
+        if (raw === undefined || raw === null) {
+          problems.push(`${id}: scope '${path}' has no expiry`)
+          continue
+        }
+        const when = readExpiry(raw)
+        if (!when) problems.push(`${id}: expiry '${raw}' is not a valid ISO 8601 date`)
+        else if (when.getTime() > limit) problems.push(`${id}: scope '${path}' expires more than ${maxDays} days ahead`)
       }
     }
   }
-  const unquote = (s) => s.replace(/^(['"])(.*)\1$/, '$2')
-
-  for (const raw of content.split('\n')) {
-    // Drop an inline comment that sits outside quotes, then trailing space.
-    const line = raw.replace(/\s+#[^'"]*$/, '').replace(/\s+$/, '')
-    if (!line.trim() || line.trimStart().startsWith('#')) continue
-
-    const top = line.match(/^([A-Za-z_][\w.-]*):/)
-    if (top) {
-      close()
-      entry = scope = null
-      inIgnore = top[1] === 'ignore'
-      continue
-    }
-    if (!inIgnore) continue
-
-    const key = line.match(/^ {2}(\S.*):$/)
-    if (key) {
-      close()
-      const id = unquote(key[1])
-      entry = { id, licence: /^snyk:lic:/i.test(id), scopes: [] }
-      scope = null
-      continue
-    }
-    if (!entry) {
-      problems.push(`unparseable line in ignore: ${line.trim()}`)
-      continue
-    }
-
-    // A list item opens a scope at four spaces; a further key in the SAME item
-    // (six spaces) is a separate rule to Snyk, so it is a scope too.
-    const item = line.match(/^ {4}- (.+):$/) || line.match(/^ {6}(\S.*):$/)
-    if (item) {
-      scope = { path: unquote(item[1]), expires: null }
-      entry.scopes.push(scope)
-      continue
-    }
-    const prop = line.match(/^ {8}([a-z]+):\s*(.*)$/)
-    if (prop && scope) {
-      if (prop[1] === 'expires') {
-        const date = new Date(unquote(prop[2]))
-        if (Number.isNaN(date.getTime())) problems.push(`${entry.id}: unreadable expiry '${prop[2]}'`)
-        else scope.expires = date
-      }
-      continue
-    }
-    if (!entry.licence) problems.push(`${entry.id}: unparseable line: ${line.trim()}`)
-  }
-  close()
   return problems
 }
 
@@ -677,7 +725,9 @@ const main = async () => {
 
   // Refuse to fan out an over-broad or never-expiring acceptance. The unit
   // suite checks the same thing, but snyk-policy-sync.yml can also be run by
-  // hand from an unmerged branch, which skips CI.
+  // hand from an unmerged branch, which skips CI. That branch runs its own copy
+  // of this script, so this catches a bad base, not a branch that also edits
+  // the check away.
   const loose = findLooseAcceptances(blockOf(base))
   if (loose.length) {
     console.error(`::error::snyk-policy/base.snyk has acceptances that are too broad or too long-lived: ${loose.join('; ')}`)
