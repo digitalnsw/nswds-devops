@@ -334,6 +334,98 @@ export const findDuplicateKeys = (content) => {
   return duplicates
 }
 
+// Vulnerability acceptances that are wider or longer-lived than base.snyk's
+// rules allow (snyk-policy/README.md, "Rules that are load-bearing"). Returns
+// one message per problem; an empty array means the policy is acceptable.
+//
+// - Every scope must name the vulnerable package as its LAST segment, plus at
+//   least one named parent. '*' or '* > pkg' accepts the advisory on every
+//   route, including a genuinely exposed one arriving later.
+// - Every scope must expire, no further ahead than `maxDays`. An entry that
+//   never comes back for re-review is the failure this exists to stop.
+//   A date already in the past is NOT flagged: Snyk stops honouring it by
+//   itself, and flagging it would fail the suite on the calendar alone.
+// - Licence keys (snyk:lic:…) legitimately use '*' and are skipped.
+//
+// The same structural scan as findDuplicateKeys rather than a YAML parse,
+// for the same reason. It fails CLOSED: comment lines are skipped without
+// losing its place, and any other line inside an ignore entry that it
+// cannot classify is itself reported. A shape it does not understand
+// therefore cannot slip an acceptance past it.
+export const findLooseAcceptances = (content, { now = new Date(), maxDays = 550 } = {}) => {
+  const problems = []
+  const limit = now.getTime() + maxDays * 24 * 60 * 60 * 1000
+  let inIgnore = false
+  let entry = null // { id, licence, scopes: [{ path, expires }] }
+  let scope = null
+
+  const close = () => {
+    if (!entry || entry.licence) return
+    if (!entry.scopes.length) problems.push(`${entry.id}: no scope`)
+    for (const s of entry.scopes) {
+      const segments = s.path.split('>').map((x) => x.trim())
+      const named = segments.filter((x) => x && x !== '*')
+      if (segments.at(-1) === '*' || named.length < 2) {
+        problems.push(`${entry.id}: scope '${s.path}' must name the package and at least one parent`)
+      }
+      if (!s.expires) problems.push(`${entry.id}: scope '${s.path}' has no expiry`)
+      else if (s.expires.getTime() > limit) {
+        problems.push(`${entry.id}: scope '${s.path}' expires more than ${maxDays} days ahead`)
+      }
+    }
+  }
+  const unquote = (s) => s.replace(/^(['"])(.*)\1$/, '$2')
+
+  for (const raw of content.split('\n')) {
+    // Drop an inline comment that sits outside quotes, then trailing space.
+    const line = raw.replace(/\s+#[^'"]*$/, '').replace(/\s+$/, '')
+    if (!line.trim() || line.trimStart().startsWith('#')) continue
+
+    const top = line.match(/^([A-Za-z_][\w.-]*):/)
+    if (top) {
+      close()
+      entry = scope = null
+      inIgnore = top[1] === 'ignore'
+      continue
+    }
+    if (!inIgnore) continue
+
+    const key = line.match(/^ {2}(\S.*):$/)
+    if (key) {
+      close()
+      const id = unquote(key[1])
+      entry = { id, licence: /^snyk:lic:/i.test(id), scopes: [] }
+      scope = null
+      continue
+    }
+    if (!entry) {
+      problems.push(`unparseable line in ignore: ${line.trim()}`)
+      continue
+    }
+
+    // A list item opens a scope at four spaces; a further key in the SAME item
+    // (six spaces) is a separate rule to Snyk, so it is a scope too.
+    const item = line.match(/^ {4}- (.+):$/) || line.match(/^ {6}(\S.*):$/)
+    if (item) {
+      scope = { path: unquote(item[1]), expires: null }
+      entry.scopes.push(scope)
+      continue
+    }
+    const prop = line.match(/^ {8}([a-z]+):\s*(.*)$/)
+    if (prop && scope) {
+      if (prop[1] === 'expires') {
+        const date = new Date(unquote(prop[2]))
+        if (Number.isNaN(date.getTime())) problems.push(`${entry.id}: unreadable expiry '${prop[2]}'`)
+        else scope.expires = date
+      }
+      continue
+    }
+    if (!entry.licence) problems.push(`${entry.id}: unparseable line: ${line.trim()}`)
+  }
+  close()
+  return problems
+}
+
 // Which bytes may be written to an existing sync branch, given what the branch
 // renders to and what the default branch renders to.
 //
@@ -580,6 +672,15 @@ const main = async () => {
     console.error(
       `::error::snyk-policy/base.snyk declares duplicate keys, so the later one silently wins: ${baseDuplicates.join(', ')}`,
     )
+    process.exit(1)
+  }
+
+  // Refuse to fan out an over-broad or never-expiring acceptance. The unit
+  // suite checks the same thing, but snyk-policy-sync.yml can also be run by
+  // hand from an unmerged branch, which skips CI.
+  const loose = findLooseAcceptances(blockOf(base))
+  if (loose.length) {
+    console.error(`::error::snyk-policy/base.snyk has acceptances that are too broad or too long-lived: ${loose.join('; ')}`)
     process.exit(1)
   }
 

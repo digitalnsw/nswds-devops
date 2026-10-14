@@ -80,6 +80,12 @@ GH_TOKEN=$(gh auth token) node .github/scripts/snyk-policy.mjs --apply --dry-run
   rationale is conditional on how the package is reached. Enumerate the real
   paths with `npx snyk test --ignore-policy --json` — an incomplete path set
   does not error, the advisory just comes back.
+- **Every vulnerability acceptance names its route and expires.** Each scope
+  must end in the vulnerable package and name at least one parent, and must
+  expire within about 18 months. `findLooseAcceptances` in
+  `.github/scripts/snyk-policy.mjs` enforces this twice: in the unit suite,
+  and in the fan-out itself, which refuses to run (so a hand-dispatched run
+  from an unmerged branch cannot skip it). Licence keys are exempt.
 - **Do not re-add the nanoid CWE-835 ignores.** They are obsolete, not expired;
   the reasoning is in `base.snyk` and in the Mechanism C section of the config
   doc.
