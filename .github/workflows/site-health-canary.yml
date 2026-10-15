@@ -21,6 +21,12 @@ permissions:
   contents: read
   issues: write
 
+# One run at a time: a manual run overlapping the scheduled one would see no
+# open tracking issue in both and file two.
+concurrency:
+  group: site-health-canary
+  cancel-in-progress: false
+
 jobs:
   probe:
     runs-on: ubuntu-latest
@@ -39,6 +45,10 @@ jobs:
           client-id: ${{ secrets.SYNC_APP_ID }}
           private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
           owner: digitalnsw
+          # The probe only lists repos and reads READMEs; the App's write
+          # grants stay out of this token.
+          permission-contents: read
+          permission-metadata: read
 
       - name: Probe sites and README links
         id: probe

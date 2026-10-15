@@ -89,13 +89,46 @@ export function declaredAddresses(html) {
   return found
 }
 
+/**
+ * The markdown with its fenced code blocks removed. A block closes only where
+ * CommonMark closes it: on a line holding nothing but a run of the opener's
+ * character at least as long as the opener, so a ``` quoted inside a ````
+ * block, or a ```js line inside a ``` block, stays code. An unclosed block
+ * runs to the end. Indentation is not limited, so fences in nested list items
+ * count; the cost is that an indented ``` continuing a paragraph, which
+ * CommonMark reads as text, hides the links after it. Missing a link is the
+ * cheaper error here: exposing an example URL files a false dead-link report.
+ */
+function withoutFencedCode(markdown) {
+  const prose = []
+  let fence
+  for (const line of markdown.split('\n')) {
+    if (fence) {
+      const close = line.match(/^\s*(`{3,}|~{3,})\s*$/)?.[1]
+      if (close && close[0] === fence[0] && close.length >= fence.length) fence = undefined
+      continue
+    }
+    const [, open, info = ''] = line.match(/^\s*(`{3,}|~{3,})(.*)$/) ?? []
+    // A backtick in a backtick fence's info string makes the line inline code.
+    if (open && !(open[0] === '`' && info.includes('`'))) {
+      fence = open
+      continue
+    }
+    prose.push(line)
+  }
+  return prose.join('\n')
+}
+
 /** Every distinct http(s) link in a README worth checking. */
 export function readmeLinks(markdown) {
   // Code is examples, not links: a `curl https://site.nsw.gov.au/` in a fenced
   // block or an inline span names a placeholder the reader substitutes.
-  const prose = markdown.replace(/^(```|~~~)[^\n]*\n[\s\S]*?^\1[^\n]*$/gm, '').replace(/`[^`\n]*`/g, '')
+  const prose = withoutFencedCode(markdown).replace(/`[^`\n]*`/g, '')
   const seen = new Set()
-  for (const raw of prose.match(/https?:\/\/[^\s<>"'`)\]]+/g) ?? []) {
+  for (const { 0: raw, index } of prose.matchAll(/https?:\/\/[^\s<>"'`)\]]+/g)) {
+    // A raw <placeholder> ends the match, so https://app-<env>.vercel.app
+    // arrives here as https://app- and would be probed as a real host.
+    if (/^<[A-Za-z][\w-]*>/.test(prose.slice(index + raw.length))) continue
     const href = raw.replace(TRAILING, '')
     let url
     try {
@@ -107,8 +140,11 @@ export function readmeLinks(markdown) {
     if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') continue
     // Reserved for documentation (RFC 2606); never meant to resolve.
     if (/(^|\.)example\.(com|org|net)$|\.(example|test|invalid|localhost)$/.test(host)) continue
-    // Template placeholders such as https://<project>.vercel.app.
-    if (/[{}<>]/.test(decodeURI(href))) continue
+    // Template placeholders such as https://{project}.vercel.app, written raw,
+    // percent-encoded or as HTML entities (&lt;env&gt;). Matched on the encoded
+    // form, not via decodeURI, which throws on a malformed escape such as %ZZ
+    // that URL parsing lets through.
+    if (/[{}<>]|%(7b|7d|3c|3e)|&(lt|gt);/i.test(href)) continue
     if (host === 'github.com' && url.pathname.toLowerCase().startsWith(`/${ORG}/`)) continue
     url.hash = ''
     seen.add(url.href)
@@ -134,8 +170,12 @@ async function get(href, method = 'GET') {
 /** Checks one site: reachable, and declaring its canonical on its own host. */
 export async function checkSite(href, fetchPage = get) {
   let res
+  let html = ''
   try {
     res = await fetchPage(href)
+    // Read inside the try: the timeout also covers the body, and a body that
+    // stalls must skip this site, not reject the whole run.
+    if (res.ok) html = await res.text()
   } catch (error) {
     if (isUnresolvable(error)) return { href, problem: 'does not resolve' }
     return { href, skipped: `request failed (${error?.cause?.code ?? error?.name ?? 'error'})` }
@@ -143,13 +183,13 @@ export async function checkSite(href, fetchPage = get) {
   if (BOT_WALL.has(res.status)) return { href, skipped: `HTTP ${res.status} (bot wall)` }
   if (!res.ok) return { href, problem: `HTTP ${res.status}` }
   const served = new URL(res.url || href).hostname
-  const html = await res.text()
-  const wrong = declaredAddresses(html).filter((d) => !sameHost(new URL(d.href).hostname, served))
+  // An address that does not parse names no host, so it is wrong too.
+  const wrong = declaredAddresses(html)
+    .map((d) => ({ ...d, host: URL.parse(d.href)?.hostname }))
+    .filter((d) => d.host === undefined || !sameHost(d.host, served))
   if (wrong.length === 0) return { href, ok: true }
-  return {
-    href,
-    problem: `served on ${served} but declares ${wrong.map((d) => `${d.kind} ${d.href}`).join(' and ')}`,
-  }
+  const describe = (d) => `${d.kind} ${d.href}${d.host === undefined ? ' (not a valid URL)' : ''}`
+  return { href, problem: `served on ${served} but declares ${wrong.map(describe).join(' and ')}` }
 }
 
 /** Checks one README link: reported only if the host is gone or the page is. */
