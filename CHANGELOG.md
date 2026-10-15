@@ -1,3 +1,9 @@
+## [1.28.4](https://github.com/digitalnsw/nswds-devops/compare/v1.28.3...v1.28.4) (2026-10-15)
+
+### Bug Fixes
+
+* **ci:** keep one bad site or README link from aborting the site health canary ([#173](https://github.com/digitalnsw/nswds-devops/issues/173)) ([6b2f9b4](https://github.com/digitalnsw/nswds-devops/commit/6b2f9b406a6e006a982ea2c684b6121e7c52d3e5))
+
 ## [1.28.3](https://github.com/digitalnsw/nswds-devops/compare/v1.28.2...v1.28.3) (2026-10-14)
 
 ### Bug Fixes
