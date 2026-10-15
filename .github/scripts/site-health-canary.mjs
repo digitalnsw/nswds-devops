@@ -140,10 +140,11 @@ export function readmeLinks(markdown) {
     if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') continue
     // Reserved for documentation (RFC 2606); never meant to resolve.
     if (/(^|\.)example\.(com|org|net)$|\.(example|test|invalid|localhost)$/.test(host)) continue
-    // Template placeholders such as https://{project}.vercel.app, written raw
-    // or percent-encoded. Matched on the encoded form, not via decodeURI, which
-    // throws on a malformed escape such as %ZZ that URL parsing lets through.
-    if (/[{}<>]|%(7b|7d|3c|3e)/i.test(href)) continue
+    // Template placeholders such as https://{project}.vercel.app, written raw,
+    // percent-encoded or as HTML entities (&lt;env&gt;). Matched on the encoded
+    // form, not via decodeURI, which throws on a malformed escape such as %ZZ
+    // that URL parsing lets through.
+    if (/[{}<>]|%(7b|7d|3c|3e)|&(lt|gt);/i.test(href)) continue
     if (host === 'github.com' && url.pathname.toLowerCase().startsWith(`/${ORG}/`)) continue
     url.hash = ''
     seen.add(url.href)

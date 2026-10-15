@@ -207,8 +207,11 @@ test('readmeLinks drops a link cut short by a raw angle-bracket placeholder', ()
   assert.deepEqual(readmeLinks(md), ['https://ui.digital.nsw.gov.au/'])
 })
 
-test('readmeLinks drops brace placeholders, written raw or percent-encoded', () => {
-  const md = 'Deploys to https://{project}.vercel.app and https://x.vercel.app/%7Bid%7D/edit'
+test('readmeLinks drops placeholders written raw, percent-encoded or as HTML entities', () => {
+  const md = [
+    'Deploys to https://{project}.vercel.app and https://x.vercel.app/%7Bid%7D/edit',
+    'Preview: https://app-&lt;env&gt;.vercel.app and https://x.vercel.app/&LT;id&GT;/edit',
+  ].join('\n')
   assert.deepEqual(readmeLinks(md), [])
 })
 
