@@ -197,6 +197,16 @@ test('readmeLinks keeps a link with a malformed percent escape, rather than thro
   ])
 })
 
+test('readmeLinks drops a link cut short by a raw angle-bracket placeholder', () => {
+  const md = [
+    'Preview: https://app-<env>.vercel.app',
+    'Edit: https://x.vercel.app/<id>/edit',
+    'Share: https://digitalnsw.github.io/share/<path>',
+    'Autolink: <https://ui.digital.nsw.gov.au/>',
+  ].join('\n')
+  assert.deepEqual(readmeLinks(md), ['https://ui.digital.nsw.gov.au/'])
+})
+
 test('readmeLinks drops brace placeholders, written raw or percent-encoded', () => {
   const md = 'Deploys to https://{project}.vercel.app and https://x.vercel.app/%7Bid%7D/edit'
   assert.deepEqual(readmeLinks(md), [])

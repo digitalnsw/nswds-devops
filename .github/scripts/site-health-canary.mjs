@@ -125,7 +125,10 @@ export function readmeLinks(markdown) {
   // block or an inline span names a placeholder the reader substitutes.
   const prose = withoutFencedCode(markdown).replace(/`[^`\n]*`/g, '')
   const seen = new Set()
-  for (const raw of prose.match(/https?:\/\/[^\s<>"'`)\]]+/g) ?? []) {
+  for (const { 0: raw, index } of prose.matchAll(/https?:\/\/[^\s<>"'`)\]]+/g)) {
+    // A raw <placeholder> ends the match, so https://app-<env>.vercel.app
+    // arrives here as https://app- and would be probed as a real host.
+    if (/^<[A-Za-z][\w-]*>/.test(prose.slice(index + raw.length))) continue
     const href = raw.replace(TRAILING, '')
     let url
     try {
