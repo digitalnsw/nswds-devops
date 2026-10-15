@@ -96,6 +96,26 @@ test('checkSite treats www and the bare host as the same host', async () => {
   assert.equal(result.ok, true)
 })
 
+test('checkSite reports a declared address that is not a valid URL, rather than throwing', async () => {
+  const html = '<link rel="canonical" href="https://%">'
+  const result = await checkSite('https://x.nsw.gov.au', page('https://x.nsw.gov.au/', html))
+  assert.equal(result.problem, 'served on x.nsw.gov.au but declares canonical https://% (not a valid URL)')
+})
+
+test('checkSite skips a site whose body fails to arrive, rather than throwing', async () => {
+  const stalled = async () => ({
+    url: 'https://x.nsw.gov.au/',
+    status: 200,
+    ok: true,
+    text: async () => {
+      throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' })
+    },
+  })
+  const result = await checkSite('https://x.nsw.gov.au', stalled)
+  assert.equal(result.problem, undefined)
+  assert.equal(result.skipped, 'request failed (TimeoutError)')
+})
+
 test('checkSite reports a site that does not resolve or is gone, and skips a bot wall', async () => {
   assert.equal((await checkSite('https://gone.nsw.gov.au', unresolvable)).problem, 'does not resolve')
   assert.equal((await checkSite('https://x.nsw.gov.au', page('https://x.nsw.gov.au/', '', 404))).problem, 'HTTP 404')
@@ -132,6 +152,54 @@ test('readmeLinks skips fenced code blocks and inline code, which hold examples'
     'Set `url: https://your-site.nsw.gov.au` in `lib/site.ts`.',
   ].join('\n')
   assert.deepEqual(readmeLinks(md), ['https://docs.nsw.gov.au/'])
+})
+
+test('readmeLinks closes a fence only where CommonMark does', () => {
+  const md = [
+    'Docs: https://docs.nsw.gov.au/',
+    // A longer fence quoting a shorter one: the inner ``` lines are content.
+    '````md',
+    '```sh',
+    'curl https://quoted.nsw.gov.au/',
+    '```',
+    'https://still-quoted.nsw.gov.au/',
+    '````',
+    // A closer cannot carry an info string, and ~~~ cannot close ```.
+    '```',
+    '```js',
+    '~~~',
+    'https://info-string.nsw.gov.au/',
+    '```',
+    // A fence indented inside a list item is still code.
+    '- Step one:',
+    '   ```sh',
+    '   curl https://in-list.nsw.gov.au/',
+    '   ```',
+    // Nested deeper than CommonMark's three spaces of top-level indent.
+    '  - Step two:',
+    '        ```sh',
+    '        curl https://in-nested-list.nsw.gov.au/',
+    '        ```',
+    'After: https://after.nsw.gov.au/',
+  ].join('\n')
+  assert.deepEqual(readmeLinks(md), ['https://docs.nsw.gov.au/', 'https://after.nsw.gov.au/'])
+})
+
+test('readmeLinks treats an unclosed fence as code to the end of the README', () => {
+  const md = ['Docs: https://docs.nsw.gov.au/', '```sh', 'curl https://unclosed.nsw.gov.au/'].join('\n')
+  assert.deepEqual(readmeLinks(md), ['https://docs.nsw.gov.au/'])
+})
+
+test('readmeLinks keeps a link with a malformed percent escape, rather than throwing', () => {
+  assert.deepEqual(readmeLinks('See https://docs.nsw.gov.au/%ZZ and https://ui.digital.nsw.gov.au/'), [
+    'https://docs.nsw.gov.au/%ZZ',
+    'https://ui.digital.nsw.gov.au/',
+  ])
+})
+
+test('readmeLinks drops brace placeholders, written raw or percent-encoded', () => {
+  const md = 'Deploys to https://{project}.vercel.app and https://x.vercel.app/%7Bid%7D/edit'
+  assert.deepEqual(readmeLinks(md), [])
 })
 
 test('checkLink reports a dead host and a confirmed 404, and nothing a bot wall returns', async () => {
