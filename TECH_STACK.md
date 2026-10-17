@@ -106,7 +106,7 @@ data, auth and email layer from nswds-app.
 |---|---|---|
 | [ESLint](https://eslint.org/) 10 via `@nswds/eslint-config` | 17 repos depend on the shared package: 16 directly (Next.js entry point or `./base`) and nswds-email-design through its `@workspace/eslint-config`. The two non-adopters are nswds-ui, whose workspace config wraps `eslint-plugin-react` itself, and nswds-tokens, which keeps a bespoke config | Fleet-wide eslint major block in Renovate remains only for nswds-ui's workspace config |
 | [Prettier](https://prettier.io/) 3 via `@nswds/prettier-config` | 24 repos | `package.json` key or a `.prettierrc.mjs` that spreads the base |
-| [Turborepo](https://turbo.build/) 2 | nswds-ui, nswds-email-design | Workspace monorepos |
+| [Turborepo](https://turbo.build/) 2 | nswds-ui, nswds-email-design, digital-projects | Workspace monorepos |
 | [tsup](https://tsup.egoist.dev/) | nswds-app, nswds-email-design, nswds-tokens, nswds-ui | Package builds |
 | [Conventional Commits](https://www.conventionalcommits.org/) via [commitlint](https://commitlint.js.org/) 21 + [husky](https://typicode.github.io/husky/) 9 | every fleet repo | Shared config from this repo; [Commit Messages](docs/best-practices/commit-messages.md) |
 | [git-conventional-commits](https://github.com/qoomon/git-conventional-commits) | every fleet repo | The synced YAML, kept in lockstep with `commit-types.mjs` |
@@ -139,7 +139,7 @@ data, auth and email layer from nswds-app.
 
 | Platform | Where |
 |---|---|
-| [Vercel](https://vercel.com/) (team "Digital NSW", Pro) | 16 repos, 22 projects, listed per repo in FLEET.md. Previews on every PR, production from `main` |
+| [Vercel](https://vercel.com/) (team "Digital NSW", Pro) | 15 repos, 24 projects, listed per repo in FLEET.md. Previews on every PR, production from `main` |
 | GitHub Pages | digitalnsw, images, share |
 | [Microsoft Power Platform](https://www.microsoft.com/en-au/power-platform) | ictds-portal-flows (bespoke production deploy pipeline; never overwritten by the sync) |
 | [Azure](https://azure.microsoft.com/) via [Pulumi](https://www.pulumi.com/) TypeScript (`@pulumi/azure-native`) | dtl-sandbox (manual `pulumi up`); Azure OpenAI in the DTL sandbox also backs the AI Gateway fallback |

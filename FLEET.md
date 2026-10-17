@@ -27,7 +27,7 @@ Related documents: [README.md](README.md) (how the shared tooling works),
 | Consumer repos in [.github/sync.yml](.github/sync.yml) | 28 |
 | Repos under the canonical Snyk policy ([snyk-policy/repos.json](snyk-policy/repos.json)) | 29 (every consumer plus this repo) |
 | Repos publishing to npm | 6 (`@nswds/ui`, `@nswds/tokens`, `@nswds/app`, `@nswds/eslint-config`, `@nswds/prettier-config`, `@nswds/metadata`) |
-| Repos deployed on Vercel (team "Digital NSW", Pro plan) | 16 repos, 22 projects |
+| Repos deployed on Vercel (team "Digital NSW", Pro plan) | 15 repos, 24 projects |
 | Node baseline | `.nvmrc` `24.16.0`; `engines.node` `^22.22.2 \|\| >=24.15.0`; `engine-strict=true` |
 | Org repos outside the fleet | 2 active (`ai-type-selector`, `commitments-dashboard`), 1 R package (`nswtheme`), 6 public learning/archive repos, 6 archived |
 
@@ -62,7 +62,7 @@ All but `agile` deploy on Vercel: `agile` has no Vercel project and no live URL,
 | `nswds-design` | NSW Design, the front door to the design system ecosystem: colour, typography, motion, layout, standards, content and agent skills, with doors to the sibling sites | https://design.nsw.gov.au (behind sign-in until launch; `design.digital.nsw.gov.au` redirects there) | Next 16, `@nswds/ui`, Better Auth, Drizzle + Neon, Vitest 5 | 1 | standard |
 | `nswds-contrast` | NSW Colour Contrast Checker: any two NSW Government colours measured against WCAG 2.2, on real chrome. Split out of `nswds-design` on 2026-10-10 | — (pending: `contrast.design.nsw.gov.au` is on Vercel project `nswds-contrast` and serves nothing until the Cloudflare CNAME points at it) | Next 16, `@nswds/ui`, Vitest 5; sign-in, Better Auth and Neon being removed in digitalnsw/nswds-contrast#5, after which the site is public with no database | 1 | + `install / typecheck` |
 | `nswds-community` | Redirect only: every path goes to the NSW Design System community forum closure notice (`designsystem.nsw.gov.au/community-closure/`) | https://community.digital.nsw.gov.au | Next 16 | 1 | standard |
-| `digital-projects` | NSW Digital Data: an npm-workspaces + Turborepo monorepo of four Next 16 apps on `@nswds/ui` (dashboard, engage, learn, review), each its own Vercel project; every home page still renders nothing | https://data.digital.nsw.gov.au (the dashboard; `projects.digital.nsw.gov.au` serves the same deployment, neither redirecting to the other). engage, learn and review: — (pending: Vercel projects `digital-projects-engage`, `-learn` and `-review` have no custom domain yet) | Next 16, `@nswds/ui`, Turborepo | 1 | standard |
+| `digital-projects` | NSW Digital Data: an npm-workspaces + Turborepo monorepo of four Next 16 apps on `@nswds/ui` (dashboard, engage, learn, review), each its own Vercel project; every home page still renders nothing | https://data.digital.nsw.gov.au (the dashboard; `projects.digital.nsw.gov.au` serves the same deployment, neither redirecting to the other). engage, learn and review: — (pending: Vercel projects `digital-projects-engage`, `-learn` and `-review` have no custom domain yet) | Next 16, `@nswds/ui`, Turborepo; Vercel: `digital-projects` (the dashboard, root directory `apps/dashboard`), `digital-projects-engage`, `digital-projects-learn`, `digital-projects-review` | 1 | standard |
 | `nswds-public-sans` | Download and specimen site for Public Sans, the NSW masterbrand typeface | https://public-sans.digital.nsw.gov.au | Next 16, `@nswds/ui`, PostHog, Vercel Analytics | 1 | standard |
 | `nswds-signature` | Redirect only: every path goes to the NSW Email Toolkit's signature page (`email.digital.nsw.gov.au/signature`) | https://signature.digital.nsw.gov.au | Next 16 | 1 | standard |
 | `risk-guidance` | NSW ICT Procurement Risk Screening Tool | https://ictrisk.digital.nsw.gov.au | Next 16, `@nswds/ui` | 1 | standard, **no Snyk contexts** (see open issues) |
@@ -125,7 +125,7 @@ has auto-merge or branch auto-delete enabled.
 | GitHub App `snyk-io-au` | Installed org-wide | Posts `code/`, `security/` and `license/snyk (DigitalNSW)` statuses on PR heads for repos imported into the `digitalnsw` Snyk org |
 | GitHub App `ictds-export-bot` | Selected repositories | Power Platform solution export for `ictds-portal-flows` |
 | GitHub Apps `vercel`, `vercel-nswds-integration` | Org-wide | Preview and production deployments |
-| Vercel team "Digital NSW" | 22 projects | See the Deploys columns above |
+| Vercel team "Digital NSW" | 24 projects | See the Deploys columns above |
 | Confluence (GDS space, https://dsia.atlassian.net/wiki) | Opt-in per repo | Manifests exist in `nswds-devops`, `ictds-portal-flows` and `share` |
 | Org secrets | `AI_GATEWAY_API_KEY`, `AZURE_OPENAI_API_KEY` (all repos); `CONFLUENCE_USER`, `CONFLUENCE_TOKEN` (selected repos) | Org variable `AZURE_OPENAI_ENDPOINT` is set; `AZURE_OPENAI_DEPLOYMENT`, `AI_MODEL` and `AI_PROVIDER` fall back to workflow defaults |
 
