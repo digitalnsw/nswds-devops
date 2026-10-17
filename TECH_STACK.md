@@ -18,11 +18,11 @@ the reference in two halves:
 
 - **Data, auth and email** — nswds-app is the reference implementation. It is
   the only repo running the full target stack (Better Auth + Neon + Drizzle,
-  with React Email and Resend), and attestation, awards, engagement,
-  nswds-email and reviewers repeat the same shape. All six still build their
+  with React Email and Resend), and awards, engagement,
+  nswds-email and reviewers repeat the same shape. All five still build their
   UI on `@nswds/app`, which `@nswds/ui` supersedes.
 - **UI and tooling** — the content sites (agile, risk-guidance, nswds-design,
-  nswds-public-sans, data, nswds-community, nswds-signature) are the current
+  nswds-public-sans, digital-projects, nswds-community, nswds-signature) are the current
   shape of the component and toolchain layer: `@nswds/ui`, `@nswds/tokens`,
   `@nswds/metadata` and Tailwind 4 on Next 16. None of them has a database,
   auth or transactional email, so do not read them as a full-stack model.
@@ -44,7 +44,7 @@ data, auth and email layer from nswds-app.
 |---|---|---|
 | [Tailwind CSS](https://tailwindcss.com/) 4 | 16 repos | via `@tailwindcss/postcss`; `prettier-plugin-tailwindcss` and `prettier-plugin-organize-imports` in the same repos |
 | Tailwind CSS 3 | nswds-email-framework, nswds-email-starter | Required by Maizzle 5; majors blocked in Renovate for these two repos by owner decision |
-| [NSW Design System](https://designsystem.nsw.gov.au/) via `@nswds/*` | fleet-wide | `@nswds/tokens` (14 repos), `@nswds/metadata` (13 repos), `@nswds/app` (5 repos; superseded by `@nswds/ui`), `@nswds/ui` (7 consuming repos; nswds-ui's own apps resolve the workspace copy through `*`). Published versions are shown live in [FLEET.md](FLEET.md) |
+| [NSW Design System](https://designsystem.nsw.gov.au/) via `@nswds/*` | fleet-wide | `@nswds/tokens` (15 repos), `@nswds/metadata` (13 repos), `@nswds/app` (4 repos; superseded by `@nswds/ui`), `@nswds/ui` (7 consuming repos; nswds-ui's own apps resolve the workspace copy through `*`). Published versions are shown live in [FLEET.md](FLEET.md) |
 | [Base UI](https://base-ui.com/) | nswds-ui | The headless primitive layer under `@nswds/ui` |
 | [shadcn/ui](https://ui.shadcn.com/) pattern | nswds-ui (own registry at `apps/registry`), nswds-app, awards, nswds-email | `class-variance-authority`, `tailwind-merge`, `clsx`, `lucide-react` |
 | [Radix UI](https://www.radix-ui.com/) primitives | awards, nswds-app, nswds-email | Previous generation, arriving through `@nswds/app` |
@@ -60,7 +60,7 @@ data, auth and email layer from nswds-app.
 | [react-hook-form](https://react-hook-form.com/) + `@hookform/resolvers` | 6 repos |
 | [TanStack Table](https://tanstack.com/table) | 6 repos (via `@nswds/app` DataTable) |
 | [Zustand](https://zustand.docs.pmnd.rs/) | 5 repos |
-| [Recharts](https://recharts.org/) | attestation, nswds-app, nswds-email |
+| [Recharts](https://recharts.org/) | nswds-app, nswds-email |
 | [sonner](https://sonner.emilkowal.ski/) | 5 repos |
 | [date-fns](https://date-fns.org/) | 4 repos |
 | [culori](https://culorijs.org/) | nswds-app, nswds-design, nswds-email, nswds-tokens (colour tooling) |
@@ -71,13 +71,13 @@ data, auth and email layer from nswds-app.
 
 | Technology | Where | Notes |
 |---|---|---|
-| [Better Auth](https://www.better-auth.com/) | attestation, awards, engagement, nswds-app, nswds-email, reviewers | The only auth library in the fleet; Drizzle adapter |
-| [Neon](https://neon.tech/) Postgres (`@neondatabase/serverless`) | attestation, awards, digitalnsw, engagement, nswds-app, nswds-email, reviewers | The only database in the fleet |
-| [Drizzle ORM](https://orm.drizzle.team/) + drizzle-kit | attestation, awards, engagement, nswds-app, nswds-email, reviewers | digitalnsw's forms API uses the Neon driver directly |
+| [Better Auth](https://www.better-auth.com/) | awards, engagement, nswds-app, nswds-email, reviewers | The only auth library in the fleet; Drizzle adapter |
+| [Neon](https://neon.tech/) Postgres (`@neondatabase/serverless`) | awards, digitalnsw, engagement, nswds-app, nswds-email, reviewers | The only database in the fleet |
+| [Drizzle ORM](https://orm.drizzle.team/) + drizzle-kit | awards, engagement, nswds-app, nswds-email, reviewers | digitalnsw's forms API uses the Neon driver directly |
 | [PGlite](https://pglite.dev/) | nswds-email | In-process Postgres for tests |
-| [React Email](https://react.email/) | attestation, engagement, nswds-app, nswds-email, reviewers | |
-| [Resend](https://resend.com/) | attestation, digitalnsw, engagement, nswds-email, reviewers | |
-| [Vercel Blob](https://vercel.com/storage/blob) | attestation, reviewers | |
+| [React Email](https://react.email/) | engagement, nswds-app, nswds-email, reviewers | |
+| [Resend](https://resend.com/) | digitalnsw, engagement, nswds-email, reviewers | |
+| [Vercel Blob](https://vercel.com/storage/blob) | reviewers | |
 
 ## Email frameworks
 
@@ -90,7 +90,7 @@ data, auth and email layer from nswds-app.
 
 | Technology | Where | Notes |
 |---|---|---|
-| [Vitest](https://vitest.dev/) | attestation, engagement, nswds-app, nswds-design, nswds-email-design, nswds-tokens, nswds-ui | Vitest 5 in nswds-design, nswds-tokens and nswds-email-design; Vitest 4 elsewhere. nswds-app and nswds-ui run browser mode through `@storybook/addon-vitest`, which is why vitest and vite majors are blocked there |
+| [Vitest](https://vitest.dev/) | engagement, nswds-app, nswds-design, nswds-email-design, nswds-tokens, nswds-ui | Vitest 5 in nswds-design, nswds-tokens and nswds-email-design; Vitest 4 elsewhere. nswds-app and nswds-ui run browser mode through `@storybook/addon-vitest`, which is why vitest and vite majors are blocked there |
 | Node's `node:test` | nswds-devops, nswds-eslint-config, nswds-prettier-config, nswds-metadata, awards, nswds-email, nswds-email-framework | Run through `npm test` by the shared test gate. nswds-ui also uses the runner (`test:scripts`) but has no root `test` script, so its suites reach the gate through the workspace-vitest path instead |
 | [Storybook](https://storybook.js.org/) 10 | nswds-app, nswds-ui | With `addon-a11y`, `addon-docs`, `addon-themes`, `addon-vitest` |
 | [Chromatic](https://www.chromatic.com/) | nswds-ui | Visual regression per PR; passes silently when the monthly snapshot quota is exhausted, so read the run log on CSS or token changes |
@@ -106,7 +106,7 @@ data, auth and email layer from nswds-app.
 |---|---|---|
 | [ESLint](https://eslint.org/) 10 via `@nswds/eslint-config` | 17 repos depend on the shared package: 16 directly (Next.js entry point or `./base`) and nswds-email-design through its `@workspace/eslint-config`. The two non-adopters are nswds-ui, whose workspace config wraps `eslint-plugin-react` itself, and nswds-tokens, which keeps a bespoke config | Fleet-wide eslint major block in Renovate remains only for nswds-ui's workspace config |
 | [Prettier](https://prettier.io/) 3 via `@nswds/prettier-config` | 24 repos | `package.json` key or a `.prettierrc.mjs` that spreads the base |
-| [Turborepo](https://turbo.build/) 2 | nswds-ui, nswds-email-design | Workspace monorepos |
+| [Turborepo](https://turbo.build/) 2 | nswds-ui, nswds-email-design, digital-projects | Workspace monorepos |
 | [tsup](https://tsup.egoist.dev/) | nswds-app, nswds-email-design, nswds-tokens, nswds-ui | Package builds |
 | [Conventional Commits](https://www.conventionalcommits.org/) via [commitlint](https://commitlint.js.org/) 21 + [husky](https://typicode.github.io/husky/) 9 | every fleet repo | Shared config from this repo; [Commit Messages](docs/best-practices/commit-messages.md) |
 | [git-conventional-commits](https://github.com/qoomon/git-conventional-commits) | every fleet repo | The synced YAML, kept in lockstep with `commit-types.mjs` |
@@ -139,7 +139,7 @@ data, auth and email layer from nswds-app.
 
 | Platform | Where |
 |---|---|
-| [Vercel](https://vercel.com/) (team "Digital NSW", Pro) | 16 repos, 22 projects, listed per repo in FLEET.md. Previews on every PR, production from `main` |
+| [Vercel](https://vercel.com/) (team "Digital NSW", Pro) | 15 repos, 24 projects, listed per repo in FLEET.md. Previews on every PR, production from `main` |
 | GitHub Pages | digitalnsw, images, share |
 | [Microsoft Power Platform](https://www.microsoft.com/en-au/power-platform) | ictds-portal-flows (bespoke production deploy pipeline; never overwritten by the sync) |
 | [Azure](https://azure.microsoft.com/) via [Pulumi](https://www.pulumi.com/) TypeScript (`@pulumi/azure-native`) | dtl-sandbox (manual `pulumi up`); Azure OpenAI in the DTL sandbox also backs the AI Gateway fallback |

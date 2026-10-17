@@ -75,7 +75,12 @@
     "the canonical block and an empty tail -- no migrate directive needed.",
     "",
     "2026-10-09: awesome-nswds was onboarded as a new repo and enrolled as a",
-    "plain key. It has no prior .snyk, so the sync creates the file."
+    "plain key. It has no prior .snyk, so the sync creates the file.",
+    "",
+    "2026-10-17: data was renamed digital-projects on GitHub, so its key",
+    "follows (same repo, same file). attestation was archived and leaves the",
+    "fleet; its key is removed, and the archived repo keeps whatever .snyk it",
+    "last received."
   ],
 
   "owner": "digitalnsw",
@@ -83,9 +88,8 @@
   "repos": {
     "agile": {},
     "awesome-nswds": {},
-    "attestation": {},
     "awards": {},
-    "data": {},
+    "digital-projects": {},
     "digitalnsw": {},
     "dtl-sandbox": {},
     "engagement": {},

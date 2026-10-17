@@ -46,7 +46,7 @@ gh api -X PATCH repos/digitalnsw/<repo> \
 
 The GitHub slug is what goes in `sync.yml` and `snyk-policy/repos.json`, and
 it is not always the local folder name (local `nswds-images` is
-`digitalnsw/images`; local `nswds-data` is `digitalnsw/data`).
+`digitalnsw/images`).
 
 ### 2. Baseline `package.json`
 
