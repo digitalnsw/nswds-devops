@@ -63,7 +63,7 @@ All but `agile` deploy on Vercel: `agile` has no Vercel project and no live URL,
 | `nswds-design` | NSW Design, the front door to the design system ecosystem: colour, typography, motion, layout, standards, content and agent skills, with doors to the sibling sites | https://design.nsw.gov.au (behind sign-in until launch; `design.digital.nsw.gov.au` redirects there) | Next 16, `@nswds/ui`, Better Auth, Drizzle + Neon, Vitest 5 | 1 | standard |
 | `nswds-contrast` | NSW Colour Contrast Checker: any two NSW Government colours measured against WCAG 2.2, on real chrome. Split out of `nswds-design` on 2026-10-10 | — (pending: `contrast.design.nsw.gov.au` is on Vercel project `nswds-contrast` and serves nothing until the Cloudflare CNAME points at it) | Next 16, `@nswds/ui`, Vitest 5; sign-in, Better Auth and Neon being removed in digitalnsw/nswds-contrast#5, after which the site is public with no database | 1 | + `install / typecheck` |
 | `nswds-community` | Redirect only: every path goes to the NSW Design System community forum closure notice (`designsystem.nsw.gov.au/community-closure/`) | https://community.digital.nsw.gov.au | Next 16 | 1 | standard |
-| `data` (local folder `nswds-data`) | Placeholder for NSW Digital Data, a planned dashboard of spend, progress and risk across IT and digital projects; the home page renders nothing | https://data.digital.nsw.gov.au | Next 16 | 1 | standard |
+| `digital-projects` | NSW Digital Data: an npm-workspaces + Turborepo monorepo of four Next 16 apps on `@nswds/ui` (dashboard, engage, learn, review), each its own Vercel project; every home page still renders nothing | https://data.digital.nsw.gov.au | Next 16, `@nswds/ui`, Turborepo | 1 | standard |
 | `nswds-public-sans` | Download and specimen site for Public Sans, the NSW masterbrand typeface | https://public-sans.digital.nsw.gov.au | Next 16, `@nswds/ui`, PostHog, Vercel Analytics | 1 | standard |
 | `nswds-signature` | Redirect only: every path goes to the NSW Email Toolkit's signature page (`email.digital.nsw.gov.au/signature`) | https://signature.digital.nsw.gov.au | Next 16 | 1 | standard |
 | `risk-guidance` | NSW ICT Procurement Risk Screening Tool | https://ictrisk.digital.nsw.gov.au | Next 16, `@nswds/ui` | 1 | standard, **no Snyk contexts** (see open issues) |
@@ -132,8 +132,8 @@ has auto-merge or branch auto-delete enabled.
 ## Local clones
 
 The GitHub slug is the identity used in `.github/sync.yml` and
-`snyk-policy/repos.json`. Two local folder names differ from their slug:
-`nswds-data` is `digitalnsw/data` and `nswds-images` is `digitalnsw/images`.
+`snyk-policy/repos.json`. One local folder name differs from its slug:
+`nswds-images` is `digitalnsw/images`.
 
 ## Open issues
 
