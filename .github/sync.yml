@@ -14,7 +14,6 @@ group:
   - repos: |
       digitalnsw/reviewers
       digitalnsw/digitalnsw
-      digitalnsw/attestation
       digitalnsw/nswds-email
       digitalnsw/awards
       digitalnsw/engagement

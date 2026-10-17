@@ -24,12 +24,12 @@ Related documents: [README.md](README.md) (how the shared tooling works),
 
 | Measure | Value |
 |---|---|
-| Consumer repos in [.github/sync.yml](.github/sync.yml) | 29 |
-| Repos under the canonical Snyk policy ([snyk-policy/repos.json](snyk-policy/repos.json)) | 30 (every consumer plus this repo) |
+| Consumer repos in [.github/sync.yml](.github/sync.yml) | 28 |
+| Repos under the canonical Snyk policy ([snyk-policy/repos.json](snyk-policy/repos.json)) | 29 (every consumer plus this repo) |
 | Repos publishing to npm | 6 (`@nswds/ui`, `@nswds/tokens`, `@nswds/app`, `@nswds/eslint-config`, `@nswds/prettier-config`, `@nswds/metadata`) |
 | Repos deployed on Vercel (team "Digital NSW", Pro plan) | 16 repos, 22 projects |
 | Node baseline | `.nvmrc` `24.16.0`; `engines.node` `^22.22.2 \|\| >=24.15.0`; `engine-strict=true` |
-| Org repos outside the fleet | 2 active (`ai-type-selector`, `commitments-dashboard`), 1 R package (`nswtheme`), 6 public learning/archive repos, 5 archived |
+| Org repos outside the fleet | 2 active (`ai-type-selector`, `commitments-dashboard`), 1 R package (`nswtheme`), 6 public learning/archive repos, 6 archived |
 
 ## Fleet members
 
@@ -55,7 +55,6 @@ All but `agile` deploy on Vercel: `agile` has no Vercel project and no live URL,
 | Repo | Purpose | Live URL | Stack notes | Sync group | Required checks (delta) |
 |---|---|---|---|---|---|
 | `agile` | Jira ticket creator: drafts ACME-framework Jira tickets with AI (Vercel AI SDK, Azure OpenAI) from a task description, repository history or pull request. README is empty | — (its `site.url`, `https://agile.digital.nsw.gov.au`, has no DNS record) | Next 16, `@nswds/ui`, `@nswds/tokens`, `ai` + `@ai-sdk/azure` | 1 | + `install / typecheck` |
-| `attestation` | Digital Restart Fund (DRF) attestation application | — (pending: `projects.digital.nsw.gov.au` has been attached to the `digital-projects` Vercel project since 2026-10-16 and serves the NSW Digital Data dashboard, see that row; where attestation deploys now is unrecorded) | Next 16, `@nswds/app` + `@nswds/ui`, Better Auth, Drizzle + Neon, Resend, Vitest | 1 | standard |
 | `awards` | Awards nomination and judging application | https://awards.digital.nsw.gov.au | Next 16, `@nswds/app`, Better Auth, Drizzle + Neon, Vercel Analytics | 1 | standard |
 | `engagement` | Digital Assurance customer satisfaction surveys: post-review feedback from independent reviewers and project sponsors | https://engagement.digital.nsw.gov.au | Next 16, `@nswds/app`, Better Auth, Drizzle + Neon, Resend, Vitest | 1 | standard |
 | `reviewers` | ICT Project Assurance expert reviewer application | https://reviewers.digital.nsw.gov.au | Next 16, `@nswds/app`, Better Auth, Drizzle + Neon, Resend, Vercel Blob | 1 | standard |
@@ -74,7 +73,7 @@ All but `agile` deploy on Vercel: `agile` has no Vercel project and no live URL,
 |---|---|---|---|---|---|
 | `nswds-ui` (public) | `@nswds/ui` [![npm](https://img.shields.io/npm/v/@nswds/ui?label=)](https://www.npmjs.com/package/@nswds/ui) | Design system source monorepo: the `@nswds/ui` package (Base UI primitives, shadcn pattern) plus a shadcn registry, Storybook and a docs site. Turborepo workspaces `apps/*`, `packages/*`; only `packages/ui` publishes | Vercel: `nswds-ui-web` (https://ui.digital.nsw.gov.au), `nswds-ui-storybook`, `nswds-ui-registry`, `nswds-ui-infographics` (root directory `apps/infographics`); Chromatic visual regression | 2a (own `release.yml` + release config, `.npmrc` variant) | + `install / typecheck`, `Lint, Typecheck & Storybook a11y` |
 | `nswds-tokens` (public) | `@nswds/tokens` [![npm](https://img.shields.io/npm/v/@nswds/tokens?label=)](https://www.npmjs.com/package/@nswds/tokens) | Design tokens (colour, spacing, typography, and so on) for CSS, SCSS, Less, JS/TS, JSON, Tailwind, Figma and DTCG; Figma sync workflows | — | 2b (own `release.yml`, release config and `ci.yml`; shared gate lands as `shared-ci.yml`) | + `Check dist artifacts`, `Lockfile`, `Package surface`, `Typecheck`, `Validate tokens` |
-| `nswds-app` | `@nswds/app` [![npm](https://img.shields.io/npm/v/@nswds/app?label=)](https://www.npmjs.com/package/@nswds/app) | Previous-generation application design system (Radix primitives, Storybook). Superseded by `@nswds/ui`; still consumed by attestation, awards, engagement, nswds-email and reviewers | Vercel: `nswds-app`, `nswds-app-storybook` | 3 (own release config, stock release stub) | standard |
+| `nswds-app` | `@nswds/app` [![npm](https://img.shields.io/npm/v/@nswds/app?label=)](https://www.npmjs.com/package/@nswds/app) | Previous-generation application design system (Radix primitives, Storybook). Superseded by `@nswds/ui`; still consumed by awards, engagement, nswds-email and reviewers | Vercel: `nswds-app`, `nswds-app-storybook` | 3 (own release config, stock release stub) | standard |
 | `nswds-eslint-config` (public) | `@nswds/eslint-config` [![npm](https://img.shields.io/npm/v/@nswds/eslint-config?label=)](https://www.npmjs.com/package/@nswds/eslint-config) | Shared ESLint flat config: `.` entry point for Next.js apps, `./base` for everything else | — | 2c | + `Config smoke test` |
 | `nswds-prettier-config` (public) | `@nswds/prettier-config` [![npm](https://img.shields.io/npm/v/@nswds/prettier-config?label=)](https://www.npmjs.com/package/@nswds/prettier-config) | Shared Prettier options | — | 2c | + `Config smoke test` (ruleset is named "Protect default branch") |
 | `nswds-metadata` (public) | `@nswds/metadata` [![npm](https://img.shields.io/npm/v/@nswds/metadata?label=)](https://www.npmjs.com/package/@nswds/metadata) | Shared Next.js App Router metadata, viewport and web manifest | — | 2c | `Package smoke test`; **no Snyk contexts** (see open issues) |
@@ -115,6 +114,7 @@ has auto-merge or branch auto-delete enabled.
 | `accessibility-in-digital-procurement`, `accessibility-testing-basics`, `creating-accessible-documents`, `fundamentals-of-digital-accessibility` (public) | Accessibility learning modules | Static learning content, no active development |
 | `digital-nsw-figma-archive` (public) | Figma backup of previous design-system versions | Archive |
 | `nsw-design-system-react`, `nsw-design-system-v2`, `nsw-design-system-web-components`, `nsw-ds-drupal-kit`, `public-sans` | Archived | Archived on GitHub |
+| `attestation` | Digital Restart Fund (DRF) attestation application; its host `projects.digital.nsw.gov.au` now belongs to `digital-projects` | Archived on GitHub, 2026-10-17 |
 
 ## Shared services and installations
 
@@ -182,15 +182,15 @@ the release deploy key is the only bypass actor on every ruleset
 (MAINTENANCE.md, ruleset bypass policy). Fix: remove the role actor from the
 "Protect main" ruleset.
 
-**Twelve fleet repos have no usable `README.md`.** Ten ship a zero-byte
-file — `agile`, `attestation`, `awards`, `engagement`, `reviewers`,
+**Eleven fleet repos have no usable `README.md`.** Nine ship a zero-byte
+file — `agile`, `awards`, `engagement`, `reviewers`,
 `nswds-community`, `digital-projects`, `nswds-design`, `nswds-signature` and
 `risk-guidance` — and `digitalnsw` and `images`
 have no README at all. Every repo README should answer what it is, how to
 run it, how to test it and where it deploys
 ([Documentation](docs/best-practices/documentation.md)).
 
-**`@nswds/app` is superseded but still consumed.** `attestation`, `awards`,
+**`@nswds/app` is superseded but still consumed.** `awards`,
 `engagement`, `nswds-email` and `reviewers` depend on `@nswds/app`;
 `@nswds/ui` is the current generation. No migration is scheduled.
 

@@ -18,8 +18,8 @@ the reference in two halves:
 
 - **Data, auth and email** — nswds-app is the reference implementation. It is
   the only repo running the full target stack (Better Auth + Neon + Drizzle,
-  with React Email and Resend), and attestation, awards, engagement,
-  nswds-email and reviewers repeat the same shape. All six still build their
+  with React Email and Resend), and awards, engagement,
+  nswds-email and reviewers repeat the same shape. All five still build their
   UI on `@nswds/app`, which `@nswds/ui` supersedes.
 - **UI and tooling** — the content sites (agile, risk-guidance, nswds-design,
   nswds-public-sans, digital-projects, nswds-community, nswds-signature) are the current
@@ -44,7 +44,7 @@ data, auth and email layer from nswds-app.
 |---|---|---|
 | [Tailwind CSS](https://tailwindcss.com/) 4 | 16 repos | via `@tailwindcss/postcss`; `prettier-plugin-tailwindcss` and `prettier-plugin-organize-imports` in the same repos |
 | Tailwind CSS 3 | nswds-email-framework, nswds-email-starter | Required by Maizzle 5; majors blocked in Renovate for these two repos by owner decision |
-| [NSW Design System](https://designsystem.nsw.gov.au/) via `@nswds/*` | fleet-wide | `@nswds/tokens` (15 repos), `@nswds/metadata` (13 repos), `@nswds/app` (5 repos; superseded by `@nswds/ui`), `@nswds/ui` (8 consuming repos; nswds-ui's own apps resolve the workspace copy through `*`). Published versions are shown live in [FLEET.md](FLEET.md) |
+| [NSW Design System](https://designsystem.nsw.gov.au/) via `@nswds/*` | fleet-wide | `@nswds/tokens` (15 repos), `@nswds/metadata` (13 repos), `@nswds/app` (4 repos; superseded by `@nswds/ui`), `@nswds/ui` (7 consuming repos; nswds-ui's own apps resolve the workspace copy through `*`). Published versions are shown live in [FLEET.md](FLEET.md) |
 | [Base UI](https://base-ui.com/) | nswds-ui | The headless primitive layer under `@nswds/ui` |
 | [shadcn/ui](https://ui.shadcn.com/) pattern | nswds-ui (own registry at `apps/registry`), nswds-app, awards, nswds-email | `class-variance-authority`, `tailwind-merge`, `clsx`, `lucide-react` |
 | [Radix UI](https://www.radix-ui.com/) primitives | awards, nswds-app, nswds-email | Previous generation, arriving through `@nswds/app` |
@@ -60,7 +60,7 @@ data, auth and email layer from nswds-app.
 | [react-hook-form](https://react-hook-form.com/) + `@hookform/resolvers` | 6 repos |
 | [TanStack Table](https://tanstack.com/table) | 6 repos (via `@nswds/app` DataTable) |
 | [Zustand](https://zustand.docs.pmnd.rs/) | 5 repos |
-| [Recharts](https://recharts.org/) | attestation, nswds-app, nswds-email |
+| [Recharts](https://recharts.org/) | nswds-app, nswds-email |
 | [sonner](https://sonner.emilkowal.ski/) | 5 repos |
 | [date-fns](https://date-fns.org/) | 4 repos |
 | [culori](https://culorijs.org/) | nswds-app, nswds-design, nswds-email, nswds-tokens (colour tooling) |
@@ -71,13 +71,13 @@ data, auth and email layer from nswds-app.
 
 | Technology | Where | Notes |
 |---|---|---|
-| [Better Auth](https://www.better-auth.com/) | attestation, awards, engagement, nswds-app, nswds-email, reviewers | The only auth library in the fleet; Drizzle adapter |
-| [Neon](https://neon.tech/) Postgres (`@neondatabase/serverless`) | attestation, awards, digitalnsw, engagement, nswds-app, nswds-email, reviewers | The only database in the fleet |
-| [Drizzle ORM](https://orm.drizzle.team/) + drizzle-kit | attestation, awards, engagement, nswds-app, nswds-email, reviewers | digitalnsw's forms API uses the Neon driver directly |
+| [Better Auth](https://www.better-auth.com/) | awards, engagement, nswds-app, nswds-email, reviewers | The only auth library in the fleet; Drizzle adapter |
+| [Neon](https://neon.tech/) Postgres (`@neondatabase/serverless`) | awards, digitalnsw, engagement, nswds-app, nswds-email, reviewers | The only database in the fleet |
+| [Drizzle ORM](https://orm.drizzle.team/) + drizzle-kit | awards, engagement, nswds-app, nswds-email, reviewers | digitalnsw's forms API uses the Neon driver directly |
 | [PGlite](https://pglite.dev/) | nswds-email | In-process Postgres for tests |
-| [React Email](https://react.email/) | attestation, engagement, nswds-app, nswds-email, reviewers | |
-| [Resend](https://resend.com/) | attestation, digitalnsw, engagement, nswds-email, reviewers | |
-| [Vercel Blob](https://vercel.com/storage/blob) | attestation, reviewers | |
+| [React Email](https://react.email/) | engagement, nswds-app, nswds-email, reviewers | |
+| [Resend](https://resend.com/) | digitalnsw, engagement, nswds-email, reviewers | |
+| [Vercel Blob](https://vercel.com/storage/blob) | reviewers | |
 
 ## Email frameworks
 
@@ -90,7 +90,7 @@ data, auth and email layer from nswds-app.
 
 | Technology | Where | Notes |
 |---|---|---|
-| [Vitest](https://vitest.dev/) | attestation, engagement, nswds-app, nswds-design, nswds-email-design, nswds-tokens, nswds-ui | Vitest 5 in nswds-design, nswds-tokens and nswds-email-design; Vitest 4 elsewhere. nswds-app and nswds-ui run browser mode through `@storybook/addon-vitest`, which is why vitest and vite majors are blocked there |
+| [Vitest](https://vitest.dev/) | engagement, nswds-app, nswds-design, nswds-email-design, nswds-tokens, nswds-ui | Vitest 5 in nswds-design, nswds-tokens and nswds-email-design; Vitest 4 elsewhere. nswds-app and nswds-ui run browser mode through `@storybook/addon-vitest`, which is why vitest and vite majors are blocked there |
 | Node's `node:test` | nswds-devops, nswds-eslint-config, nswds-prettier-config, nswds-metadata, awards, nswds-email, nswds-email-framework | Run through `npm test` by the shared test gate. nswds-ui also uses the runner (`test:scripts`) but has no root `test` script, so its suites reach the gate through the workspace-vitest path instead |
 | [Storybook](https://storybook.js.org/) 10 | nswds-app, nswds-ui | With `addon-a11y`, `addon-docs`, `addon-themes`, `addon-vitest` |
 | [Chromatic](https://www.chromatic.com/) | nswds-ui | Visual regression per PR; passes silently when the monthly snapshot quota is exhausted, so read the run log on CSS or token changes |
