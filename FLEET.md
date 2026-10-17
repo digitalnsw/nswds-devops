@@ -184,7 +184,7 @@ the release deploy key is the only bypass actor on every ruleset
 
 **Twelve fleet repos have no usable `README.md`.** Ten ship a zero-byte
 file — `agile`, `attestation`, `awards`, `engagement`, `reviewers`,
-`nswds-community`, `data`, `nswds-design`, `nswds-signature` and
+`nswds-community`, `digital-projects`, `nswds-design`, `nswds-signature` and
 `risk-guidance` — and `digitalnsw` and `images`
 have no README at all. Every repo README should answer what it is, how to
 run it, how to test it and where it deploys

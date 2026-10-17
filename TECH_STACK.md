@@ -22,7 +22,7 @@ the reference in two halves:
   nswds-email and reviewers repeat the same shape. All six still build their
   UI on `@nswds/app`, which `@nswds/ui` supersedes.
 - **UI and tooling** — the content sites (agile, risk-guidance, nswds-design,
-  nswds-public-sans, data, nswds-community, nswds-signature) are the current
+  nswds-public-sans, digital-projects, nswds-community, nswds-signature) are the current
   shape of the component and toolchain layer: `@nswds/ui`, `@nswds/tokens`,
   `@nswds/metadata` and Tailwind 4 on Next 16. None of them has a database,
   auth or transactional email, so do not read them as a full-stack model.
