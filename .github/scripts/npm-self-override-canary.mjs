@@ -37,8 +37,8 @@
 //   Top-level string values only. A nested override
 //   (`{"@tailwindcss/typography": {"postcss-selector-parser": "^6.1.3"}}`)
 //   gives the PARENT key no version spec and applies only inside that
-//   subtree, so it cannot collide with a root direct dependency. reviewers
-//   carries a nested block that is correct as written.
+//   subtree, so it cannot collide with a root direct dependency. The reviewers
+//   repo carries a nested block that is correct as written.
 //
 //   Not checked: a $-reference pointing at a package that is not a direct
 //   dependency (`"foo": "$bar"` with no `bar`). npm fails that loudly on the
